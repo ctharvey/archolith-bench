@@ -1,0 +1,40 @@
+$ npm test
+[exit 0]
+
+> myapp@1.0.0 test
+> jest --coverage
+
+PASS src/__tests__/auth.test.ts
+  auth module
+    ✓ should login with valid credentials (12ms)
+    ✓ should reject invalid password (3ms)
+    ✓ should refresh expired tokens (8ms)
+    ✓ should handle OAuth callback (5ms)
+
+PASS src/__tests__/api.test.ts
+  api module
+    ✓ should create resource via POST (15ms)
+    ✓ should list resources with pagination (4ms)
+    ✓ should delete resource via DELETE (6ms)
+    ✓ should handle 404 gracefully (2ms)
+
+PASS src/__tests__/db.test.ts
+  database module
+    ✓ should connect to PostgreSQL (34ms)
+    ✓ should run migrations (22ms)
+    ✓ should handle connection timeout (8ms)
+
+Test Suites: 3 passed, 3 total
+Tests:       11 passed, 11 total
+Snapshots:   0 total
+Time:        3.241s
+Ran all test suites.
+
+----------|---------|----------|---------|---------|-------------------
+File      | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+----------|---------|----------|---------|---------|-------------------
+All files |   78.32 |    65.21 |   83.33 |   76.18 |                   
+ auth.ts  |   92.31 |    84.62 |    87.5  |   91.67 | 23-26             
+ api.ts   |   71.43 |    53.85 |   75.00  |   69.23 | 45-62, 78-81      
+ db.ts    |   68.75 |    57.14 |   83.33 |   65.71 | 34-48, 67-73      
+----------|---------|----------|---------|---------|-------------------

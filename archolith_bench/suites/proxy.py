@@ -351,13 +351,6 @@ def run_benchmark(
     arm_config = arm_def["config_overrides"]
     _key = api_key or API_KEY
 
-    if arm == "filter_only":
-        raise NotImplementedError(
-            "filter_only requires Phase 2 archolith-rtk integration. "
-            "Use archolith-bench filter --corpora to measure filter savings, "
-            "or run a proxy arm (proxy_only, proxy_plus_filter, etc.)."
-        )
-
     results: list[dict] = []
     probe_results: list[dict] = []
     direct_history: list[dict] = []
@@ -413,7 +406,15 @@ def run_benchmark(
             direct_est = estimate_messages_tokens(direct_history)
             arm_est = estimate_messages_tokens(arm_history)
 
-            is_direct_arm = not arm_def["proxy_enabled"]
+            is_direct_arm = not arm_def["proxy_enabled"] and arm != "filter_only"
+            is_filter_only = arm == "filter_only"
+
+            if is_filter_only:
+                from .filter import apply_filter_to_history
+                arm_chat_history = apply_filter_to_history(arm_history)
+                arm_est = estimate_messages_tokens(arm_chat_history)
+            else:
+                arm_chat_history = arm_history
 
             print(f"  [direct] Sending {len(direct_history)} messages (~{direct_est} tokens)...")
             direct_text, direct_latency, direct_usage = send_chat(
@@ -423,7 +424,26 @@ def run_benchmark(
             direct_output = direct_usage.get("completion_tokens", estimate_tokens(direct_text))
             print(f"  [direct] {direct_input} in / {direct_output} out in {direct_latency:.0f}ms")
 
-            if is_direct_arm:
+            if is_filter_only:
+                print(f"  [arm={arm}] Sending {len(arm_chat_history)} messages (~{arm_est} tokens, filter-preprocessed)...")
+                arm_text, arm_latency, arm_usage = send_chat(
+                    client, direct_url, _key, arm_chat_history, model
+                )
+                arm_input = arm_usage.get("prompt_tokens", arm_est)
+                arm_output = arm_usage.get("completion_tokens", estimate_tokens(arm_text))
+                print(f"  [arm={arm}] {arm_input} in / {arm_output} out in {arm_latency:.0f}ms (filter-only)")
+                trace_turn = {
+                    "assembly_mode": "filter_only",
+                    "input_tokens": arm_input,
+                    "rewritten_tokens": arm_est,
+                    "savings_tokens": direct_input - arm_input if direct_input > arm_input else 0,
+                    "savings_ratio": round((direct_input - arm_input) / direct_input, 4) if direct_input > 0 else 0.0,
+                    "facts_stored": 0,
+                    "assembly_latency_ms": 0.0,
+                    "extraction_latency_ms": 0.0,
+                    "session_id": "",
+                }
+            elif is_direct_arm:
                 arm_text, arm_latency, arm_usage = direct_text, direct_latency, direct_usage
                 arm_input, arm_output = direct_input, direct_output
                 print(f"  [arm={arm}] Using direct baseline (no proxy)")

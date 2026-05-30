@@ -1,0 +1,55 @@
+$ python -c "import json; print(json.dumps({'users': [{'id': 1, 'name': 'Alice', 'email': 'alice@example.com', 'role': 'admin', 'active': True, 'preferences': {'theme': 'dark', 'notifications': True, 'language': 'en'}}, {'id': 2, 'name': 'Bob', 'email': 'bob@example.com', 'role': 'user', 'active': True, 'preferences': {'theme': 'light', 'notifications': False, 'language': 'en'}}, {'id': 3, 'name': 'Charlie', 'email': 'charlie@example.com', 'role': 'user', 'active': False, 'preferences': {'theme': 'system', 'notifications': True, 'language': 'fr'}}], 'pagination': {'total': 150, 'page': 1, 'per_page': 3, 'total_pages': 50, 'has_next': True, 'has_prev': False}, 'metadata': {'request_id': 'req-7f3a2c1e', 'timestamp': '2026-05-29T14:32:00Z', 'api_version': '2.1'}}))"
+[exit 0]
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "Alice",
+      "email": "alice@example.com",
+      "role": "admin",
+      "active": true,
+      "preferences": {
+        "theme": "dark",
+        "notifications": true,
+        "language": "en"
+      }
+    },
+    {
+      "id": 2,
+      "name": "Bob",
+      "email": "bob@example.com",
+      "role": "user",
+      "active": true,
+      "preferences": {
+        "theme": "light",
+        "notifications": false,
+        "language": "en"
+      }
+    },
+    {
+      "id": 3,
+      "name": "Charlie",
+      "email": "charlie@example.com",
+      "role": "user",
+      "active": false,
+      "preferences": {
+        "theme": "system",
+        "notifications": true,
+        "language": "fr"
+      }
+    }
+  ],
+  "pagination": {
+    "total": 150,
+    "page": 1,
+    "per_page": 3,
+    "total_pages": 50,
+    "has_next": true,
+    "has_prev": false
+  },
+  "metadata": {
+    "request_id": "req-7f3a2c1e",
+    "timestamp": "2026-05-29T14:32:00Z",
+    "api_version": "2.1"
+  }
+}

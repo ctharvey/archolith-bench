@@ -1,0 +1,103 @@
+$ cat src/main.py
+[exit 0]
+"""
+Main application entry point for the web service.
+Handles configuration, startup, and graceful shutdown.
+"""
+
+import os
+import sys
+import signal
+import logging
+from typing import Optional
+
+from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+
+from .config import Settings, get_settings
+from .routes import api_router
+from .db import Database, init_db
+from .auth import AuthMiddleware
+from .cache import RedisCache
+
+logger = logging.getLogger(__name__)
+
+# Global references for graceful shutdown
+_app: Optional[FastAPI] = None
+_db: Optional[Database] = None
+_cache: Optional[RedisCache] = None
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
+    """Application factory. Creates and configures the FastAPI app."""
+    if settings is None:
+        settings = get_settings()
+
+    app = FastAPI(
+        title=settings.app_name,
+        version=settings.version,
+        docs_url="/api/docs" if settings.debug else None,
+        redoc_url=None,
+    )
+
+    # Middleware (order matters - last added = first executed)
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    app.add_middleware(AuthMiddleware, secret_key=settings.secret_key)
+
+    # Routes
+    app.include_router(api_router, prefix="/api/v1")
+
+    @app.on_event("startup")
+    async def startup():
+        global _db, _cache
+        _db = Database(settings.database_url)
+        await _db.connect()
+        await init_db(_db)
+        _cache = RedisCache(settings.redis_url)
+        await _cache.connect()
+        logger.info("Application started: %s v%s", settings.app_name, settings.version)
+
+    @app.on_event("shutdown")
+    async def shutdown():
+        global _db, _cache
+        if _db:
+            await _db.disconnect()
+        if _cache:
+            await _cache.disconnect()
+        logger.info("Application shutdown complete")
+
+    # Signal handlers for graceful shutdown
+    def handle_signal(signum, frame):
+        logger.info("Received signal %s, initiating graceful shutdown", signum)
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, handle_signal)
+    signal.signal(signal.SIGINT, handle_signal)
+
+    return app
+
+
+def main():
+    """CLI entry point."""
+    import uvicorn
+    settings = get_settings()
+    uvicorn.run(
+        "myapp.main:create_app",
+        factory=True,
+        host=settings.host,
+        port=settings.port,
+        workers=settings.workers,
+        log_level=settings.log_level,
+    )
+
+
+if __name__ == "__main__":
+    main()

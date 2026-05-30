@@ -1,5 +1,5 @@
 # archolith-bench — Benchmark Results
-Generated: 2026-05-30 02:01 UTC
+Generated: 2026-05-30 05:43 UTC
 ## Filter Suite (archolith-rtk)
 Token-savings compression ratio measured on real tool-output corpora.
 | Category | Samples | Raw Tokens | Filtered | Savings |
@@ -12,7 +12,13 @@ Token-savings compression ratio measured on real tool-output corpora.
 | **Total** | 6 | 3,604 | 2,408 | **33.2%** |
 
 ## Proxy Suite
-*Pending live-proxy run. Run `archolith-bench proxy --all --arms direct,proxy_plus_filter` to generate.*
+Multi-turn token savings and continuity metrics across proxy experiment arms.
+| Scenario | Arm | Budget | Direct In | Arm In | Savings | Recall Pres. |
+|----------|-----|--------|-----------|--------|---------|-------------|
+| code_review | proxy_only | 15000 | 108,516 | 80,520 | 58.6% | 57% |
+| code_review | proxy_only | 4000 | 108,516 | 91,701 | 58.6% | 91% |
+| code_review | proxy_plus_filter | 15000 | 108,376 | 111,021 | 58.7% | 60% |
+| code_review | proxy_plus_filter | 4000 | 108,516 | 105,139 | 58.6% | 54% |
 
 ## Audit Suite (archolith-audit)
 > **Note:** sample/fixture data, not a live audit run. The numbers below reflect the bundled `fixtures/` inputs and demonstrate the report format only. Run `archolith-bench audit` against real before/after session logs to produce measured results.

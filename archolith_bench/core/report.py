@@ -71,8 +71,8 @@ def print_summary(data: dict) -> None:
         print(f"    Repeat file reads:       {c.get('repeat_file_reads', 0)}")
         print(f"    Repeat diagnostics:      {c.get('repeat_diagnostics', 0)}")
         print(f"    Decision retention:      {c.get('decision_retention', 0):.1%}")
-        print(f"    Verification continuity:  {c.get('verification_continuity', 0):.1%}")
-        print(f"    Orientation score:        {c.get('turn_one_orientation_score', 0):.1%}")
+        print(f"    Verification continuity:  {c.get('verification_continuity', 0):.1%}  (experimental)")
+        print(f"    Orientation score:        {c.get('turn_one_orientation_score', 0):.1%}  (experimental)")
     print()
 
 

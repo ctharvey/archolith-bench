@@ -46,5 +46,5 @@ See `scenarios/code_review.json` for the schema.
 ## License
 
 By contributing, you agree that your contributions will be licensed under
-the same source-available license as the project (see [LICENSE](LICENSE)).
-Commercial use requires explicit permission from the copyright holder.
+the [PolyForm Noncommercial License 1.0.0](LICENSE). Non-commercial use
+is permitted; commercial use requires explicit permission from the licensor.

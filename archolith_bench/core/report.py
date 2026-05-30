@@ -126,3 +126,76 @@ def print_cross_scenario_summary(all_results: list[dict]) -> None:
             f"{recall_str:>10}"
         )
     print()
+
+
+def print_four_way_table(all_arm_results: list[dict]) -> None:
+    """Print the four-way headline comparison: direct/filter/proxy/proxy+filter.
+
+    Each entry in all_arm_results is a run_benchmark result dict with a
+    'stack_arm' key identifying which arm produced it.
+    """
+    print(f"\n{'='*100}")
+    print("  FOUR-WAY COMPARISON TABLE")
+    print(f"{'='*100}")
+
+    header = (
+        f"{'Scenario':<16} {'Arm':<22} {'Direct In':>10} {'Arm In':>10} "
+        f"{'Savings':>10} {'Ratio':>8} {'Recall':>8} {'Dec Ret':>8} {'V Cont':>8}"
+    )
+    print(header)
+    print("-" * 100)
+
+    for data in all_arm_results:
+        s = data["summary"]
+        q = data.get("quality", {})
+        c = data.get("continuity", {})
+        recall_str = f"{q.get('avg_arm_recall', 0):.0%}" if q else "N/A"
+        dec_ret = f"{c.get('decision_retention', 0):.0%}" if c else "N/A"
+        v_cont = f"{c.get('verification_continuity', 0):.0%}" if c else "N/A"
+        print(
+            f"{data['scenario']:<16} "
+            f"{data.get('stack_arm', data.get('arm', '?')):<22} "
+            f"{s['total_direct_input_tokens']:>10,} "
+            f"{s['total_proxy_input_tokens']:>10,} "
+            f"{s['total_savings_tokens']:>10,} "
+            f"{s['overall_savings_ratio']:>7.1%} "
+            f"{recall_str:>8} "
+            f"{dec_ret:>8} "
+            f"{v_cont:>8}"
+        )
+
+    print("-" * 100)
+
+    arms_seen = set(d.get("stack_arm", d.get("arm", "")) for d in all_arm_results)
+    for arm in ["direct", "filter_only", "proxy_only", "proxy_plus_filter"]:
+        arm_results = [d for d in all_arm_results if d.get("stack_arm", d.get("arm", "")) == arm]
+        if arm_results:
+            total_savings = sum(d["summary"]["overall_savings_ratio"] for d in arm_results)
+            avg_savings = total_savings / len(arm_results)
+            total_recall = sum(d.get("quality", {}).get("recall_preservation", 0) for d in arm_results if d.get("quality"))
+            recall_count = sum(1 for d in arm_results if d.get("quality"))
+            avg_recall = total_recall / recall_count if recall_count else 0
+            total_dec = sum(d.get("continuity", {}).get("decision_retention", 0) for d in arm_results if d.get("continuity"))
+            dec_count = sum(1 for d in arm_results if d.get("continuity", {}).get("decision_retention", 0) > 0)
+            avg_dec = total_dec / dec_count if dec_count else 0
+            total_vcont = sum(d.get("continuity", {}).get("verification_continuity", 0) for d in arm_results if d.get("continuity"))
+            vcont_count = sum(1 for d in arm_results if d.get("continuity", {}).get("verification_continuity", 0) > 0)
+            avg_vcont = total_vcont / vcont_count if vcont_count else 0
+            print(f"  {arm:<22} avg savings: {avg_savings:.1%}  avg recall preservation: {avg_recall:.1%}  "
+                  f"avg decision_retention: {avg_dec:.1%}  avg verification_continuity: {avg_vcont:.1%}")
+
+    headline_savings = None
+    headline_continuity = None
+    proxy_plus = [d for d in all_arm_results if d.get("stack_arm") == "proxy_plus_filter"]
+    direct_results = [d for d in all_arm_results if d.get("stack_arm") == "direct"]
+    if proxy_plus and direct_results:
+        pp_savings = sum(d["summary"]["overall_savings_ratio"] for d in proxy_plus) / len(proxy_plus)
+        headline_savings = pp_savings
+        pp_cont = [d.get("continuity", {}) for d in proxy_plus]
+        dec_vals = [c.get("decision_retention", 0) for c in pp_cont if c.get("decision_retention", 0) > 0]
+        headline_continuity = sum(dec_vals) / len(dec_vals) if dec_vals else 0
+
+    if headline_savings is not None:
+        cont_str = f", {headline_continuity:.0%} continuity preserved" if headline_continuity else ""
+        print(f"\n  HEADLINE: {headline_savings:.0%} token savings{cont_str}")
+    print()

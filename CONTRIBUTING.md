@@ -43,8 +43,11 @@ See `scenarios/code_review.json` for the schema.
 - Python 3.11+, type hints, `from __future__ import annotations`
 - No external formatting tool enforced; keep consistent with existing code
 
-## License
+## Contributor License Agreement
 
-By contributing, you agree that your contributions will be licensed under
-the [PolyForm Noncommercial License 1.0.0](LICENSE). Non-commercial use
-is permitted; commercial use requires explicit permission from the licensor.
+By submitting a pull request, you agree to the [CLA](CLA.md). In short:
+you keep your copyright, but you grant the project owner a broad license
+to use your contribution — including under commercial licenses. The project
+itself is distributed under the [PolyForm Noncommercial License 1.0.0](LICENSE).
+
+Every PR template includes a CLA checkbox. Please check it before submitting.

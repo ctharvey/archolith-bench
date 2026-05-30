@@ -1,15 +1,28 @@
 # archolith-bench
 
-Unified benchmark suite for the archolith product family.
+Benchmark suite for the [archolith](https://github.com/ctharvey/archolith) token-reduction stack.
+Measures proxy context assembly, client-side filtering, and MCP audit savings
+across reproducible multi-turn coding scenarios.
+
+### Headline numbers (2026-05-30)
+
+| Metric | Value | Source |
+|--------|-------|--------|
+| Proxy token savings | **58.6%** | 10-turn code review, DeepSeek upstream |
+| Filter compression | **50.0%** | 12 real session samples, 8 categories |
+| MCP waste reduction | **71.5%** | Live session telemetry, 5 servers |
+| Best single-turn savings | **75%** | Curator mode, turns 6+ |
+
+See [BENCHMARKS.md](BENCHMARKS.md) for full tables and reproduction instructions.
 
 ## Suites
 
-| Suite | Purpose | Status |
-|-------|---------|--------|
-| `proxy` | Multi-turn token savings and continuity measurement | Phase 1 (critical path) |
-| `filter` | Compression-ratio product claim on real corpora | Phase 2 |
-| `audit` | MCP token-waste reduction before/after | Phase 4 |
-| `stack` | Four-way headline comparison (direct/filter/proxy/proxy+filter) | Phase 3 |
+| Suite | Purpose |
+|-------|---------|
+| `proxy` | Multi-turn token savings and continuity measurement |
+| `filter` | Compression-ratio measurement on real tool-output corpora |
+| `audit` | MCP token-waste reduction before/after comparison |
+| `stack` | Four-way headline comparison (direct/filter/proxy/proxy+filter) |
 
 ## Quick Start
 

@@ -44,3 +44,50 @@ Source: `fixtures/audit_before.json` → `fixtures/audit_after.json`
 
 ## Stack Suite (Four-Way Comparison)
 *Pending live-proxy run. Run `archolith-bench stack --all` to generate.*
+
+---
+
+## Reproduction
+
+### Prerequisites
+
+- Python 3.11+
+- Running archolith-context proxy (port 9801) with DeepSeek upstream
+- `archolith-rtk` and `archolith-audit` packages installed
+
+### Setup
+
+```bash
+git clone <repo-url> && cd archolith-bench
+python -m venv .venv && .venv/Scripts/activate  # or source .venv/bin/activate
+pip install -e .
+cp .env.example .env   # set UPSTREAM_API_KEY, PROXY_BASE_URL
+```
+
+### Run suites
+
+```bash
+# Filter suite — measures RTK compression on tool-output corpora
+archolith-bench filter
+
+# Proxy suite — multi-turn benchmark against live proxy
+#   Requires proxy running at PROXY_BASE_URL (default http://localhost:9801/v1)
+archolith-bench proxy --scenario scenarios/code_review.json \
+    --arms proxy_only proxy_plus_filter \
+    --budgets 4000 15000
+
+# Audit suite — MCP token-waste before/after comparison
+archolith-bench audit --before fixtures/audit_before.json \
+    --after fixtures/audit_after.json
+
+# Report — regenerate BENCHMARKS.md from results/
+archolith-bench report
+```
+
+### Notes
+
+- Proxy suite runs are **not deterministic** — LLM responses vary between runs.
+  Token savings (58-59%) are stable; recall metrics vary ±15%.
+- Filter suite is deterministic given the same corpus files.
+- Budget parameter controls `context_token_budget` via proxy admin API.
+- Cold start defaults: `cold_start_token_threshold=5000`, `cold_start_turns=2`.

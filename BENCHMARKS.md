@@ -1,5 +1,5 @@
 # archolith-bench — Benchmark Results
-Generated: 2026-05-30 01:52 UTC
+Generated: 2026-05-30 02:01 UTC
 ## Filter Suite (archolith-rtk)
 Token-savings compression ratio measured on real tool-output corpora.
 | Category | Samples | Raw Tokens | Filtered | Savings |
@@ -15,14 +15,18 @@ Token-savings compression ratio measured on real tool-output corpora.
 *Pending live-proxy run. Run `archolith-bench proxy --all --arms direct,proxy_plus_filter` to generate.*
 
 ## Audit Suite (archolith-audit)
+> **Note:** sample/fixture data, not a live audit run. The numbers below reflect the bundled `fixtures/` inputs and demonstrate the report format only. Run `archolith-bench audit` against real before/after session logs to produce measured results.
+
 MCP token-waste reduction before vs after.
+Source: `fixtures\audit_before.json` -> `fixtures\audit_after.json`
+
 | Server | Before | After | Change | Pct | Status |
 |--------|--------|-------|--------|-----|--------|
 | gradle | 18,500 | 8,200 | -10,300 | -55.7% | improved |
 | home | 4,800 | 4,200 | -600 | -12.5% | no_change |
 | memory | 32,000 | 14,000 | -18,000 | -56.2% | improved |
 | vps | 9,200 | 6,100 | -3,100 | -33.7% | improved |
-| **Total** | 64,500 | 32,500 | +32,000 | +49.6% | - |
+| **Total** | 64,500 | 32,500 | -32,000 | -49.6% | - |
 
 **Token reduction:** 32,000 (49.6%). **Waste reduction:** 21,500 (83.0%).
 

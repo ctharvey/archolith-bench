@@ -22,9 +22,11 @@ Built archolith-bench from scratch across Phases 0-5. Phase 0 scaffolded the rep
 | `506120a` | fix(bench): wire dead continuity metrics, correct orientation score, guard filter_only, untrack logs |
 | `35cf047` | feat(bench): filter compression-claim suite via archolith-rtk |
 | `2d253b4` | feat(bench): four-way stack comparison suite |
+| `12e3e27` | docs(bench): update wrapup for Phase 0-3 with all fixes and verification |
 | `87b329e` | feat(bench): audit waste-reduction suite via archolith-audit |
 | `1d0881b` | feat(bench): BENCHMARKS.md report generation |
-| `e27ca06` | docs(bench): update wrapup for Phase 0-5 complete |
+| `a959715` | docs(bench): update wrapup for Phase 0-5 complete |
+| `<pending>` | fix(bench): audit report fixture caveat + sign consistency, wrapup commit table |
 
 ## Review Fixes Applied (Round 1)
 
@@ -79,7 +81,7 @@ Built archolith-bench from scratch across Phases 0-5. Phase 0 scaffolded the rep
 
 | Claim | Verified |
 |-------|----------|
-| archolith-bench is its own repo with 10 commits | yes |
+| archolith-bench is its own repo with 11+ commits | yes |
 | All modules import cleanly | yes |
 | proxy --list works without proxy | yes |
 | filter --corpora works without proxy | yes |

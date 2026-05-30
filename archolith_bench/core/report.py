@@ -268,7 +268,18 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
         with open(audit_path, encoding="utf-8") as f:
             audit_data = json.load(f)
         lines.append("## Audit Suite (archolith-audit)\n")
+        before_p = str(audit_data.get("before_path", ""))
+        after_p = str(audit_data.get("after_path", ""))
+        is_sample = "fixture" in before_p.lower() or "fixture" in after_p.lower()
+        if is_sample:
+            lines.append(
+                "> **Note:** sample/fixture data, not a live audit run. The numbers "
+                "below reflect the bundled `fixtures/` inputs and demonstrate the "
+                "report format only. Run `archolith-bench audit` against real "
+                "before/after session logs to produce measured results.\n\n"
+            )
         lines.append("MCP token-waste reduction before vs after.\n")
+        lines.append(f"Source: `{before_p}` -> `{after_p}`\n\n")
         lines.append("| Server | Before | After | Change | Pct | Status |\n")
         lines.append("|--------|--------|-------|--------|-----|--------|\n")
         for s in audit_data.get("per_server", []):
@@ -276,9 +287,13 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
                 f"| {s['server']} | {s['before_tokens']:,} | {s['after_tokens']:,} "
                 f"| {s['token_change']:+,} | {s['token_change_pct']:+.1f}% | {s['status']} |\n"
             )
+        # Total row uses the same change convention as the per-server rows
+        # (after - before; negative = reduction) for sign consistency.
+        agg_change = audit_data["after_total_tokens"] - audit_data["before_total_tokens"]
+        agg_change_pct = -audit_data["token_reduction_pct"]
         lines.append(
             f"| **Total** | {audit_data['before_total_tokens']:,} | {audit_data['after_total_tokens']:,} "
-            f"| {audit_data['token_reduction']:+,} | {audit_data['token_reduction_pct']:+.1f}% | - |\n"
+            f"| {agg_change:+,} | {agg_change_pct:+.1f}% | - |\n"
         )
         lines.append(
             f"\n**Token reduction:** {audit_data['token_reduction']:,} ({audit_data['token_reduction_pct']:.1f}%). "

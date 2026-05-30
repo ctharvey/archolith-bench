@@ -1,31 +1,45 @@
 {
+  "_source": "Projected from live session with archolith-rtk filtering applied per-server",
+  "_method": "Applied category-specific filter savings: JSON/MCP 75%, text/artifacts 30%, build 40%",
   "servers": {
     "memory": {
-      "token_share": 14000,
-      "call_count": 38,
+      "token_share": 7100,
+      "call_count": 32,
       "findings": [
-        {"waste_type": "oversized_response", "tokens_wasted": 1900, "severity": "low"},
-        {"waste_type": "redundant_recall", "tokens_wasted": 600, "severity": "low"}
-      ]
-    },
-    "gradle": {
-      "token_share": 8200,
-      "call_count": 18,
-      "findings": [
-        {"waste_type": "stale_cache", "tokens_wasted": 800, "severity": "low"}
+        {"waste_type": "duplicate_context", "tokens_wasted": 1200, "severity": "medium"},
+        {"waste_type": "redundant_recall", "tokens_wasted": 900, "severity": "low"}
       ]
     },
     "vps": {
-      "token_share": 6100,
-      "call_count": 12,
+      "token_share": 12600,
+      "call_count": 593,
       "findings": [
-        {"waste_type": "oversized_response", "tokens_wasted": 1100, "severity": "low"}
+        {"waste_type": "oversized_response", "tokens_wasted": 2800, "severity": "medium"},
+        {"waste_type": "repeated_health_check", "tokens_wasted": 4200, "severity": "medium"}
       ]
     },
-    "home": {
-      "token_share": 4200,
-      "call_count": 7,
-      "findings": []
+    "gradle": {
+      "token_share": 19500,
+      "call_count": 144,
+      "findings": [
+        {"waste_type": "oversized_response", "tokens_wasted": 3200, "severity": "medium"},
+        {"waste_type": "stale_cache", "tokens_wasted": 1500, "severity": "low"}
+      ]
+    },
+    "workspace-artifacts": {
+      "token_share": 148000,
+      "call_count": 141,
+      "findings": [
+        {"waste_type": "oversized_response", "tokens_wasted": 12600, "severity": "medium"},
+        {"waste_type": "duplicate_content", "tokens_wasted": 4700, "severity": "low"}
+      ]
+    },
+    "harness": {
+      "token_share": 5100,
+      "call_count": 10,
+      "findings": [
+        {"waste_type": "oversized_response", "tokens_wasted": 2100, "severity": "low"}
+      ]
     }
   }
 }

@@ -1,33 +1,45 @@
 {
+  "_source": "Live session 2026-05-30, 2322 MCP results, 2.49M chars",
   "servers": {
     "memory": {
-      "token_share": 32000,
-      "call_count": 45,
+      "token_share": 28400,
+      "call_count": 32,
       "findings": [
-        {"waste_type": "duplicate_context", "tokens_wasted": 8500, "severity": "high"},
-        {"waste_type": "oversized_response", "tokens_wasted": 3200, "severity": "medium"},
+        {"waste_type": "duplicate_context", "tokens_wasted": 6200, "severity": "high"},
+        {"waste_type": "oversized_response", "tokens_wasted": 4100, "severity": "medium"},
         {"waste_type": "redundant_recall", "tokens_wasted": 1800, "severity": "low"}
       ]
     },
-    "gradle": {
-      "token_share": 18500,
-      "call_count": 22,
-      "findings": [
-        {"waste_type": "oversized_response", "tokens_wasted": 7200, "severity": "high"},
-        {"waste_type": "stale_cache", "tokens_wasted": 2100, "severity": "medium"}
-      ]
-    },
     "vps": {
-      "token_share": 9200,
-      "call_count": 15,
+      "token_share": 50200,
+      "call_count": 593,
       "findings": [
-        {"waste_type": "oversized_response", "tokens_wasted": 3100, "severity": "medium"}
+        {"waste_type": "oversized_response", "tokens_wasted": 18500, "severity": "high"},
+        {"waste_type": "repeated_health_check", "tokens_wasted": 4200, "severity": "medium"}
       ]
     },
-    "home": {
-      "token_share": 4800,
-      "call_count": 8,
-      "findings": []
+    "gradle": {
+      "token_share": 32500,
+      "call_count": 144,
+      "findings": [
+        {"waste_type": "oversized_response", "tokens_wasted": 12800, "severity": "high"},
+        {"waste_type": "stale_cache", "tokens_wasted": 3100, "severity": "medium"}
+      ]
+    },
+    "workspace-artifacts": {
+      "token_share": 211400,
+      "call_count": 141,
+      "findings": [
+        {"waste_type": "oversized_response", "tokens_wasted": 42000, "severity": "high"},
+        {"waste_type": "duplicate_content", "tokens_wasted": 15600, "severity": "medium"}
+      ]
+    },
+    "harness": {
+      "token_share": 20300,
+      "call_count": 10,
+      "findings": [
+        {"waste_type": "oversized_response", "tokens_wasted": 8400, "severity": "high"}
+      ]
     }
   }
 }

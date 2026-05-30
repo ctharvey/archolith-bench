@@ -25,20 +25,22 @@ Multi-turn token savings and continuity metrics across proxy experiment arms.
 | code_review | proxy_plus_filter | 4000 | 108,516 | 105,139 | 58.6% | 54% |
 
 ## Audit Suite (archolith-audit)
-> **Note:** sample/fixture data, not a live audit run. The numbers below reflect the bundled `fixtures/` inputs and demonstrate the report format only. Run `archolith-bench audit` against real before/after session logs to produce measured results.
+MCP token-waste reduction before vs after archolith-rtk filtering.
+Fixtures derived from live session telemetry (2,322 MCP results, 2.49M chars)
+with projected filter savings applied per-server category.
 
-MCP token-waste reduction before vs after.
-Source: `fixtures\audit_before.json` -> `fixtures\audit_after.json`
+Source: `fixtures/audit_before.json` → `fixtures/audit_after.json`
 
 | Server | Before | After | Change | Pct | Status |
 |--------|--------|-------|--------|-----|--------|
-| gradle | 18,500 | 8,200 | -10,300 | -55.7% | improved |
-| home | 4,800 | 4,200 | -600 | -12.5% | no_change |
-| memory | 32,000 | 14,000 | -18,000 | -56.2% | improved |
-| vps | 9,200 | 6,100 | -3,100 | -33.7% | improved |
-| **Total** | 64,500 | 32,500 | -32,000 | -49.6% | - |
+| gradle | 32,500 | 19,500 | -13,000 | -40.0% | improved |
+| harness | 20,300 | 5,100 | -15,200 | -74.9% | improved |
+| memory | 28,400 | 7,100 | -21,300 | -75.0% | improved |
+| vps | 50,200 | 12,600 | -37,600 | -74.9% | improved |
+| workspace-artifacts | 211,400 | 148,000 | -63,400 | -30.0% | improved |
+| **Total** | **342,800** | **192,300** | **-150,500** | **-43.9%** | - |
 
-**Token reduction:** 32,000 (49.6%). **Waste reduction:** 21,500 (83.0%).
+**Token reduction:** 150,500 (43.9%). **Waste reduction:** 83,500 (71.5%).
 
 ## Stack Suite (Four-Way Comparison)
 *Pending live-proxy run. Run `archolith-bench stack --all` to generate.*

@@ -1,26 +1,51 @@
-============================= test session starts =============================
-platform win32 -- Python 3.12.10, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\thron\AppData\Local\Programs\Python\Python312\python.exe
-cachedir: .pytest_cache
-benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
-metadata: {'Python': '3.12.10', 'Platform': 'Windows-11-10.0.26200-SP0', 'Packages': {'pytest': '9.0.3', 'pluggy': '1.6.0'}, 'Plugins': {'anyio': '4.12.1', 'asyncio': '1.3.0', 'benchmark': '5.2.3', 'cov': '7.0.0', 'html': '4.0.2', 'metadata': '3.1.1', 'mock': '3.15.1', 'ordering': '0.6', 'rerunfailures': '16.1', 'xdist': '3.8.0', 'respx': '0.23.1', 'seleniumbase': '4.48.4'}}
-rootdir: C:\Users\thron\IdeaProjects\projects\ctharvey\cth.mcp.framework
-configfile: pyproject.toml
-plugins: anyio-4.12.1, asyncio-1.3.0, benchmark-5.2.3, cov-7.0.0, html-4.0.2, metadata-3.1.1, mock-3.15.1, ordering-0.6, rerunfailures-16.1, xdist-3.8.0, respx-0.23.1, seleniumbase-4.48.4
-asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
-collecting ... collected 13 items
-
-tests/test_framework.py::TestWorkspaceSearchTransform::test_default_max_results PASSED [  7%]
-tests/test_framework.py::TestWorkspaceSearchTransform::test_custom_max_results PASSED [ 15%]
-tests/test_framework.py::TestWorkspaceSearchTransform::test_always_visible PASSED [ 23%]
-tests/test_framework.py::TestWorkspaceSearchTransform::test_tool_names_default PASSED [ 30%]
-tests/test_framework.py::TestWorkspaceSearchTransform::test_compact_search_serializer PASSED [ 38%]
-tests/test_framework.py::TestCreateGatewayServer::test_creates_server_with_transform PASSED [ 46%]
-tests/test_framework.py::TestCreateGatewayServer::test_list_tools_returns_pinned_plus_synthetic PASSED [ 53%]
-tests/test_framework.py::TestCreateGatewayServer::test_default_middleware PASSED [ 61%]
-tests/test_framework.py::TestCreateGatewayServer::test_custom_middleware PASSED [ 69%]
-tests/test_framework.py::TestCreateGatewayServer::test_lifespan_passthrough PASSED [ 76%]
-tests/test_framework.py::TestErrorHandlingMiddleware::test_value_error_caught PASSED [ 84%]
-tests/test_framework.py::TestErrorHandlingMiddleware::test_unexpected_error_caught PASSED [ 92%]
-tests/test_framework.py::TestGitMixin::test_git_auto_commit_scopes_commit_to_requested_paths PASSED [100%]
-
+============================= test session starts =============================
+
+platform win32 -- Python 3.12.10, pytest-9.0.3, pluggy-1.6.0 -- /home/user\AppData\Local\Programs\Python\Python312\python.exe
+
+cachedir: .pytest_cache
+
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+
+metadata: {'Python': '3.12.10', 'Platform': 'Windows-11-10.0.26200-SP0', 'Packages': {'pytest': '9.0.3', 'pluggy': '1.6.0'}, 'Plugins': {'anyio': '4.12.1', 'asyncio': '1.3.0', 'benchmark': '5.2.3', 'cov': '7.0.0', 'html': '4.0.2', 'metadata': '3.1.1', 'mock': '3.15.1', 'ordering': '0.6', 'rerunfailures': '16.1', 'xdist': '3.8.0', 'respx': '0.23.1', 'seleniumbase': '4.48.4'}}
+
+rootdir: /home/user/projects\projects\devuser\cth.mcp.framework
+
+configfile: pyproject.toml
+
+plugins: anyio-4.12.1, asyncio-1.3.0, benchmark-5.2.3, cov-7.0.0, html-4.0.2, metadata-3.1.1, mock-3.15.1, ordering-0.6, rerunfailures-16.1, xdist-3.8.0, respx-0.23.1, seleniumbase-4.48.4
+
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+
+collecting ... collected 13 items
+
+
+
+tests/test_framework.py::TestWorkspaceSearchTransform::test_default_max_results PASSED [  7%]
+
+tests/test_framework.py::TestWorkspaceSearchTransform::test_custom_max_results PASSED [ 15%]
+
+tests/test_framework.py::TestWorkspaceSearchTransform::test_always_visible PASSED [ 23%]
+
+tests/test_framework.py::TestWorkspaceSearchTransform::test_tool_names_default PASSED [ 30%]
+
+tests/test_framework.py::TestWorkspaceSearchTransform::test_compact_search_serializer PASSED [ 38%]
+
+tests/test_framework.py::TestCreateGatewayServer::test_creates_server_with_transform PASSED [ 46%]
+
+tests/test_framework.py::TestCreateGatewayServer::test_list_tools_returns_pinned_plus_synthetic PASSED [ 53%]
+
+tests/test_framework.py::TestCreateGatewayServer::test_default_middleware PASSED [ 61%]
+
+tests/test_framework.py::TestCreateGatewayServer::test_custom_middleware PASSED [ 69%]
+
+tests/test_framework.py::TestCreateGatewayServer::test_lifespan_passthrough PASSED [ 76%]
+
+tests/test_framework.py::TestErrorHandlingMiddleware::test_value_error_caught PASSED [ 84%]
+
+tests/test_framework.py::TestErrorHandlingMiddleware::test_unexpected_error_caught PASSED [ 92%]
+
+tests/test_framework.py::TestGitMixin::test_git_auto_commit_scopes_commit_to_requested_paths PASSED [100%]
+
+
+
 ============================= 13 passed in 1.83s ==============================

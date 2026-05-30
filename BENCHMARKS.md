@@ -6,14 +6,14 @@ live Claude Code agent sessions (git diffs, grep results, file reads, MCP JSON, 
 | Category | Samples | Raw Tokens | Filtered | Savings |
 |----------|---------|------------|----------|--------|
 | git_diff | 2 | 4,566 | 1,826 | 60.0% |
-| git_log | 1 | 582 | 582 | 0.0% |
-| git_status | 1 | 776 | 776 | 0.0% |
-| json | 1 | 2,085 | 59 | 97.2% |
+| git_log | 1 | 580 | 580 | 0.0% |
+| git_status | 1 | 774 | 774 | 0.0% |
+| json | 1 | 2,078 | 59 | 97.2% |
 | logs | 2 | 977 | 835 | 14.5% |
-| read_file | 1 | 1,317 | 589 | 55.3% |
-| search | 2 | 6,372 | 3,051 | 52.1% |
-| test | 2 | 1,873 | 1,564 | 16.5% |
-| **Total** | **12** | **18,548** | **9,282** | **50.0%** |
+| read_file | 1 | 1,296 | 568 | 56.2% |
+| search | 2 | 5,588 | 2,755 | 50.7% |
+| test | 2 | 1,851 | 1,542 | 16.7% |
+| **Total** | **12** | **17,710** | **8,939** | **49.5%** |
 
 ## Proxy Suite
 Multi-turn token savings and continuity metrics across proxy experiment arms.

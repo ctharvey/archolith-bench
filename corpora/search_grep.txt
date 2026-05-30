@@ -1,47 +1,47 @@
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java-20- */
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java-21-@Component
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java-20- */
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java-21-@Component
 src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java:22:public class HttpRetryHelper {
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java-23-
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java-24-    private static final Logger log = LoggerFactory.getLogger(HttpRetryHelper.class);
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java-23-
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java-24-    private static final Logger log = LoggerFactory.getLogger(HttpRetryHelper.class);
 --
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java-34-     * @param immediateAbortStatuses status codes that abort without retrying (e.g. {@code Set.of(403)})
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java-35-     */
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java-34-     * @param immediateAbortStatuses status codes that abort without retrying (e.g. {@code Set.of(403)})
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java-35-     */
 src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java:36:    public HttpResponse<String> sendWithRetry(
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java-37-            HttpClient httpClient,
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java-38-            HttpRequest request,
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java-37-            HttpClient httpClient,
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\util\HttpRetryHelper.java-38-            HttpRequest request,
 --
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\EbayPriceService.java-141-                    .build();
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\EbayPriceService.java-142-
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\EbayPriceService.java-141-                    .build();
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\EbayPriceService.java-142-
 src\main\java\rip\yawn\market\service\source\EbayPriceService.java:143:            HttpResponse<String> response = httpRetryHelper.sendWithRetry(
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\EbayPriceService.java-144-                    httpClient, request, maxRetries, "eBay Finding API", logLabel, Set.of());
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\EbayPriceService.java-145-
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\EbayPriceService.java-144-                    httpClient, request, maxRetries, "eBay Finding API", logLabel, Set.of());
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\EbayPriceService.java-145-
 --
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java-89-            HttpResponse<String> response = apiTokenOrchestrator.enqueue(1, description, () -> {
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java-90-                try {
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java-89-            HttpResponse<String> response = apiTokenOrchestrator.enqueue(1, description, () -> {
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java-90-                try {
 src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java:91:                    return sendWithRetry(request, query);
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java-92-                } catch (IOException | InterruptedException e) {
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java-93-                    throw new RuntimeException("Failed to fetch from PriceCharting", e);
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java-92-                } catch (IOException | InterruptedException e) {
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java-93-                    throw new RuntimeException("Failed to fetch from PriceCharting", e);
 --
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java-216-    }
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java-217-
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java-216-    }
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java-217-
 src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java:218:    private HttpResponse<String> sendWithRetry(HttpRequest request, String logContext)
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java-219-            throws IOException, InterruptedException {
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java-220-        IOException lastException = null;
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java-219-            throws IOException, InterruptedException {
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\PriceChartingPriceService.java-220-        IOException lastException = null;
 --
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java-158-            HttpResponse<String> response = apiTokenOrchestrator.enqueue(tokenCost, description, () -> {
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java-159-                try {
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java-158-            HttpResponse<String> response = apiTokenOrchestrator.enqueue(tokenCost, description, () -> {
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java-159-                try {
 src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java:160:                    return httpRetryHelper.sendWithRetry(
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java-161-                            httpClient, request, maxRetries, "PriceTracker", cardName, Set.of(403));
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java-162-                } catch (java.io.IOException | InterruptedException e) {
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java-161-                            httpClient, request, maxRetries, "PriceTracker", cardName, Set.of(403));
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java-162-                } catch (java.io.IOException | InterruptedException e) {
 --
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java-239-                        .build();
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java-240-
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java-239-                        .build();
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java-240-
 src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java:241:                HttpResponse<String> response = httpRetryHelper.sendWithRetry(
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java-242-                        httpClient, request, maxRetries, "PriceTracker", setName, Set.of(403));
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java-243-                Thread.sleep(requestDelayMs);
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java-242-                        httpClient, request, maxRetries, "PriceTracker", setName, Set.of(403));
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\TcgPlayerPriceService.java-243-                Thread.sleep(requestDelayMs);
 --
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\SealedProductPriceService.java-158-                        .build();
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\SealedProductPriceService.java-159-
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\SealedProductPriceService.java-158-                        .build();
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\SealedProductPriceService.java-159-
 src\main\java\rip\yawn\market\service\source\SealedProductPriceService.java:160:                HttpResponse<String> response = httpRetryHelper.sendWithRetry(
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\SealedProductPriceService.java-161-                        httpClient, request, maxRetries, "SealedProducts", "page " + page, Set.of(403));
-C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\SealedProductPriceService.java-162-
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\SealedProductPriceService.java-161-                        httpClient, request, maxRetries, "SealedProducts", "page " + page, Set.of(403));
+/home/user/projects\projects\yawn\example-app\src\main\java\rip\yawn\market\service\source\SealedProductPriceService.java-162-

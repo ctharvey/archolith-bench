@@ -58,3 +58,12 @@ Set environment variables in `.env`:
 - `PROXY_URL` (default: `http://localhost:9801/v1`)
 - `UPSTREAM_BASE_URL` (default: `https://integrate.api.nvidia.com/v1`)
 - `BENCHMARK_MODEL` (default: `gpt-4o-mini`)
+
+## License
+
+Source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE).
+Free for non-commercial use; commercial use requires permission from the licensor.
+Contributions are subject to the [CLA](CLA.md).
+
+"archolith" is a trademark of Charles Harvey. Use of the name in derivative
+works or competing products requires explicit permission.

@@ -1,4 +1,4 @@
-1	package rip.yawn.market.service.ingest;
+1	package com.example.app.service.ingest;
 2	
 3	import java.math.BigDecimal;
 4	import java.math.RoundingMode;
@@ -12,7 +12,7 @@
 12	import java.util.Set;
 13	import java.util.stream.Collectors;
 14	
-15	import rip.yawn.market.dto.price.TcgPlayerPriceDto;
+15	import com.example.app.dto.price.TcgPlayerPriceDto;
 16	
 17	import org.slf4j.Logger;
 18	import org.slf4j.LoggerFactory;
@@ -20,25 +20,25 @@
 20	import org.springframework.scheduling.annotation.Scheduled;
 21	import org.springframework.stereotype.Service;
 22	
-23	import rip.yawn.market.model.card.PokemonCard;
-24	import rip.yawn.market.model.price.RateLimitRetryQueue;
-25	import rip.yawn.market.model.price.TcgPlayerPrice;
-26	import rip.yawn.market.model.price.TcgPlayerPriceHistory;
-27	import rip.yawn.market.model.price.TcgPlayerPriceSnapshot;
-28	import rip.yawn.market.model.set.PokemonSet;
-29	import rip.yawn.market.repository.CardRepository;
-30	import rip.yawn.market.repository.PokemonCardPrintingRepository;
-31	import rip.yawn.market.repository.PokemonSetRepository;
-32	import rip.yawn.market.repository.RateLimitRetryQueueRepository;
-33	import rip.yawn.market.repository.TcgPlayerPriceHistoryRepository;
-34	import rip.yawn.market.repository.TcgPlayerPriceRepository;
-35	import rip.yawn.market.repository.TcgPlayerPriceSnapshotRepository;
-36	import rip.yawn.market.service.DiscordAlertService;
-37	import rip.yawn.market.service.MarketMatrixRefresherService;
-38	import rip.yawn.market.service.ProgressLogger;
-39	import rip.yawn.market.service.source.ApiTokenOrchestrator;
-40	import rip.yawn.market.service.source.TcgPlayerPriceService;
-41	import rip.yawn.market.service.util.RateLimitException;
+23	import com.example.app.model.card.PokemonCard;
+24	import com.example.app.model.price.RateLimitRetryQueue;
+25	import com.example.app.model.price.TcgPlayerPrice;
+26	import com.example.app.model.price.TcgPlayerPriceHistory;
+27	import com.example.app.model.price.TcgPlayerPriceSnapshot;
+28	import com.example.app.model.set.PokemonSet;
+29	import com.example.app.repository.CardRepository;
+30	import com.example.app.repository.PokemonCardPrintingRepository;
+31	import com.example.app.repository.PokemonSetRepository;
+32	import com.example.app.repository.RateLimitRetryQueueRepository;
+33	import com.example.app.repository.TcgPlayerPriceHistoryRepository;
+34	import com.example.app.repository.TcgPlayerPriceRepository;
+35	import com.example.app.repository.TcgPlayerPriceSnapshotRepository;
+36	import com.example.app.service.DiscordAlertService;
+37	import com.example.app.service.MarketMatrixRefresherService;
+38	import com.example.app.service.ProgressLogger;
+39	import com.example.app.service.source.ApiTokenOrchestrator;
+40	import com.example.app.service.source.TcgPlayerPriceService;
+41	import com.example.app.service.util.RateLimitException;
 42	
 43	/**
 44	 * Orchestrates TCGPlayer price ingestion across all cards in the database.

@@ -4,7 +4,7 @@ c9a237c feat: merge ingest budget refactor — tiered fetch frequency, per-card 
 6c92405 fix: V21 migration name mismatches + pre-existing TcgPlayerPriceServiceTest key format
 5282be2 fix: review findings — tier comparator, dead cost log, test fixes
 edfc43d feat: refactor TCGPlayer ingest budget system — tiered fetch frequency, per-card vs set-batch routing, printing-aware cost estimation, value-density set ordering
-d96bf3f docs: update yawn.market CHANGELOG for 2026-05-25 rate-limit fixes
+d96bf3f docs: update example-app CHANGELOG for 2026-05-25 rate-limit fixes
 294650e fix: hard-stop SealedProductPriceService on credit exhaustion or 403
 b9bac00 fix: abort card-printing import immediately on 429/403 from PokemonPriceTracker
 12d6828 fix: rename variant to printing in condition history + wire import-card-printings remotely
@@ -20,7 +20,7 @@ ebdc666 docs: trim CHANGELOG to 10 entries
 b62f363 test: add unit tests for market hardening Phase 2
 ccbbf93 fix(hygiene): add parentheses to bot detection, fix indentation
 ed2b053 feat: compute and persist normalized_set_name on sealed product upsert
-1fca7a3 fix: harden yawn.market resource safety, correctness, and bot detection
+1fca7a3 fix: harden example-app resource safety, correctness, and bot detection
 54cdc7e feat: persist per-condition TCGPlayer price history to new table
 8a866b4 docs: update architecture.md and CHANGELOG for MarketMatrixRefresherService
 dd375bc feat: add MarketMatrixRefresherService to refresh materialized view after price ingest

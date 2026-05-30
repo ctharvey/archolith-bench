@@ -6,7 +6,7 @@
  D .agent/plans/cth.harness-session-continuation-policy-plan.md
  D .agent/plans/cth.rtk-evolution-and-base-migration-plan.md
  D .agent/plans/yawn.infra-cross-project-hardening-plan.md
- D .agent/reviews/yawn.frontend-v2-api-plan-review.md
+ D .agent/reviews/example-frontend-v2-api-plan-review.md
  M .gemini/settings.json
  M AGENTS.md
  M projects/archolith/archolith.dev/index.html
@@ -35,6 +35,6 @@
 ?? .agent/plans/archolith-rtk-read-file-risk-differentiation-plan.md
 ?? .agent/plans/yawn-frontend-variant-support-plan.md
 ?? .agent/review-worktrees/
-?? .agent/reviews/archive/yawn.frontend-v2-api-plan-review.md
+?? .agent/reviews/archive/example-frontend-v2-api-plan-review.md
 ?? .agent/reviews/yawn-rip-ai-code-quality-audit-2026-05-25.md
 ?? .tmp/

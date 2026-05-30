@@ -26,7 +26,7 @@ Built archolith-bench from scratch across Phases 0-5. Phase 0 scaffolded the rep
 | `87b329e` | feat(bench): audit waste-reduction suite via archolith-audit |
 | `1d0881b` | feat(bench): BENCHMARKS.md report generation |
 | `a959715` | docs(bench): update wrapup for Phase 0-5 complete |
-| `<pending>` | fix(bench): audit report fixture caveat + sign consistency, wrapup commit table |
+| `3aa9b2c` | fix(bench): audit report fixture caveat + sign consistency, wrapup commit table |
 
 ## Review Fixes Applied (Round 1)
 

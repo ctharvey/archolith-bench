@@ -55,12 +55,29 @@ _FILE_PATH_RE = re.compile(r'(?:/[\w.\-]+/){1,}[\w.\-]+\.\w{1,12}', re.IGNORECAS
 _COMMAND_RE = re.compile(r'(?:npm|pip|python|git|cargo|go|docker|kubectl|make)\s+\S+', re.IGNORECASE)
 
 
+_REREAD_PHRASES = re.compile(
+    r"(?:let me (?:re-?read|read|open|check|look at|view|cat|see) "
+    r"|i (?:need to |should )?(?:re-?read|read|open|check|look at|view) "
+    r"|can you (?:re-?read|read|open|show|print|display) "
+    r"|show me (?:the |that |those )?(?:file|content|output|result)s?)",
+    re.IGNORECASE,
+)
+
+
 class ContinuityTracker:
     """Track re-mentions of file paths and commands across a scenario run.
 
     Scans each arm response for file paths / commands first seen in earlier
-    turns.  Records repeat_file_reads, repeat_diagnostics, and computes
-    decision_retention and verification_continuity at the end.
+    turns.  Records repeat_file_reads and repeat_diagnostics.
+
+    decision_retention is derived from final-turn fact probes: for each
+    expected keyword, did the arm recall it at least as well as the direct
+    baseline?  A decision is "retained" if keyword recall is not degraded.
+
+    verification_continuity is derived from whether the last-turn response
+    refers to a previously stated conclusion, plan, or next step (heuristic:
+    the last user message is about wrapping up / verifying; the response
+    should reference prior work rather than starting from scratch).
     """
 
     def __init__(self) -> None:
@@ -68,10 +85,10 @@ class ContinuityTracker:
         self._seen_commands: dict[str, int] = {}
         self._repeat_file_reads: int = 0
         self._repeat_diagnostics: int = 0
-        self._decisions_retained: int = 0
-        self._decisions_total: int = 0
-        self._verifications_continued: int = 0
-        self._verifications_total: int = 0
+        self._decision_retained: int = 0
+        self._decision_total: int = 0
+        self._verification_continued: int = 0
+        self._verification_total: int = 0
 
     def observe_turn(self, turn: int, response: str) -> dict:
         """Scan a response, update internal state, and return per-turn stats."""
@@ -108,28 +125,42 @@ class ContinuityTracker:
             "new_commands": new_cmds,
         }
 
-    def record_decision(self, retained: bool) -> None:
-        self._decisions_total += 1
-        if retained:
-            self._decisions_retained += 1
+    def record_probe_result(self, direct_recall: float, arm_recall: float) -> None:
+        """Record whether a fact-probe decision was retained (arm >= direct)."""
+        self._decision_total += 1
+        if arm_recall >= direct_recall:
+            self._decision_retained += 1
 
-    def record_verification(self, continued: bool) -> None:
-        self._verifications_total += 1
-        if continued:
-            self._verifications_continued += 1
+    def record_verification(self, response: str, prior_files: set[str], prior_commands: set[str]) -> None:
+        """Record whether a final-turn response references prior work.
 
-    def compute(self) -> ContinuityMetrics:
+        Verification is "continued" if the response mentions at least one
+        previously-seen file path or command without expressing intent to
+        re-read it (which would indicate information loss).
+        """
+        self._verification_total += 1
+        mentions_prior_file = any(f.lower() in response.lower() for f in prior_files)
+        mentions_prior_cmd = any(c.lower() in response.lower() for c in prior_commands)
+        wants_reread = bool(_REREAD_PHRASES.search(response))
+        if (mentions_prior_file or mentions_prior_cmd) and not wants_reread:
+            self._verification_continued += 1
+
+    def compute(self, final_response: str = "", known_files: set | None = None, known_commands: set | None = None) -> ContinuityMetrics:
+        decision_retention = (
+            self._decision_retained / self._decision_total
+            if self._decision_total else 0.0
+        )
+        if self._verification_total == 0 and final_response and known_files is not None:
+            self.record_verification(final_response, known_files, known_commands or set())
+        verification_continuity = (
+            self._verification_continued / self._verification_total
+            if self._verification_total else 0.0
+        )
         return ContinuityMetrics(
             repeat_file_reads=self._repeat_file_reads,
             repeat_diagnostics=self._repeat_diagnostics,
-            decision_retention=(
-                self._decisions_retained / self._decisions_total
-                if self._decisions_total else 0.0
-            ),
-            verification_continuity=(
-                self._verifications_continued / self._verifications_total
-                if self._verifications_total else 0.0
-            ),
+            decision_retention=decision_retention,
+            verification_continuity=verification_continuity,
         )
 
 
@@ -147,8 +178,12 @@ def run_restart_bootstrap(
     arm_config: dict | None = None,
 ) -> dict:
     """Replay a scenario, then start a fresh conversation in the same proxy
-    session and score turn_one_orientation_score: did the model recover
-    the last blocker / next step without re-reading previously-mentioned files?
+    session and score turn_one_orientation_score.
+
+    The orientation prompt asks the model to recall the last blocker/next step.
+    A good response should reference key facts from earlier turns (high keyword
+    overlap with the last response) WITHOUT expressing intent to re-read files
+    (which indicates information loss).
     """
     _key = api_key or API_KEY
     system_msg = {"role": "system", "content": scenario.system_prompt}
@@ -161,35 +196,51 @@ def run_restart_bootstrap(
 
     last_response = history[-1]["content"] if history else ""
     last_files = set(_FILE_PATH_RE.findall(last_response))
+    last_commands = set(_COMMAND_RE.findall(last_response))
+
+    all_keywords: set[str] = set()
+    for turn_text in [m["content"] for m in history if m["role"] == "assistant"]:
+        words = turn_text.lower().split()
+        all_keywords.update(w for w in words if len(w) >= 4)
+    last_keywords = set(last_response.lower().split())
+    key_facts = last_keywords & all_keywords
 
     orientation_prompt = (
-        "Without re-reading any files we already discussed, "
-        "what was the last blocker or next step we were working on, "
-        "and what should we do next?"
+        "This is a new conversation in the same project. Without re-reading any "
+        "files, what was the last blocker or next step we were working on, and "
+        "what should we do next?"
     )
-
-    tracker = ContinuityTracker()
-    for f in last_files:
-        tracker._seen_files[f] = len(scenario.turns)
 
     fresh_history = [system_msg, {"role": "user", "content": orientation_prompt}]
     orientation_text, _, _ = send_chat(client, proxy_url, _key, fresh_history, model)
 
-    turn_stats = tracker.observe_turn(len(scenario.turns) + 1, orientation_text)
+    orientation_lower = orientation_text.lower()
 
-    orientation_score = 0.0
-    if last_files:
-        re_mentioned = sum(1 for f in last_files if f.lower() in orientation_text.lower())
-        orientation_score = 1.0 - (re_mentioned / len(last_files))
+    if key_facts:
+        facts_recalled = sum(1 for kw in key_facts if kw in orientation_lower)
+        fact_recovery = facts_recalled / len(key_facts)
     else:
-        orientation_score = 1.0 if orientation_text.strip() else 0.0
+        fact_recovery = 1.0 if orientation_text.strip() else 0.0
+
+    explicit_reread = bool(_REREAD_PHRASES.search(orientation_text))
+
+    if fact_recovery > 0 and not explicit_reread:
+        orientation_score = min(fact_recovery * 1.2, 1.0)
+    elif fact_recovery > 0 and explicit_reread:
+        orientation_score = fact_recovery * 0.5
+    else:
+        orientation_score = 0.0
 
     return {
         "orientation_prompt": orientation_prompt,
         "orientation_response_preview": orientation_text[:500],
         "orientation_score": round(orientation_score, 4),
+        "fact_recovery": round(fact_recovery, 4),
+        "key_facts_count": len(key_facts),
+        "facts_recalled": facts_recalled if key_facts else 0,
+        "explicit_reread": explicit_reread,
         "last_files_count": len(last_files),
-        "re_mentioned_files": turn_stats["repeat_files"],
+        "last_commands_count": len(last_commands),
     }
 
 
@@ -299,6 +350,13 @@ def run_benchmark(
     arm_label = arm_def["label"]
     arm_config = arm_def["config_overrides"]
     _key = api_key or API_KEY
+
+    if arm == "filter_only":
+        raise NotImplementedError(
+            "filter_only requires Phase 2 archolith-rtk integration. "
+            "Use archolith-bench filter --corpora to measure filter savings, "
+            "or run a proxy arm (proxy_only, proxy_plus_filter, etc.)."
+        )
 
     results: list[dict] = []
     probe_results: list[dict] = []
@@ -457,6 +515,11 @@ def run_benchmark(
                     proxy_url, direct_url, model, i, api_key=_key,
                 )
                 probe_results.extend(probes)
+                for p in probes:
+                    tracker.record_probe_result(
+                        direct_recall=p.get("direct_recall", 0.0),
+                        arm_recall=p.get("arm_recall", 0.0),
+                    )
 
             _save_checkpoint(
                 ckpt_path, scenario.name, arm, budget,
@@ -471,6 +534,18 @@ def run_benchmark(
 
     if ckpt_path.exists():
         ckpt_path.unlink()
+
+    if results:
+        known_files = set(tracker._seen_files.keys())
+        known_commands = set(tracker._seen_commands.keys())
+        final_response = results[-1].get("arm", {}).get("response", "")
+        final_continuity = tracker.compute(
+            final_response=final_response,
+            known_files=known_files,
+            known_commands=known_commands,
+        )
+    else:
+        final_continuity = tracker.compute()
 
     total_direct_input = sum(r["direct"]["input_tokens"] for r in results)
     total_arm_input = sum(r["arm"]["input_tokens"] for r in results)
@@ -493,7 +568,8 @@ def run_benchmark(
     ]
     aborted = consecutive_collapses >= COLLAPSE_CONSECUTIVE_LIMIT
 
-    final_continuity = tracker.compute()
+    if not results:
+        final_continuity = tracker.compute()
 
     bootstrap_result = None
     if run_restart and not is_direct_arm:

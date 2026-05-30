@@ -1,6 +1,6 @@
 # archolith-bench
 
-Benchmark suite for the [archolith](https://github.com/ctharvey/archolith) token-reduction stack.
+Benchmark suite for the [archolith&trade;](https://github.com/ctharvey/archolith) token-reduction stack.
 Measures proxy context assembly, client-side filtering, and MCP audit savings
 across reproducible multi-turn coding scenarios.
 
@@ -65,5 +65,5 @@ Source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE).
 Free for non-commercial use; commercial use requires permission from the licensor.
 Contributions are subject to the [CLA](CLA.md).
 
-"archolith" is a trademark of Charles Harvey. Use of the name in derivative
-works or competing products requires explicit permission.
+archolith&trade; is a trademark of Charles Harvey. Use of the name in
+derivative works or competing products requires explicit permission.

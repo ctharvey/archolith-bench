@@ -4,9 +4,21 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "archolith-bench"
-version = "0.3.0"
-description = "Unified benchmark suite for the archolith product family"
+version = "0.4.0"
+description = "Benchmark suite for the archolith token-reduction stack"
+license = "Apache-2.0"
+authors = [{name = "Charles Harvey"}]
+readme = "README.md"
 requires-python = ">=3.11"
+keywords = ["benchmark", "llm", "token-reduction", "context-management"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Testing",
+]
 dependencies = [
     "httpx>=0.27",
     "python-dotenv>=1.0",
@@ -19,6 +31,10 @@ dev = [
     "archolith-rtk",
     "archolith-audit",
 ]
+
+[project.urls]
+Homepage = "https://github.com/ctharvey/archolith-bench"
+Issues = "https://github.com/ctharvey/archolith-bench/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

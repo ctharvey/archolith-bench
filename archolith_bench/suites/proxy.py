@@ -2,6 +2,13 @@
 
 Ports the seed benchmark.py into the arm-aware architecture and adds
 continuity tracking and restart/bootstrap scoring.
+
+Continuity tracking (Step 3 from the original plan):
+- ContinuityTracker: counts repeat file reads and diagnostics across turns,
+  records decision retention and verification continuity at final turns.
+- run_restart_bootstrap: replays a scenario, then starts a fresh conversation
+  to score turn_one_orientation_score (does the model recover context without
+  re-reading?).
 """
 
 from __future__ import annotations

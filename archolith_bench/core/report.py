@@ -27,23 +27,23 @@ def print_summary(data: dict) -> None:
 
     for r in results:
         d = r["direct"]
-        p = r["proxy"]
+        a = r.get("arm", r.get("proxy", {}))
         t = r["trace"]
         savings_str = f"{t['savings_tokens']:>5} ({t['savings_ratio']:.0%})"
-        collapse_marker = " !!" if p["output_tokens"] < COLLAPSE_TOKEN_THRESHOLD else ""
+        collapse_marker = " !!" if a["output_tokens"] < COLLAPSE_TOKEN_THRESHOLD else ""
         print(
             f"{r['turn']:>4}  "
             f"{d['input_tokens']:>10}  "
-            f"{p['input_tokens']:>10}  "
+            f"{a['input_tokens']:>10}  "
             f"{t['input_tokens']:>10}  "
             f"{t['rewritten_tokens']:>10}  "
             f"{savings_str:>14}  "
             f"{t.get('assembly_mode', 'unknown'):>14}  "
             f"{t.get('facts_stored', 0):>5}  "
             f"{d['output_tokens']:>6}  "
-            f"{p['output_tokens']:>6}{collapse_marker}  "
+            f"{a['output_tokens']:>6}{collapse_marker}  "
             f"{d['latency_ms']:>7.0f}  "
-            f"{p['latency_ms']:>7.0f}"
+            f"{a['latency_ms']:>7.0f}"
         )
 
     s = data["summary"]
@@ -62,7 +62,7 @@ def print_summary(data: dict) -> None:
         print(f"\n  Fact Probe Quality:")
         print(f"    Probes run:              {q['total_probes']}")
         print(f"    Avg direct recall:       {q['avg_direct_recall']:.1%}")
-        print(f"    Avg proxy recall:        {q['avg_proxy_recall']:.1%}")
+        print(f"    Avg arm recall:          {q.get('avg_arm_recall', q.get('avg_proxy_recall', 0)):.1%}")
         print(f"    Recall preservation:     {q['recall_preservation']:.1%}")
 
     if data.get("continuity"):
@@ -88,7 +88,7 @@ def save_results(data: dict, output_dir: Path) -> Path:
 
     transcripts_dir = output_dir / "transcripts"
     transcripts_dir.mkdir(parents=True, exist_ok=True)
-    for label in ("direct", "proxy"):
+    for label in ("direct", "arm"):
         transcript_path = transcripts_dir / f"{data['scenario']}_{arm_label}{budget_str}_{label}.md"
         with open(transcript_path, "w", encoding="utf-8") as tf:
             tf.write(f"# {data['scenario']} ({arm_label}) -- {label.upper()} transcript\n")
@@ -116,7 +116,7 @@ def print_cross_scenario_summary(all_results: list[dict]) -> None:
     for data in all_results:
         s = data["summary"]
         q = data.get("quality", {})
-        recall_str = f"{q.get('avg_proxy_recall', 0):.0%}" if q else "N/A"
+        recall_str = f"{q.get('avg_arm_recall', q.get('avg_proxy_recall', 0)):.0%}" if q else "N/A"
         print(
             f"{data['scenario']:<20} "
             f"{data.get('arm', 'proxy'):<20} "

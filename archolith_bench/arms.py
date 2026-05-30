@@ -28,8 +28,7 @@ ARM_DEFINITIONS = {
         "filter_enabled": True,
         "proxy_enabled": False,
         "config_overrides": {
-            "filter_enabled": True,
-            "context_engine_enabled": False,
+            "rtk_enabled": False,
         },
     },
     "proxy_only": {
@@ -37,8 +36,7 @@ ARM_DEFINITIONS = {
         "filter_enabled": False,
         "proxy_enabled": True,
         "config_overrides": {
-            "filter_enabled": False,
-            "context_engine_enabled": True,
+            "rtk_enabled": False,
         },
     },
     "proxy_plus_filter": {
@@ -46,8 +44,7 @@ ARM_DEFINITIONS = {
         "filter_enabled": True,
         "proxy_enabled": True,
         "config_overrides": {
-            "filter_enabled": True,
-            "context_engine_enabled": True,
+            "rtk_enabled": True,
         },
     },
     "proxy_typed_state": {
@@ -55,8 +52,7 @@ ARM_DEFINITIONS = {
         "filter_enabled": True,
         "proxy_enabled": True,
         "config_overrides": {
-            "filter_enabled": True,
-            "context_engine_enabled": True,
+            "rtk_enabled": True,
             "assembly_mode": "typed_state",
         },
     },
@@ -65,8 +61,7 @@ ARM_DEFINITIONS = {
         "filter_enabled": True,
         "proxy_enabled": True,
         "config_overrides": {
-            "filter_enabled": True,
-            "context_engine_enabled": True,
+            "rtk_enabled": True,
             "assembly_mode": "state_snippets",
         },
     },

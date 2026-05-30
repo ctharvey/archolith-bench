@@ -46,4 +46,5 @@ See `scenarios/code_review.json` for the schema.
 ## License
 
 By contributing, you agree that your contributions will be licensed under
-the Apache License 2.0.
+the same source-available license as the project (see [LICENSE](LICENSE)).
+Commercial use requires explicit permission from the copyright holder.

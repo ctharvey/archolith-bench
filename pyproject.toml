@@ -4,18 +4,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "archolith-bench"
-version = "0.2.0"
+version = "0.3.0"
 description = "Unified benchmark suite for the archolith product family"
 requires-python = ">=3.11"
 dependencies = [
     "httpx>=0.27",
     "python-dotenv>=1.0",
     "archolith-rtk",
+    "archolith-audit",
 ]
 
 [project.optional-dependencies]
 dev = [
     "archolith-rtk",
+    "archolith-audit",
 ]
 
 [tool.setuptools.packages.find]

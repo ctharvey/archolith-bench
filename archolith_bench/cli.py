@@ -70,6 +70,26 @@ def main(argv: list[str] | None = None) -> None:
     stack_p.add_argument("--no-probes", action="store_true", help="Skip fact probes")
     stack_p.add_argument("--no-restart", action="store_true", help="Skip restart/bootstrap scoring")
 
+    # ---- audit subcommand ----
+    audit_p = subparsers.add_parser("audit", help="Audit suite: MCP token-waste before/after comparison")
+    audit_p.add_argument("--before", type=Path, required=True,
+                         help="Path to 'before' JSON audit report")
+    audit_p.add_argument("--after", type=Path, required=True,
+                         help="Path to 'after' JSON audit report")
+    audit_p.add_argument("--format", choices=["markdown", "json", "report"], default="report",
+                         help="Output format (default: report)")
+    audit_p.add_argument("--output-dir", type=Path, default=Path("results"),
+                         help="Output directory for results")
+
+    # ---- report subcommand ----
+    report_p = subparsers.add_parser("report", help="Generate BENCHMARKS.md from results/")
+    report_p.add_argument("--out", type=Path, default=Path("BENCHMARKS.md"),
+                          help="Output file path (default: BENCHMARKS.md)")
+    report_p.add_argument("--results-dir", type=Path, default=Path("results"),
+                          help="Directory containing results/ JSON files")
+    report_p.add_argument("--format", choices=["markdown"], default="markdown",
+                          help="Output format (default: markdown)")
+
     args = parser.parse_args(argv)
 
     if not args.suite:
@@ -82,6 +102,10 @@ def main(argv: list[str] | None = None) -> None:
         _run_filter(args)
     elif args.suite == "stack":
         _run_stack(args)
+    elif args.suite == "audit":
+        _run_audit(args)
+    elif args.suite == "report":
+        _run_report(args)
     else:
         print(f"Unknown suite: {args.suite}")
         sys.exit(1)
@@ -270,6 +294,56 @@ def _run_stack(args: argparse.Namespace) -> None:
 
     from .core.report import print_four_way_table
     print_four_way_table(all_arm_results)
+
+
+def _run_audit(args: argparse.Namespace) -> None:
+    from .suites.audit import print_audit_summary, run_audit_comparison
+
+    before_path = args.before
+    after_path = args.after
+
+    if not before_path.exists():
+        print(f"ERROR: Before report not found: {before_path}", file=sys.stderr)
+        sys.exit(1)
+    if not after_path.exists():
+        print(f"ERROR: After report not found: {after_path}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Audit suite: comparing before vs after")
+    print(f"  Before: {before_path}")
+    print(f"  After:  {after_path}")
+
+    result = run_audit_comparison(before_path, after_path, output_dir=args.output_dir)
+    print_audit_summary(result)
+
+    if args.format == "json":
+        pass
+    elif args.format == "markdown":
+        md_path = args.output_dir / "audit_comparison.md"
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        with open(md_path, "w", encoding="utf-8") as f:
+            f.write("# Audit Comparison: Before vs After\n\n")
+            f.write(f"| Server | Before | After | Change | Pct | Status |\n")
+            f.write(f"|--------|--------|-------|--------|-----|--------|\n")
+            for s in result.get("per_server", []):
+                f.write(f"| {s['server']} | {s['before_tokens']:,} | {s['after_tokens']:,} "
+                        f"| {s['token_change']:+,} | {s['token_change_pct']:+.1f}% | {s['status']} |\n")
+            f.write(f"| **Total** | {result['before_total_tokens']:,} | {result['after_total_tokens']:,} "
+                    f"| {result['token_reduction']:+,} | {result['token_reduction_pct']:+.1f}% | - |\n")
+            f.write(f"\n**Waste reduction:** {result['waste_reduction']:,} tokens "
+                    f"({result['waste_reduction_pct']:.1f}%)\n")
+        print(f"  Markdown report saved to {md_path}")
+
+
+def _run_report(args: argparse.Namespace) -> None:
+    from .core.report import write_benchmarks_md
+
+    results_dir = args.results_dir
+    out_path = args.out
+
+    print(f"Generating BENCHMARKS.md from {results_dir}")
+    write_benchmarks_md(results_dir, out_path)
+    print(f"  Written to {out_path}")
 
 
 if __name__ == "__main__":

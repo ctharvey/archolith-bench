@@ -1,0 +1,33 @@
+{
+  "servers": {
+    "memory": {
+      "token_share": 32000,
+      "call_count": 45,
+      "findings": [
+        {"waste_type": "duplicate_context", "tokens_wasted": 8500, "severity": "high"},
+        {"waste_type": "oversized_response", "tokens_wasted": 3200, "severity": "medium"},
+        {"waste_type": "redundant_recall", "tokens_wasted": 1800, "severity": "low"}
+      ]
+    },
+    "gradle": {
+      "token_share": 18500,
+      "call_count": 22,
+      "findings": [
+        {"waste_type": "oversized_response", "tokens_wasted": 7200, "severity": "high"},
+        {"waste_type": "stale_cache", "tokens_wasted": 2100, "severity": "medium"}
+      ]
+    },
+    "vps": {
+      "token_share": 9200,
+      "call_count": 15,
+      "findings": [
+        {"waste_type": "oversized_response", "tokens_wasted": 3100, "severity": "medium"}
+      ]
+    },
+    "home": {
+      "token_share": 4800,
+      "call_count": 8,
+      "findings": []
+    }
+  }
+}

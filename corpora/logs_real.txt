@@ -1,0 +1,32 @@
+=== files root currently tracks under projects/archolith (will stop tracking): ===
+30
+=== archolith.dev contents (sanity) ===
+AGENTS.md
+CLAUDE.md
+QWEN.md
+gemini.md
+hero
+index.html
+logos
+screenshots
+=== Stage 1: git rm --cached (keeps files on disk) ===
+rm --cached: OK
+=== staged deletions under projects/archolith (count) ===
+30
+=== commit root removal ===
+warning: in the working copy of 'projects/archolith/.agent/CONVENTIONS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/archolith/.agent/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/archolith/.agent/RESEARCH-FINDINGS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/archolith/.agent/archive/plans/archolith-migration-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/archolith/.agent/plans/archolith-benchmarking-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/archolith/.agent/plans/archolith-caller-compat-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/archolith/.agent/plans/archolith-context-engine-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/archolith/.agent/plans/archolith-harness-benchmark-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/archolith/.agent/plans/archolith-product-map.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/archolith/.agent/plans/archolith-rtk-novel-compression-research-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/archolith/.agent/plans/archolith-rtk-read-file-risk-differentiation-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/archolith/archolith.dev/index.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/archolith/.agent/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/archolith/archolith.dev/index.html', LF will be replaced by CRLF the next time Git touches it
+commit: OK
+538642c chore: stop tracking archolith artifacts in root repo

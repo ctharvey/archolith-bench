@@ -24,6 +24,23 @@ CATEGORY_MAP: dict[str, str] = {
     "generic": "generic",
 }
 
+# Representative shell commands / tool names for each category so that
+# filter_output routes samples through their specialised filter, not generic.
+CATEGORY_FILTER_DEFAULTS: dict[str, dict[str, str]] = {
+    "git_diff":   {"command": "git diff --staged"},
+    "git_log":    {"command": "git log --oneline -20"},
+    "git_status": {"command": "git status"},
+    "git_show":   {"command": "git show HEAD"},
+    "search":     {"command": "rg --heading pattern src"},
+    "logs":       {"command": "", "tool": "wait_for_job"},
+    "json":       {"command": "", "tool": "mcp__memory__recall_memories"},
+    "read_file":  {"command": "", "tool": "read_file"},
+    "lint":       {"command": "eslint src/"},
+    "build":      {"command": "npm run build"},
+    "test":       {"command": "npm test"},
+    "generic":    {},
+}
+
 _FILENAME_PATTERN = re.compile(
     r"^(git_diff|git_log|git_status|git_show|search|logs|json|read_file|lint|build|test|generic)"
 )

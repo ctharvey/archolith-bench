@@ -14,7 +14,7 @@ from pathlib import Path
 
 from archolith_rtk import count_tokens, filter_output
 
-from ..core.corpus import CorpusSample, list_corpora, load_sample
+from ..core.corpus import CATEGORY_FILTER_DEFAULTS, CorpusSample, list_corpora, load_sample
 from ..core.report import save_results
 
 
@@ -34,9 +34,21 @@ def run_filter_sample(sample: CorpusSample, command: str = "", tool: str = "") -
     """Run filter_output on a single corpus sample and record metrics."""
     raw_text = load_sample(sample)
 
+    # Use category-specific defaults so samples route to their specialised
+    # filter instead of always hitting generic.
+    use_defaults = not command and not tool
+    if use_defaults:
+        defaults = CATEGORY_FILTER_DEFAULTS.get(sample.category, {})
+        command = defaults.get("command", "")
+        tool = defaults.get("tool", "")
+
+    # When defaults provide a tool but no command, do NOT fall back to
+    # sample.name — that would override the tool-based classification.
+    effective_command = command or ("" if (use_defaults and tool) else sample.name)
+
     result = filter_output(
         raw_text,
-        command=command or sample.name,
+        command=effective_command,
         tool=tool,
     )
 

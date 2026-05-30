@@ -1,15 +1,19 @@
 # archolith-bench — Benchmark Results
-Generated: 2026-05-30 05:43 UTC
+Generated: 2026-05-30 06:15 UTC
 ## Filter Suite (archolith-rtk)
-Token-savings compression ratio measured on real tool-output corpora.
+Token-savings compression ratio measured on real tool-output corpora extracted from
+live Claude Code agent sessions (git diffs, grep results, file reads, MCP JSON, etc.).
 | Category | Samples | Raw Tokens | Filtered | Savings |
 |----------|---------|------------|----------|--------|
-| generic | 2 | 937 | 953 | -1.7% |
-| git_diff | 1 | 1,413 | 500 | 64.6% |
-| read_file | 1 | 606 | 307 | 49.3% |
-| search | 1 | 227 | 227 | 0.0% |
-| test | 1 | 421 | 421 | 0.0% |
-| **Total** | 6 | 3,604 | 2,408 | **33.2%** |
+| git_diff | 2 | 4,566 | 1,826 | 60.0% |
+| git_log | 1 | 582 | 582 | 0.0% |
+| git_status | 1 | 776 | 776 | 0.0% |
+| json | 1 | 2,085 | 59 | 97.2% |
+| logs | 2 | 977 | 835 | 14.5% |
+| read_file | 1 | 1,317 | 589 | 55.3% |
+| search | 2 | 6,372 | 3,051 | 52.1% |
+| test | 2 | 1,873 | 1,564 | 16.5% |
+| **Total** | **12** | **18,548** | **9,282** | **50.0%** |
 
 ## Proxy Suite
 Multi-turn token savings and continuity metrics across proxy experiment arms.

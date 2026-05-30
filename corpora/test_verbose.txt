@@ -1,0 +1,37 @@
+===== who imports archolith_proxy.rtk =====
+/c/Users/thron/IdeaProjects/projects/ctharvey/cth.context-engine/archolith_proxy/openai/chat.py:31:from archolith_proxy.rtk import filter_request_body
+/c/Users/thron/IdeaProjects/projects/ctharvey/cth.context-engine/archolith_proxy/proxy/recall.py:27:from archolith_proxy.rtk import filter_request_body
+
+===== is rtk.py committed at origin/main or HEAD? =====
+error: pathspec 'archolith_proxy/rtk.py' did not match any file(s) known to git
+fatal: path 'archolith_proxy/rtk.py' exists on disk, but not in 'origin/main'
+rtk.py NOT on origin/main
+fatal: path 'archolith_proxy/rtk.py' exists on disk, but not in 'HEAD'
+rtk.py NOT at HEAD (uncommitted)
+
+===== run the proxy test suite (collection + run) =====
+------------------------------ Captured log call ------------------------------
+WARNING  archolith_proxy.config:config.py:108 {'event': 'UPSTREAM_API_KEY is empty � proxy will fail on upstream calls. Set UPSTREAM_API_KEY in .env or environment.', 'logger': 'archolith_proxy.config', 'level': 'warning', 'timestamp': '2026-05-29T17:56:22.822034Z'}
+WARNING  archolith_proxy.main:main.py:130 {'vars': ['UPSTREAM_API_KEY'], 'note': 'proxy calls will fail', 'event': 'missing_required_env_vars', 'logger': 'archolith_proxy.main', 'level': 'warning', 'timestamp': '2026-05-29T17:56:22.822302Z'}
+INFO     archolith_proxy.main:main.py:134 {'vars': ['SESSION_NEO4J_PASSWORD', 'EXTRACTOR_API_KEY'], 'note': 'set these to enable session graph + context assembly', 'event': 'graph_features_missing_env', 'logger': 'archolith_proxy.main', 'level': 'info', 'timestamp': '2026-05-29T17:56:22.822404Z'}
+INFO     archolith_proxy.main:main.py:168 {'note': 'set GRAPH_BACKEND=ladybug or SESSION_NEO4J_PASSWORD for graph features', 'event': 'graph_not_configured', 'logger': 'archolith_proxy.main', 'level': 'info', 'timestamp': '2026-05-29T17:56:22.836998Z'}
+WARNING  archolith_proxy.main:main.py:207 {'error': "Illegal header value b'Bearer '", 'event': 'upstream_connectivity_check_failed', 'logger': 'archolith_proxy.main', 'level': 'warning', 'timestamp': '2026-05-29T17:56:22.856726Z'}
+INFO     archolith_proxy.main:main.py:209 {'port': 9800, 'upstream': 'https://api.deepseek.com/v1', 'event': 'proxy_starting', 'logger': 'archolith_proxy.main', 'level': 'info', 'timestamp': '2026-05-29T17:56:22.856967Z'}
+INFO     archolith_proxy.openai.chat:chat.py:161 {'session_id': 'test-session-123', 'goal': 'Where is my API key?', 'event': 'session_goal_set_initial', 'method': 'POST', 'path': '/v1/chat/completions', 'logger': 'archolith_proxy.openai.chat', 'level': 'info', 'timestamp': '2026-05-29T17:56:22.860359Z'}
+=========================== short test summary info ===========================
+FAILED tests/test_proxy/test_non_streaming_recall.py::TestHandleNonStreamingRecall::test_single_recall_round
+FAILED tests/test_proxy/test_non_streaming_recall.py::TestHandleNonStreamingRecall::test_two_recall_rounds
+FAILED tests/test_proxy/test_non_streaming_recall.py::TestResendWithRecallMetadata::test_returns_questions_from_second_recall
+FAILED tests/test_proxy/test_passthrough.py::test_non_streaming_passthrough
+FAILED tests/test_proxy/test_passthrough.py::test_non_streaming_forwards_auth_header
+FAILED tests/test_proxy/test_passthrough.py::test_non_streaming_forwards_model_field
+FAILED tests/test_proxy/test_passthrough.py::test_streaming_passthrough - Att...
+FAILED tests/test_proxy/test_passthrough.py::test_streaming_forwards_sse_format
+FAILED tests/test_proxy/test_passthrough.py::test_upstream_500_relayed_as_502
+FAILED tests/test_proxy/test_passthrough.py::test_tool_calls_forwarded - Attr...
+FAILED tests/test_proxy/test_rtk_filtering.py::test_rtk_enabled_filters_outbound_tool_messages
+FAILED tests/test_proxy/test_rtk_filtering.py::test_rtk_disabled_leaves_tool_messages_unchanged
+FAILED tests/test_proxy/test_streaming_recall.py::TestStreamingRecallInterception::test_streaming_with_no_recall_tool
+FAILED tests/test_proxy/test_streaming_recall.py::TestStreamingRecallInterception::test_streaming_recall_detection_passthrough
+FAILED tests/test_proxy/test_streaming_recall.py::TestStreamingRecallInterception::test_streaming_recall_interception_full_flow
+15 failed, 98 passed in 5.04s

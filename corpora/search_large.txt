@@ -1,0 +1,94 @@
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\shell\command\PriceIngestCommands.java-72- @ShellMethod(key = "sync tcgplayer-daily", value = "Fetch TCGPlayer prices with history for 'daily'-tier sets only (~22 sets, fastest daily refresh)")
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\shell\command\PriceIngestCommands.java-73- public void syncTcgPlayerDaily() {
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\shell\command\PriceIngestCommands.java-74- shellTaskExecutor.runAsync("TCGPlayer daily-tier history ingest (~22 sets)",
+src\main\java\rip\yawn\market\shell\command\PriceIngestCommands.java:75: () -> priceIngestService.ingestTcgPlayerDailyTierOnly());
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\shell\command\PriceIngestCommands.java-76- }
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\shell\command\PriceIngestCommands.java-77-
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\shell\command\PriceIngestCommands.java-78-    @ShellMethod(key = "sync sealed-prices", value = "Harvest sealed product prices from PokemonPriceTracker API v2")
+--
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\shell\command\PriceIngestCommands.java-86-    public void syncPrices() {
+src\main\java\rip\yawn\market\shell\command\PriceIngestCommands.java-87-        log.warn("DEPRECATED: 'sync prices' is not Phase 1/2 aware and uses 3 credits/card.");
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\shell\command\PriceIngestCommands.java-88-        log.warn("Use 'sync tcgplayer-basic' (1 credit/card) or 'sync tcgplayer-history' (2 credits/card) instead.");
+src\main\java\rip\yawn\market\shell\command\PriceIngestCommands.java:89:        shellTaskExecutor.runAsync("full price sync", () -> priceIngestService.ingestPricesForAllCards());
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\shell\command\PriceIngestCommands.java-90-    }
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\shell\command\PriceIngestCommands.java-91-
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\shell\command\PriceIngestCommands.java-92-    @ShellMethod(key = "sync import-card-printings", value = "Populate pokemon_card_printings for all sets (1 credit/card, basic mode)")
+--
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\TcgPlayerDailyScheduler.java-33-        this.shellTaskExecutor = shellTaskExecutor;
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\TcgPlayerDailyScheduler.java-34-    }
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\TcgPlayerDailyScheduler.java-35-
+src\main\java\rip\yawn\market\service\ingest\TcgPlayerDailyScheduler.java:36:    @Scheduled(
+src\main\java\rip\yawn\market\service\ingest\TcgPlayerDailyScheduler.java-37-            cron = "${yawn.price-ingest.tcgplayer-daily-scheduler.cron:0 30 2 * * *}",
+src\main\java\rip\yawn\market\service\ingest\TcgPlayerDailyScheduler.java-38-            zone = "${yawn.price-ingest.tcgplayer-daily-scheduler.zone:America/Chicago}")
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\TcgPlayerDailyScheduler.java-39-    public void runScheduledSync() {
+--
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-152-    }
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-153-
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-154-    /** Ingest only the daily-tier sets with history — fast path for ~22 priority sets. */
+src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java:155:    public void ingestTcgPlayerDailyTierOnly() {
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-156-        ingestPricesForAllSetsWithMode(true, null, true);
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-157-    }
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-158-
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-159-    /** Ingest prices for every card currently in the database (Phase 1/2 aware). */
+src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java:160:    public void ingestPricesForAllCards() {
+src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java:161:        ingestPricesForAllCardsWithMode(null);
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-162-    }
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-163-
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-164-    /** Ingest TCGPlayer prices with basic data only (1 credit/card). */
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-165-    public void ingestTcgPlayerPricesBasic() {
+src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java:166:        ingestPricesForAllCardsWithMode(false);
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-167-    }
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-168-
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-169-    /** Ingest TCGPlayer prices with history for high-value cards (Phase 1 strategy). */
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-170-    public void ingestTcgPlayerPricesHistory() {
+src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java:171:        ingestPricesForAllCardsWithMode(true);
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-172-    }
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-173-
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-174-    // -------------------------------------------------------------------------
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-175-    // Orchestration
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-176-    // -------------------------------------------------------------------------
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-177-
+src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java:178:    private void ingestPricesForAllCardsWithMode(Boolean includeHistoryOverride) {
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-179-        List<PokemonSet> allSets = setRepository.findAll();
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-180-        Map<String, String> setNameById = buildSetNameMap(allSets);
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-181-
+--
+src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-355-     * Scheduled cleanup: purge stale retry queue entries older than the configured max age.
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-356-     * Runs every 6 hours. Prevents unbounded growth from persistent rate-limit failures.
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-357-     */
+src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java:358:    @Scheduled(fixedDelayString = "${yawn.price-ingest.retry-queue-cleanup-interval-ms:21600000}")
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-359-    public void cleanupStaleRetryQueueEntries() {
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-360-        try {
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\ingest\PriceIngestService.java-361-            LocalDateTime cutoff = LocalDateTime.now().minusDays(retryQueueMaxAgeDays);
+--
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\ApiTokenOrchestrator.java-101-        }
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\ApiTokenOrchestrator.java-102-    }
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\ApiTokenOrchestrator.java-103-
+src\main\java\rip\yawn\market\service\source\ApiTokenOrchestrator.java:104:    @Scheduled(cron = "0 0 0 * * *", zone = "UTC")
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\ApiTokenOrchestrator.java-105-    public void resetDailyTokens() {
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\ApiTokenOrchestrator.java-106-        int previous = this.tokensConsumedToday.getAndSet(0);
+src\main\java\rip\yawn\market\service\source\ApiTokenOrchestrator.java-107-        log.info("Daily API token counter reset. Previous in-memory value: {}", previous);
+--
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\MarketRemoteTaskWatcher.java-40-        this.priceIngestCommands = priceIngestCommands;
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\MarketRemoteTaskWatcher.java-41-    }
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\MarketRemoteTaskWatcher.java-42-
+src\main\java\rip\yawn\market\service\MarketRemoteTaskWatcher.java:43:    @Scheduled(fixedDelay = 5000)
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\MarketRemoteTaskWatcher.java-44-    public void checkForRemoteCommands() {
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\MarketRemoteTaskWatcher.java-45-        poll();
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\MarketRemoteTaskWatcher.java-46-    }
+--
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\SealedPriceScheduler.java-33-        this.shellTaskExecutor = shellTaskExecutor;
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\SealedPriceScheduler.java-34-    }
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\SealedPriceScheduler.java-35-
+src\main\java\rip\yawn\market\service\source\SealedPriceScheduler.java:36:    @Scheduled(
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\SealedPriceScheduler.java-37-            initialDelay = 30000, // 30 seconds after startup
+src\main\java\rip\yawn\market\service\source\SealedPriceScheduler.java-38-            fixedRateString = "${yawn.price-ingest.sealed-scheduler.interval-ms:14400000}")
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\source\SealedPriceScheduler.java-39-    public void runScheduledSync() {
+--
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\RetentionCleanupService.java-45-        this.rawScrapesRetentionDays = rawScrapesRetentionDays;
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\RetentionCleanupService.java-46-    }
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\RetentionCleanupService.java-47-
+src\main\java\rip\yawn\market\service\RetentionCleanupService.java:48:    @Scheduled(cron = "${yawn.scrape.retention.cron:0 0 3 * * *}")
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\RetentionCleanupService.java-49-    @Transactional
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\RetentionCleanupService.java-50-    public void pruneOldRunsAndScrapes() {
+C:\Users\thron\IdeaProjects\projects\yawn\yawn.market\src\main\java\rip\yawn\market\service\RetentionCleanupService.java-51-        LocalDateTime cutoff = LocalDateTime.now().minusDays(runRetentionDays);

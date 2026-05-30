@@ -1,0 +1,40 @@
+ M .agent/WRAPUP-TEMPLATE.md
+ D .agent/for-review/WRAPUP-2026-05-25-archolith-proxy-rca-qol-implementation.md
+ D .agent/for-review/WRAPUP-2026-05-25-yawn-frontend-v2-api-migration.md
+ D .agent/for-review/WRAPUP-2026-05-25-yawn-rip-v2-api.md
+ D .agent/plans/archolith-synthetic-recall-tool-plan.md
+ D .agent/plans/cth.harness-session-continuation-policy-plan.md
+ D .agent/plans/cth.rtk-evolution-and-base-migration-plan.md
+ D .agent/plans/yawn.infra-cross-project-hardening-plan.md
+ D .agent/reviews/yawn.frontend-v2-api-plan-review.md
+ M .gemini/settings.json
+ M AGENTS.md
+ M projects/archolith/archolith.dev/index.html
+?? .agent/archive/plans/archolith-native-read-intercept-plan.md
+?? .agent/archive/plans/archolith-synthetic-recall-tool-plan.md
+?? .agent/archive/plans/cth.rtk-evolution-and-base-migration-plan.md
+?? .agent/archive/plans/yawn.infra-cross-project-hardening-plan.md
+?? .agent/archive/wrapups/WRAPUP-2026-05-25-archolith-native-read-intercept.md
+?? .agent/archive/wrapups/WRAPUP-2026-05-25-artifacts-git-auto-commit.md
+?? .agent/for-review/WRAPUP-2026-05-26-archolith-plugin-registration-and-rtk-extractors.md
+?? .agent/for-review/WRAPUP-2026-05-26-ascended-heroes-price-drop-investigation.md
+?? .agent/for-review/WRAPUP-2026-05-26-printing-feature-set-round2.md
+?? .agent/for-review/WRAPUP-2026-05-26-variant-printing-support.md
+?? .agent/for-review/WRAPUP-2026-05-26-yawn-seed-colorsync-vps-logging.md
+?? .agent/for-review/archive/WRAPUP-2026-05-25-archolith-proxy-rca-qol-implementation.md
+?? .agent/for-review/archive/WRAPUP-2026-05-25-cth-harness-session-continuation-policy.md
+?? .agent/for-review/archive/WRAPUP-2026-05-25-yawn-frontend-v2-api-migration.md
+?? .agent/for-review/archive/WRAPUP-2026-05-25-yawn-rip-v2-api.md
+?? .agent/plans/archive/cth.harness-session-continuation-policy-plan.md
+?? .agent/plans/archolith-context-plugin-registration-plan.md
+?? .agent/plans/archolith-peek-then-release-plan.md
+?? .agent/plans/archolith-rtk-cross-turn-dedupe-plan.md
+?? .agent/plans/archolith-rtk-extractor-plugin-plan.md
+?? .agent/plans/archolith-rtk-git-diff-calibration-plan.md
+?? .agent/plans/archolith-rtk-read-file-layer2-shrink-plan.md
+?? .agent/plans/archolith-rtk-read-file-risk-differentiation-plan.md
+?? .agent/plans/yawn-frontend-variant-support-plan.md
+?? .agent/review-worktrees/
+?? .agent/reviews/archive/yawn.frontend-v2-api-plan-review.md
+?? .agent/reviews/yawn-rip-ai-code-quality-audit-2026-05-25.md
+?? .tmp/

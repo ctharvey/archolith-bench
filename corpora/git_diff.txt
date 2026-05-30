@@ -1,164 +1,125 @@
-$ git diff --staged
-[exit 0]
-src/core/context_manager.py | 18 ++++++++++--------
-src/core/filter_router.py | 22 ++++++++++++++--------
-src/core/search_grouping.py | 16 +++++++++-------
-src/core/log_parser.py | 14 ++++++++------
-src/core/token_budget.py | 12 +++++++-----
-src/core/json_filter.py | 20 ++++++++++++--------
-src/core/history_fold.py | 26 ++++++++++++++++----------
-7 files changed, 83 insertions(+), 45 deletions(-)
-diff --git a/src/core/context_manager.py b/src/core/context_manager.py
-index 1111111..2222222 100644
---- a/src/core/context_manager.py
-+++ b/src/core/context_manager.py
-@@ -10,6 +10,18 @@ export function foldHistory(history) {
--    return history;
-+    const summary = buildSummary(history);
-+    const recent = history.slice(-8);
-+    return [summary, ...recent];
- }
-+function buildSummary(history) {
-+    return {
-+        role: "assistant",
-+        content: history.map((entry) => entry.role).join(", "),
-+    };
-+}
-+function shouldFold(history, usageRatio) {
-+    return usageRatio > 0.5 && history.length > 10;
-+}
-+function estimateTail(history) {
-+    return history.slice(-4);
-+}
-diff --git a/src/core/filter_router.py b/src/core/filter_router.py
-index 3333333..4444444 100644
---- a/src/core/filter_router.py
-+++ b/src/core/filter_router.py
-@@ -18,7 +18,22 @@ export function routeFilter(command, payload) {
--    return genericFilter(payload);
-+    if (command.startsWith("git diff")) {
-+        return gitDiffFilter(payload);
-+    }
-+    if (command.startsWith("rg ")) {
-+        return searchFilter(payload);
-+    }
-+    if (command.startsWith("pytest")) {
-+        return testFilter(payload);
-+    }
-+    if (command.startsWith("npm run build")) {
-+        return buildFilter(payload);
-+    }
-+    if (command.startsWith("tsc")) {
-+        return typecheckFilter(payload);
-+    }
-+    return genericFilter(payload);
- }
-+export function classifyTool(toolName) {
-+    return toolName.startsWith("mcp__") ? "json" : "generic";
-+}
-diff --git a/src/core/search_grouping.py b/src/core/search_grouping.py
-index 5555555..6666666 100644
---- a/src/core/search_grouping.py
-+++ b/src/core/search_grouping.py
-@@ -4,8 +4,18 @@ export function parseHeadingMode(lines) {
--    return [];
-+    const groups = [];
-+    let current = null;
-+    for (const line of lines) {
-+        if (line.endsWith(":")) {
-+            current = { path: line.slice(0, -1), lines: [] };
-+            groups.push(current);
-+            continue;
-+        }
-+        if (current) {
-+            current.lines.push(line);
-+        }
-+    }
-+    return groups;
- }
-diff --git a/src/core/log_parser.py b/src/core/log_parser.py
-index 7777777..8888888 100644
---- a/src/core/log_parser.py
-+++ b/src/core/log_parser.py
-@@ -2,7 +2,17 @@ export function collapseLogs(lines) {
--    return lines;
-+    const output = [];
-+    let repeated = 0;
-+    for (const line of lines) {
-+        if (line === "[INFO] polling status") {
-+            repeated += 1;
-+            if (repeated > 3) continue;
-+        } else {
-+            repeated = 0;
-+        }
-+        output.push(line);
-+    }
-+    return output;
- }
-diff --git a/src/core/token_budget.py b/src/core/token_budget.py
-index 9999999..aaaaaaa 100644
---- a/src/core/token_budget.py
-+++ b/src/core/token_budget.py
-@@ -1,5 +1,12 @@
- export function estimateTokens(text) {
--    return Math.ceil(text.length / 4);
-+    if (text.length === 0) {
-+        return 0;
-+    }
-+    return Math.max(1, Math.ceil(text.length / 4));
- }
-+export function estimateRequest(messages, tools) {
-+    return messages.reduce((sum, message) => sum + estimateTokens(message.content ?? ""), 0)
-+        + estimateTokens(JSON.stringify(tools ?? []));
-+}
-diff --git a/src/core/json_filter.py b/src/core/json_filter.py
-index bbbbbbb..ccccccc 100644
---- a/src/core/json_filter.py
-+++ b/src/core/json_filter.py
-@@ -12,6 +12,20 @@ export function compressJson(input) {
--    return input;
-+    const parsed = JSON.parse(input);
-+    return JSON.stringify(
-+        {
-+            metadata: parsed.metadata,
-+            files: parsed.files.slice(0, 5).map((file) => ({
-+                path: file.path,
-+                summary: file.summary,
-+                diagnostics: file.diagnostics.slice(0, 3),
-+            })),
-+        },
-+        null,
-+        2,
-+    );
- }
-+export function hasJsonPrefix(input) {
-+    return input.trim().startsWith("{") || input.trim().startsWith("[");
-+}
-diff --git a/src/core/history_fold.py b/src/core/history_fold.py
-index ddddddd..eeeeeee 100644
---- a/src/core/history_fold.py
-+++ b/src/core/history_fold.py
-@@ -8,7 +8,31 @@ export function maybeFold(history, ratio) {
--    return { folded: false, history };
-+    if (ratio < 0.5) {
-+        return { folded: false, history };
-+    }
-+    const summary = {
-+        role: "assistant",
-+        content: "Summary of prior tool output, decisions, and user goals.",
-+    };
-+    return {
-+        folded: true,
-+        history: [summary, ...history.slice(-6)],
-+    };
- }
-+export function compactToolResults(history) {
-+    return history.map((entry) => {
-+        if (entry.role !== "tool") return entry;
-+        if ((entry.content ?? "").length < 5000) return entry;
-+        return {
-+            ...entry,
-+            content: (entry.content ?? "").slice(0, 4000) + "\n[...truncated benchmark payload...]",
-+        };
-+    });
-+}
+On branch master
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   archolith_bench/arms.py
+	modified:   archolith_bench/core/report.py
+
+no changes added to commit (use "git add" and/or "git commit -a")
+---
+warning: in the working copy of 'archolith_bench/arms.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith_bench/core/report.py', LF will be replaced by CRLF the next time Git touches it
+diff --git a/archolith_bench/arms.py b/archolith_bench/arms.py
+index b161255..d9fe365 100644
+--- a/archolith_bench/arms.py
++++ b/archolith_bench/arms.py
+@@ -28,8 +28,7 @@ ARM_DEFINITIONS = {
+         "filter_enabled": True,
+         "proxy_enabled": False,
+         "config_overrides": {
+-            "filter_enabled": True,
+-            "context_engine_enabled": False,
++            "rtk_enabled": False,
+         },
+     },
+     "proxy_only": {
+@@ -37,8 +36,7 @@ ARM_DEFINITIONS = {
+         "filter_enabled": False,
+         "proxy_enabled": True,
+         "config_overrides": {
+-            "filter_enabled": False,
+-            "context_engine_enabled": True,
++            "rtk_enabled": False,
+         },
+     },
+     "proxy_plus_filter": {
+@@ -46,8 +44,7 @@ ARM_DEFINITIONS = {
+         "filter_enabled": True,
+         "proxy_enabled": True,
+         "config_overrides": {
+-            "filter_enabled": True,
+-            "context_engine_enabled": True,
++            "rtk_enabled": True,
+         },
+     },
+     "proxy_typed_state": {
+@@ -55,8 +52,7 @@ ARM_DEFINITIONS = {
+         "filter_enabled": True,
+         "proxy_enabled": True,
+         "config_overrides": {
+-            "filter_enabled": True,
+-            "context_engine_enabled": True,
++            "rtk_enabled": True,
+             "assembly_mode": "typed_state",
+         },
+     },
+@@ -65,8 +61,7 @@ ARM_DEFINITIONS = {
+         "filter_enabled": True,
+         "proxy_enabled": True,
+         "config_overrides": {
+-            "filter_enabled": True,
+-            "context_engine_enabled": True,
++            "rtk_enabled": True,
+             "assembly_mode": "state_snippets",
+         },
+     },
+diff --git a/archolith_bench/core/report.py b/archolith_bench/core/report.py
+index 4883604..7e055df 100644
+--- a/archolith_bench/core/report.py
++++ b/archolith_bench/core/report.py
+@@ -27,23 +27,23 @@ def print_summary(data: dict) -> None:
+ 
+     for r in results:
+         d = r["direct"]
+-        p = r["proxy"]
++        a = r.get("arm", r.get("proxy", {}))
+         t = r["trace"]
+         savings_str = f"{t['savings_tokens']:>5} ({t['savings_ratio']:.0%})"
+-        collapse_marker = " !!" if p["output_tokens"] < COLLAPSE_TOKEN_THRESHOLD else ""
++        collapse_marker = " !!" if a["output_tokens"] < COLLAPSE_TOKEN_THRESHOLD else ""
+         print(
+             f"{r['turn']:>4}  "
+             f"{d['input_tokens']:>10}  "
+-            f"{p['input_tokens']:>10}  "
++            f"{a['input_tokens']:>10}  "
+             f"{t['input_tokens']:>10}  "
+             f"{t['rewritten_tokens']:>10}  "
+             f"{savings_str:>14}  "
+             f"{t.get('assembly_mode', 'unknown'):>14}  "
+             f"{t.get('facts_stored', 0):>5}  "
+             f"{d['output_tokens']:>6}  "
+-            f"{p['output_tokens']:>6}{collapse_marker}  "
++            f"{a['output_tokens']:>6}{collapse_marker}  "
+             f"{d['latency_ms']:>7.0f}  "
+-            f"{p['latency_ms']:>7.0f}"
++            f"{a['latency_ms']:>7.0f}"
+         )
+ 
+     s = data["summary"]
+@@ -62,7 +62,7 @@ def print_summary(data: dict) -> None:
+         print(f"\n  Fact Probe Quality:")
+         print(f"    Probes run:              {q['total_probes']}")
+         print(f"    Avg direct recall:       {q['avg_direct_recall']:.1%}")
+-        print(f"    Avg proxy recall:        {q['avg_proxy_recall']:.1%}")
++        print(f"    Avg arm recall:          {q.get('avg_arm_recall', q.get('avg_proxy_recall', 0)):.1%}")
+         print(f"    Recall preservation:     {q['recall_preservation']:.1%}")
+ 
+     if data.get("continuity"):
+@@ -88,7 +88,7 @@ def save_results(data: dict, output_dir: Path) -> Path:
+ 
+     transcripts_dir = output_dir / "transcripts"
+     transcripts_dir.mkdir(parents=True, exist_ok=True)
+-    for label in ("direct", "proxy"):
++    for label in ("direct", "arm"):
+         transcript_path = transcripts_dir / f"{data['scenario']}_{arm_label}{budget_str}_{label}.md"
+         with open(transcript_path, "w", encoding="utf-8") as tf:
+             tf.write(f"# {data['scenario']} ({arm_label}) -- {label.upper()} transcript\n")
+@@ -116,7 +116,7 @@ def print_cross_scenario_summary(all_results: list[dict]) -> None:
+     for data in all_results:
+         s = data["summary"]
+         q = data.get("quality", {})
+-        recall_str = f"{q.get('avg_proxy_recall', 0):.0%}" if q else "N/A"
++        recall_str = f"{q.get('avg_arm_recall', q.get('avg_proxy_recall', 0)):.0%}" if q else "N/A"
+         print(
+             f"{data['scenario']:<20} "
+             f"{data.get('arm', 'proxy'):<20} "

@@ -1,0 +1,30 @@
+ffa1659 fix: wire IngestBudgetPlanner into test scaffolding post-merge
+5702f9a chore: commit unstaged test and Dockerfile changes
+c9a237c feat: merge ingest budget refactor — tiered fetch frequency, per-card routing, printing cost estimation
+6c92405 fix: V21 migration name mismatches + pre-existing TcgPlayerPriceServiceTest key format
+5282be2 fix: review findings — tier comparator, dead cost log, test fixes
+edfc43d feat: refactor TCGPlayer ingest budget system — tiered fetch frequency, per-card vs set-batch routing, printing-aware cost estimation, value-density set ordering
+d96bf3f docs: update yawn.market CHANGELOG for 2026-05-25 rate-limit fixes
+294650e fix: hard-stop SealedProductPriceService on credit exhaustion or 403
+b9bac00 fix: abort card-printing import immediately on 429/403 from PokemonPriceTracker
+12d6828 fix: rename variant to printing in condition history + wire import-card-printings remotely
+b1e674c feat: card printing variant remodel — parser fix, new printing entity, ingest update
+03d41d5 fix: clamp history days param to API-documented max of 365
+d2f17b7 fix: continue set batch pagination after filtered rows
+9ba9cfe fix: route market one-off commands through worker
+ebdc666 docs: trim CHANGELOG to 10 entries
+8e92890 test: add price ingest hardening coverage
+2d66cff feat: request 730 days of price history from PokemonPriceTracker API
+4ee0060 fix: run tier-aware batch in nightly scheduler so weekly sets get price snapshots
+3296fa0 test: add ScrapeOrchestrator and EbaySoldScrapeScheduler budget tests
+b62f363 test: add unit tests for market hardening Phase 2
+ccbbf93 fix(hygiene): add parentheses to bot detection, fix indentation
+ed2b053 feat: compute and persist normalized_set_name on sealed product upsert
+1fca7a3 fix: harden yawn.market resource safety, correctness, and bot detection
+54cdc7e feat: persist per-condition TCGPlayer price history to new table
+8a866b4 docs: update architecture.md and CHANGELOG for MarketMatrixRefresherService
+dd375bc feat: add MarketMatrixRefresherService to refresh materialized view after price ingest
+3ebb510 chore: integrate yawn.db Flyway centralization
+94f9fbc feat: add tcgplayer daily scheduler coverage
+6130fff fix: enable URL fingerprint randomization to reduce Akamai bot detection
+595ee95 fix: soften PLAYWRIGHT_PAGE compression guard to warn-only

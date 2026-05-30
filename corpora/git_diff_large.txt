@@ -1,0 +1,97 @@
+/usr/bin/bash: line 20: cd: projects/archolith: No such file or directory
+warning: in the working copy of '.agent/CONVENTIONS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/RESEARCH-FINDINGS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/plans/archolith-context-curator-remediation-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/plans/archolith-homepage-refinement-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/plans/archolith-migration-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/plans/archolith-rtk-cross-turn-dedupe-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/plans/archolith-rtk-extraction-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/plans/archolith-rtk-git-diff-calibration-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/plans/archolith-rtk-practical-report-risk-level-harness-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/plans/archolith-rtk-read-file-compressor-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/plans/archolith-rtk-read-file-layer2-shrink-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/plans/archolith-rtk-read-file-v2-delegation.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/plans/archolith-scripted-harness-benchmark-remediation-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/plans/cth.context-engine-archolith-product-map-old.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/plans/cth.context-engine-eval-rollout-remediation-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/plans/cth.context-engine-full-audit-remediation-plan-2026-05-21.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/plans/cth.context-engine-memory-adapters-and-promotion-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/plans/cth.context-engine-observability-dashboard-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/plans/reasonix-rtk-output-filtering-remediation-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/reviews/archolith-proxy-rca-qol-adversarial-review.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/reviews/cth.context-engine-full-project-audit-2026-05-21.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/reviews/reasonix-recovery-audit-2026-05-08.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/reviews/reasonix-rtk-output-filtering-big4-review.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/reviews/reasonix-rtk-output-filtering-e2e-review.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/reviews/reasonix-rtk-output-filtering-remediation-review.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/wrapups/WRAPUP-2026-05-07-reasonix-rtk-output-filtering-ph0-ph6.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/wrapups/WRAPUP-2026-05-07-reasonix-rtk-output-filtering.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/wrapups/WRAPUP-2026-05-10-cth-context-engine-phase4.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/wrapups/WRAPUP-2026-05-10-reasonix-rtk-remediation-polish.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/wrapups/WRAPUP-2026-05-11-context-engine-embedding-retrieval.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/wrapups/WRAPUP-2026-05-11-context-engine-phase3-remediation.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/wrapups/WRAPUP-2026-05-12-context-engine-eval-rollout-and-token-accounting.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/wrapups/WRAPUP-2026-05-12-context-engine-live-stream.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/wrapups/WRAPUP-2026-05-12-context-engine-phase5b-streaming-recall.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/wrapups/WRAPUP-2026-05-12-cth.context-engine-observability-dashboard.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/wrapups/WRAPUP-2026-05-13-context-engine-eval-rollout-remediation.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/archive/wrapups/WRAPUP-2026-05-13-context-engine-wrapup-remediation.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/plans/archolith-benchmarking-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/plans/archolith-caller-compat-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/plans/archolith-context-engine-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/plans/archolith-harness-benchmark-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/plans/archolith-product-map.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/plans/archolith-questions.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/plans/archolith-rtk-novel-compression-research-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.agent/plans/archolith-rtk-read-file-risk-differentiation-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.gitignore', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/.agent/CHANGELOG.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/.agent/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/.agent/architecture.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/.agent/data_models.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/.agent/workflows/code_conventions.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/.clinerules', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/.cursorrules', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/.githooks/pre-push', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/.github/copilot-instructions.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/.windsurfrules', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/AGENTS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/CLAUDE.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/QWEN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/gemini.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/hero/ArcholithHero.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/hero/SliceAnnotations.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/hero/StrataField.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/hero/StrataSlice.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/hero/archolith-hero.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/hero/sliceDefinitions.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/hero/sliceDefinitions.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/index.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/logos/01-k8-dropping-keystone.svg', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/logos/02-k2-minimal-keystone.svg', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/logos/03-k1-classic-keystone.svg', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/logos/04-doorway.svg', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/logos/05-strata-column.svg', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/logos/05a-wider-shift.svg', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/logos/05b-wider-shift-mark.svg', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/logos/05c-squat-wide.svg', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/logos/05d-gap-visible.svg', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/logos/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/logos/color-matrix.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'archolith.dev/logos/showcase.html', LF will be replaced by CRLF the next time Git touches it
+=== staged file count ===
+184
+=== verify my plan-review edits are included ===
+.agent/plans/archolith-audit-claude-plugin-plan.md
+.agent/plans/archolith-audit-codex-plugin-plan.md
+.agent/plans/archolith-audit-gemini-plugin-plan.md
+.agent/plans/archolith-audit-opencode-plugin-plan.md
+.agent/plans/archolith-rtk-format-switch-plan.md
+.agent/plans/archolith-rtk-layer0-hardening-plan.md
+=== verify archived plans are present under .agent/archive/plans ===
+35
+=== umbrella HEAD ===
+ec373ed chore: initialize archolith umbrella repo
+total tracked:
+184

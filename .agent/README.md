@@ -16,6 +16,14 @@ archolith-bench proxy --list          # list scenarios (no proxy needed)
 archolith-bench proxy --all --arms direct,proxy_only  # run against live proxy
 ```
 
+## Headline Numbers Policy
+
+**`HEADLINE-NUMBERS.md` is the canonical source for any stat used in marketing copy or README headlines.**
+Before writing any percentage or token count into archolith.dev or a product README:
+1. Check `HEADLINE-NUMBERS.md` — if it isn't there, it isn't verified.
+2. Run the benchmark, paste the result row into the table, note the commit.
+3. Fixture data (from bundled `fixtures/`) is NOT a headline number — it demonstrates report format only.
+
 ## FOLLOW-UP
 - GitHub remote `archolith/archolith-bench` still needs creating. Add with: `git remote add origin git@github.com:archolith/archolith-bench.git`
 - Phase 2+ deps (archolith-rtk, archolith-audit) not yet in pyproject.toml

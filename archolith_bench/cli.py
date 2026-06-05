@@ -46,7 +46,7 @@ def main(argv: list[str] | None = None) -> None:
     proxy_p.add_argument("--no-restart", action="store_true", help="Skip restart/bootstrap scoring")
 
     # ---- filter subcommand ----
-    filter_p = subparsers.add_parser("filter", help="Filter suite: compression-ratio measurement via archolith-rtk")
+    filter_p = subparsers.add_parser("filter", help="Filter suite: compression-ratio measurement via archolith-filter")
     filter_p.add_argument("--corpora", type=Path, default=Path("corpora"),
                           help="Path to corpora directory (default: corpora/)")
     filter_p.add_argument("--format", choices=["markdown", "json"], default="markdown",

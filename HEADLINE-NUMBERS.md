@@ -54,7 +54,7 @@ README headlines, or the archolith.dev site.
 ## What to Run to Refresh Headlines
 
 ```bash
-# Filter suite (archolith-rtk compression)
+# Filter suite (archolith-filter compression)
 archolith-bench filter --all
 
 # Proxy suite (token savings + recall)

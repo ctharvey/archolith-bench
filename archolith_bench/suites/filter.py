@@ -1,4 +1,4 @@
-"""Filter suite: measure archolith-rtk compression ratios on real tool-output corpora.
+"""Filter suite: measure archolith-filter compression ratios on real tool-output corpora.
 
 For each corpus sample, runs filter_output (and shrink_oversized where relevant)
 and records raw vs filtered token counts and ratio per command category.
@@ -12,7 +12,7 @@ import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from archolith_rtk import count_tokens, filter_output
+from archolith_filter import count_tokens, filter_output
 
 from ..core.corpus import CATEGORY_FILTER_DEFAULTS, CorpusSample, list_corpora, load_sample
 from ..core.report import save_results
@@ -151,7 +151,7 @@ def apply_filter_to_history(messages: list[dict]) -> list[dict]:
     """Pre-filter tool results in a conversation history using filter_output.
 
     Used by the filter_only arm to compress tool results before they enter
-    the model context, simulating what archolith-rtk does as a pre-processing
+    the model context, simulating what archolith-filter does as a pre-processing
     step without the proxy.
     """
     filtered = []

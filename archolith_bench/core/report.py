@@ -220,7 +220,7 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
     if filter_path.exists():
         with open(filter_path, encoding="utf-8") as f:
             filter_data = json.load(f)
-        lines.append("## Filter Suite (archolith-rtk)\n")
+        lines.append("## Filter Suite (archolith-filter)\n")
         lines.append("Token-savings compression ratio measured on real tool-output corpora.\n")
         lines.append("| Category | Samples | Raw Tokens | Filtered | Savings |\n")
         lines.append("|----------|---------|------------|----------|--------|\n")
@@ -235,7 +235,7 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
         )
         lines.append("\n")
     else:
-        lines.append("## Filter Suite (archolith-rtk)\n")
+        lines.append("## Filter Suite (archolith-filter)\n")
         lines.append("*No filter results found. Run `archolith-bench filter --corpora corpora/` to generate.*\n\n")
 
     # ---- Proxy section ----

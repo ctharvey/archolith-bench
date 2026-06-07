@@ -55,7 +55,7 @@ archolith-bench proxy --all --arms direct,proxy_only,proxy_plus_filter --budgets
 Set environment variables in `.env`:
 
 - `UPSTREAM_API_KEY` (required for runs)
-- `PROXY_URL` (default: `http://localhost:9801/v1`)
+- `PROXY_URL` (default: `http://localhost:9800/v1`)
 - `UPSTREAM_BASE_URL` (default: `https://integrate.api.nvidia.com/v1`)
 - `BENCHMARK_MODEL` (default: `gpt-4o-mini`)
 

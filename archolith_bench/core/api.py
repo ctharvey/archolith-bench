@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-_proxy_port = os.getenv("PROXY_PORT", "9801")
+_proxy_port = os.getenv("PROXY_PORT", "9800")
 PROXY_URL = os.getenv("PROXY_URL", f"http://localhost:{_proxy_port}/v1")
 DIRECT_URL = os.getenv("UPSTREAM_BASE_URL", "https://integrate.api.nvidia.com/v1")
 API_KEY = os.getenv("UPSTREAM_API_KEY", "")

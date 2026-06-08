@@ -107,12 +107,19 @@ def get_proxy_trace(client: httpx.Client, proxy_url: str, session_id: str | None
         return {"error": str(e)}
 
 
-def set_proxy_budget(client: httpx.Client, proxy_url: str, budget: int) -> bool:
-    """Set the proxy context token budget. Returns True if successful."""
+def set_proxy_budget(
+    client: httpx.Client, proxy_url: str, budget: int, persist: bool = False
+) -> bool:
+    """Set the proxy context token budget. Returns True if successful.
+
+    Applies ephemerally by default so a benchmark run does not mutate the proxy's
+    persisted config_overrides.json.
+    """
     base = _proxy_base(proxy_url)
     try:
         resp = client.post(
             f"{base}/admin/config",
+            params={"persist": str(persist).lower()},
             json={"context_token_budget": budget},
             timeout=5,
         )
@@ -121,12 +128,21 @@ def set_proxy_budget(client: httpx.Client, proxy_url: str, budget: int) -> bool:
         return False
 
 
-def apply_arm_config(client: httpx.Client, proxy_url: str, config_overrides: dict) -> bool:
-    """Apply experiment-arm config overrides to the proxy. Returns True if successful."""
+def apply_arm_config(
+    client: httpx.Client, proxy_url: str, config_overrides: dict, persist: bool = False
+) -> bool:
+    """Apply experiment-arm config overrides to the proxy. Returns True if successful.
+
+    Applies ephemerally by default (persist=False): the proxy holds the override
+    in memory for its current process but does NOT write config_overrides.json, so a
+    benchmark run never mutates the proxy's persisted config. (Older proxies that do
+    not support ?persist ignore the query param and persist as before.)
+    """
     base = _proxy_base(proxy_url)
     try:
         resp = client.post(
             f"{base}/admin/config",
+            params={"persist": str(persist).lower()},
             json=config_overrides,
             timeout=5,
         )
@@ -135,7 +151,8 @@ def apply_arm_config(client: httpx.Client, proxy_url: str, config_overrides: dic
             if result.get("rejected"):
                 print(f"  WARNING: rejected overrides: {result['rejected']}")
             else:
-                print(f"  Config overrides applied: {result.get('updated', {})}")
+                _mode = "persisted" if result.get("persisted", True) else "ephemeral"
+                print(f"  Config overrides applied ({_mode}): {result.get('updated', {})}")
             return True
         print(f"  WARNING: Failed to apply config overrides: {resp.status_code}")
         return False

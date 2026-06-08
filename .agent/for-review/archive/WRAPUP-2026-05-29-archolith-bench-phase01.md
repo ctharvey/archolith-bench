@@ -1,9 +1,9 @@
-# WRAPUP: archolith-bench Phase 0-5
+# WRAPUP REVIEWED — archolith-bench Phase 0-5
 
 **Agent:** opencode
 **Model:** nvidia/z-ai/glm-5.1
 **Date:** 2026-05-30
-**Status:** PARTIAL (all code complete; live-proxy runs NOT RUN; filter suite verified offline; audit suite verified on fixtures)
+**Status:** REVIEWED WITH FINDINGS
 **Plan:** `.agent/plans/archolith-bench-suite-plan.md` (Phase 0 through Phase 5)
 **Worktree:** `C:\Users\thron\IdeaProjects\projects\archolith\archolith-bench`
 
@@ -103,3 +103,22 @@ Built archolith-bench from scratch across Phases 0-5. Phase 0 scaffolded the rep
 - **Representative corpus expansion**: Current 6-corpus filter result (33.2%) is below the product claim range (36-57%). More representative corpora would bring the number into range.
 - **GitHub remote creation**: `archolith/archolith-bench` repo needs creating on GitHub.
 - **Phase 6 (DEFERRED)**: Supervised LLM-judge quality eval (`judge.py` stub).
+
+## Review Findings
+
+### 2026-05-29 — Claude Opus 4.8
+
+Scores:
+- Implementation: 76/100 (C)
+- Wrapup: 80/100 (B)
+
+Findings:
+- [P2] The reviewed Phase 1 continuity work left `decision_retention` and `verification_continuity` effectively dead, even though the wrapup claimed those metrics were wired into the benchmark.
+- [P3] Runtime log files were committed in the reviewed work and `logs/` was not yet gitignored at that point.
+- [P3] The reviewed `orientation_score` logic likely inverted the intended signal for "remember what we were doing."
+- [P3] The reviewed `filter_only` arm silently aliased `direct` instead of representing a distinct filter-only path.
+- [P3] The wrapup's model field was incorrect for the reviewed session.
+
+Verification Summary:
+- Offline import/list/filter/audit/report commands were re-run against the claimed commit work product during review
+- Live `HEAD` later drifted beyond the reviewed commit set; that later drift was not scored against this review

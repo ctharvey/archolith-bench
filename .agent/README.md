@@ -26,4 +26,4 @@ Before writing any percentage or token count into archolith.dev or a product REA
 
 ## FOLLOW-UP
 - GitHub remote `archolith/archolith-bench` still needs creating. Add with: `git remote add origin git@github.com:archolith/archolith-bench.git`
-- Phase 2+ deps (archolith-filter, archolith-audit) not yet in pyproject.toml
+- ~~Phase 2+ deps (archolith-filter, archolith-audit) not yet in pyproject.toml~~ — both are now in `pyproject.toml` dependencies

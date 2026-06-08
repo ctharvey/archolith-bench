@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import re
 import time
+import uuid
 from dataclasses import asdict
 from pathlib import Path
 
@@ -294,6 +295,7 @@ def _run_fact_probes(
     model: str,
     current_turn: int,
     api_key: str = "",
+    proxy_session_id: str | None = None,
 ) -> list[dict]:
     _key = api_key or API_KEY
     results = []
@@ -304,7 +306,9 @@ def _run_fact_probes(
         direct_messages = direct_history + [probe_msg]
         direct_text, _, _ = send_chat(client, direct_url, _key, direct_messages, model)
         arm_messages = arm_history + [probe_msg]
-        arm_text, _, _ = send_chat(client, proxy_url, _key, arm_messages, model)
+        arm_text, _, _ = send_chat(
+            client, proxy_url, _key, arm_messages, model, session_id=proxy_session_id
+        )
         direct_hits = sum(1 for kw in probe.expected_keywords if kw.lower() in direct_text.lower())
         arm_hits = sum(1 for kw in probe.expected_keywords if kw.lower() in arm_text.lower())
         total_kw = len(probe.expected_keywords)
@@ -355,7 +359,10 @@ def run_benchmark(
     probe_results: list[dict] = []
     direct_history: list[dict] = []
     arm_history: list[dict] = []
-    proxy_session_id: str | None = None
+    # Pin a known session id for this run and send it as X-Session-ID on every proxy
+    # call. The proxy honors X-Session-ID as the primary key, so the trace query reads
+    # exactly this session instead of guessing sessions[0] (which read stale runs).
+    proxy_session_id: str | None = f"bench-{scenario.name}-{arm}-{uuid.uuid4().hex[:12]}"
     start_turn = 0
     consecutive_collapses = 0
     tracker = ContinuityTracker()
@@ -461,7 +468,8 @@ def run_benchmark(
             else:
                 print(f"  [arm={arm}] Sending {len(arm_history)} messages (~{arm_est} tokens)...")
                 arm_text, arm_latency, arm_usage = send_chat(
-                    client, proxy_url, _key, arm_history, model
+                    client, proxy_url, _key, arm_history, model,
+                    session_id=proxy_session_id,
                 )
                 arm_input = arm_usage.get("prompt_tokens", arm_est)
                 arm_output = arm_usage.get("completion_tokens", estimate_tokens(arm_text))
@@ -469,6 +477,8 @@ def run_benchmark(
 
                 time.sleep(3)
                 trace = get_proxy_trace(client, proxy_url, session_id=proxy_session_id)
+                if trace.get("error"):
+                    print(f"  [trace]  WARNING: {trace['error']}")
                 trace_turns = trace.get("turns", [])
                 expected_turn = i - 1
                 trace_turn = {}
@@ -478,9 +488,6 @@ def run_benchmark(
                         break
                 if not trace_turn and trace_turns:
                     trace_turn = trace_turns[-1]
-                if not proxy_session_id and trace.get("summary", {}).get("session_id"):
-                    proxy_session_id = trace["summary"]["session_id"]
-                    print(f"  [trace]  session_id={proxy_session_id}")
 
                 trace_turn = {
                     "assembly_mode": trace_turn.get("assembly_mode", "unknown"),
@@ -533,6 +540,7 @@ def run_benchmark(
                 probes = _run_fact_probes(
                     client, scenario, direct_history, arm_history,
                     proxy_url, direct_url, model, i, api_key=_key,
+                    proxy_session_id=proxy_session_id,
                 )
                 probe_results.extend(probes)
                 for p in probes:

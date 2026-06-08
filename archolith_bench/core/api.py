@@ -24,16 +24,23 @@ def send_chat(
     messages: list[dict],
     model: str,
     max_retries: int = 5,
+    session_id: str | None = None,
 ) -> tuple[str, float, dict]:
     """Send a chat completion request. Returns (response_text, latency_ms, usage_dict).
 
     Retries on 429 (rate limit) with exponential backoff.
+
+    When session_id is provided it is sent as the X-Session-ID header so the proxy
+    pins this conversation to a known session id (which the trace query then reads
+    directly, instead of guessing sessions[0]).
     """
     url = f"{base_url.rstrip('/')}/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
+    if session_id:
+        headers["X-Session-ID"] = session_id
     body = {
         "model": model,
         "messages": messages,
@@ -86,16 +93,12 @@ def _proxy_base(proxy_url: str) -> str:
 
 def get_proxy_trace(client: httpx.Client, proxy_url: str, session_id: str | None = None) -> dict:
     base = _proxy_base(proxy_url)
+    # A session_id is REQUIRED. The old sessions[0] fallback read whatever session
+    # happened to be first in the proxy's store (often a stale/unrelated run), which
+    # silently reported the wrong session's assembly_mode/savings. Fail loudly instead.
+    if not session_id:
+        return {"error": "get_proxy_trace requires an explicit session_id (no sessions[0] fallback)"}
     try:
-        if not session_id:
-            resp = client.get(f"{base}/trace/sessions", timeout=10)
-            if resp.status_code != 200:
-                return {"error": f"trace sessions {resp.status_code}"}
-            sessions = resp.json().get("sessions", [])
-            if not sessions:
-                return {"error": "no trace sessions"}
-            session_id = sessions[0]["session_id"]
-
         resp2 = client.get(f"{base}/trace/sessions/{session_id}", timeout=10)
         if resp2.status_code != 200:
             return {"error": f"trace session detail {resp2.status_code}"}

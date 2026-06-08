@@ -28,7 +28,6 @@ from ..core.api import (
     DIRECT_URL,
     MODEL,
     PROXY_URL,
-    apply_arm_config,
     estimate_messages_tokens,
     estimate_tokens,
     get_proxy_trace,
@@ -192,7 +191,7 @@ def run_restart_bootstrap(
 
     for i, user_msg in enumerate(scenario.turns, 1):
         history.append({"role": "user", "content": user_msg})
-        text, _, _ = send_chat(client, proxy_url, _key, history, model)
+        text, _, _ = send_chat(client, proxy_url, _key, history, model, session_config=arm_config)
         history.append({"role": "assistant", "content": text})
 
     last_response = history[-1]["content"] if history else ""
@@ -213,7 +212,7 @@ def run_restart_bootstrap(
     )
 
     fresh_history = [system_msg, {"role": "user", "content": orientation_prompt}]
-    orientation_text, _, _ = send_chat(client, proxy_url, _key, fresh_history, model)
+    orientation_text, _, _ = send_chat(client, proxy_url, _key, fresh_history, model, session_config=arm_config)
 
     orientation_lower = orientation_text.lower()
 
@@ -296,6 +295,7 @@ def _run_fact_probes(
     current_turn: int,
     api_key: str = "",
     proxy_session_id: str | None = None,
+    arm_config: dict | None = None,
 ) -> list[dict]:
     _key = api_key or API_KEY
     results = []
@@ -307,7 +307,8 @@ def _run_fact_probes(
         direct_text, _, _ = send_chat(client, direct_url, _key, direct_messages, model)
         arm_messages = arm_history + [probe_msg]
         arm_text, _, _ = send_chat(
-            client, proxy_url, _key, arm_messages, model, session_id=proxy_session_id
+            client, proxy_url, _key, arm_messages, model,
+            session_id=proxy_session_id, session_config=arm_config,
         )
         direct_hits = sum(1 for kw in probe.expected_keywords if kw.lower() in direct_text.lower())
         arm_hits = sum(1 for kw in probe.expected_keywords if kw.lower() in arm_text.lower())
@@ -394,8 +395,13 @@ def run_benchmark(
             else:
                 print("  WARNING: Could not set budget via admin API")
 
+        # Arm config is applied per-session via the X-Session-Config header on each
+        # proxy chat call (see send_chat session_config=arm_config below), NOT via a
+        # global PATCH /admin/config. This scopes the arm's overrides to this run's
+        # session only, so concurrent arms/runs cannot clobber each other's config
+        # and global config_overrides.json is never touched.
         if arm_config:
-            apply_arm_config(client, proxy_url, arm_config)
+            print(f"  Arm config (per-session): {arm_config}")
 
         config_snapshot = snapshot_proxy_config(client, proxy_url)
 
@@ -469,7 +475,7 @@ def run_benchmark(
                 print(f"  [arm={arm}] Sending {len(arm_history)} messages (~{arm_est} tokens)...")
                 arm_text, arm_latency, arm_usage = send_chat(
                     client, proxy_url, _key, arm_history, model,
-                    session_id=proxy_session_id,
+                    session_id=proxy_session_id, session_config=arm_config,
                 )
                 arm_input = arm_usage.get("prompt_tokens", arm_est)
                 arm_output = arm_usage.get("completion_tokens", estimate_tokens(arm_text))
@@ -540,7 +546,7 @@ def run_benchmark(
                 probes = _run_fact_probes(
                     client, scenario, direct_history, arm_history,
                     proxy_url, direct_url, model, i, api_key=_key,
-                    proxy_session_id=proxy_session_id,
+                    proxy_session_id=proxy_session_id, arm_config=arm_config,
                 )
                 probe_results.extend(probes)
                 for p in probes:

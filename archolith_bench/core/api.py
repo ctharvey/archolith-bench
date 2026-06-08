@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import time
 
@@ -25,6 +26,7 @@ def send_chat(
     model: str,
     max_retries: int = 5,
     session_id: str | None = None,
+    session_config: dict | None = None,
 ) -> tuple[str, float, dict]:
     """Send a chat completion request. Returns (response_text, latency_ms, usage_dict).
 
@@ -33,6 +35,11 @@ def send_chat(
     When session_id is provided it is sent as the X-Session-ID header so the proxy
     pins this conversation to a known session id (which the trace query then reads
     directly, instead of guessing sessions[0]).
+
+    When session_config is provided it is sent as the X-Session-Config header (JSON
+    object) so the proxy scopes those config overrides to this session only, without
+    mutating global config. The proxy merges + persists it on the session, so it is
+    safe (idempotent) to send on every turn.
     """
     url = f"{base_url.rstrip('/')}/chat/completions"
     headers = {
@@ -41,6 +48,8 @@ def send_chat(
     }
     if session_id:
         headers["X-Session-ID"] = session_id
+    if session_config:
+        headers["X-Session-Config"] = json.dumps(session_config)
     body = {
         "model": model,
         "messages": messages,

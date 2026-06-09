@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
 
-SCENARIOS_DIR = Path(__file__).resolve().parent.parent.parent / "scenarios"
+_env_scenarios = os.environ.get("ARCHOLITH_BENCH_SCENARIOS_DIR")
+SCENARIOS_DIR = Path(_env_scenarios) if _env_scenarios else Path(__file__).resolve().parent.parent.parent / "scenarios"
 
 
 @dataclass

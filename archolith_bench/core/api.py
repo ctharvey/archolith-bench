@@ -182,24 +182,6 @@ def snapshot_proxy_config(client: httpx.Client, proxy_url: str) -> dict:
     return {}
 
 
-def estimate_tokens(text: str | None) -> int:
-    if not text:
-        return 1
-    return max(1, len(text) // 4)
-
-
-def estimate_messages_tokens(messages: list[dict]) -> int:
-    total = 0
-    for m in messages:
-        c = m.get("content", "")
-        if isinstance(c, str):
-            total += estimate_tokens(c)
-        elif isinstance(c, list):
-            for part in c:
-                total += estimate_tokens(part.get("text", ""))
-    return max(1, total)
-
-
 def check_proxy_health(proxy_url: str) -> dict | None:
     """Check proxy health. Returns health dict on success, None on failure."""
     base = _proxy_base(proxy_url)

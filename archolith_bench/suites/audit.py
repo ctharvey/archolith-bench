@@ -9,10 +9,9 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import asdict
 from pathlib import Path
 
-from archolith_mcp_audit.comparator import ServerDelta, compare_reports, format_delta_report
+from archolith_mcp_audit.comparator import compare_reports, format_delta_report
 
 
 def run_audit_comparison(
@@ -103,7 +102,7 @@ def run_audit_comparison(
 def print_audit_summary(result: dict) -> None:
     """Print a human-readable audit comparison summary."""
     print(f"\n{'='*80}")
-    print(f"  AUDIT COMPARISON: BEFORE vs AFTER")
+    print("  AUDIT COMPARISON: BEFORE vs AFTER")
     print(f"{'='*80}")
     print(f"  Before: {result['before_path']}")
     print(f"  After:  {result['after_path']}")

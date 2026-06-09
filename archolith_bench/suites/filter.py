@@ -15,7 +15,6 @@ from pathlib import Path
 from archolith_filter import count_tokens, filter_output
 
 from ..core.corpus import CATEGORY_FILTER_DEFAULTS, CorpusSample, list_corpora, load_sample
-from ..core.report import save_results
 
 
 @dataclass
@@ -71,7 +70,7 @@ def run_filter_sample(sample: CorpusSample, command: str = "", tool: str = "") -
 def run_filter_suite(
     corpora_dir: Path | None = None,
     output_dir: Path = Path("results"),
-) -> list[dict]:
+) -> tuple[list[dict], dict]:
     """Run the filter suite across all corpus samples.
 
     Returns a list of per-sample result dicts plus an aggregate summary.
@@ -134,7 +133,7 @@ def run_filter_suite(
 def print_filter_summary(data: dict) -> None:
     """Print a human-readable filter suite summary table."""
     print(f"\n{'='*80}")
-    print(f"  FILTER SUITE SUMMARY")
+    print("  FILTER SUITE SUMMARY")
     print(f"{'='*80}")
     print(f"  {'Category':<15} {'Samples':>8} {'Raw Tokens':>12} {'Filtered':>12} {'Savings':>10}")
     print(f"  {'-'*15} {'-'*8} {'-'*12} {'-'*12} {'-'*10}")

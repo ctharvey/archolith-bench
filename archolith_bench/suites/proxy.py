@@ -14,7 +14,6 @@ Continuity tracking (Step 3 from the original plan):
 from __future__ import annotations
 
 import json
-import re
 import time
 import uuid
 from dataclasses import asdict
@@ -28,308 +27,21 @@ from ..core.api import (
     DIRECT_URL,
     MODEL,
     PROXY_URL,
-    estimate_messages_tokens,
-    estimate_tokens,
     get_proxy_trace,
     send_chat,
     set_proxy_budget,
     snapshot_proxy_config,
 )
-from ..core.metrics import (
-    ContinuityMetrics,
-    ScenarioResult,
-    TokenMetrics,
-    TurnResult,
-)
-from ..core.report import COLLAPSE_TOKEN_THRESHOLD, print_cross_scenario_summary, print_summary, save_results
-from ..core.scenario import FactProbe, Scenario
+from ..core.display import COLLAPSE_TOKEN_THRESHOLD, print_cross_scenario_summary, print_summary
+from ..core.metrics import ContinuityMetrics, estimate_messages_tokens, estimate_tokens
+from ..core.report import save_results
+from ..core.scenario import Scenario
+from .checkpoints import checkpoint_path, load_checkpoint, save_checkpoint
+from .continuity import ContinuityTracker
+from .probes import run_fact_probes
+from .restart import run_restart_bootstrap
 
 COLLAPSE_CONSECUTIVE_LIMIT = 2
-
-
-# ---------------------------------------------------------------------------
-# ContinuityTracker
-# ---------------------------------------------------------------------------
-
-_FILE_PATH_RE = re.compile(r'(?:/[\w.\-]+/){1,}[\w.\-]+\.\w{1,12}', re.IGNORECASE)
-_COMMAND_RE = re.compile(r'(?:npm|pip|python|git|cargo|go|docker|kubectl|make)\s+\S+', re.IGNORECASE)
-
-
-_REREAD_PHRASES = re.compile(
-    r"(?:let me (?:re-?read|read|open|check|look at|view|cat|see) "
-    r"|i (?:need to |should )?(?:re-?read|read|open|check|look at|view) "
-    r"|can you (?:re-?read|read|open|show|print|display) "
-    r"|show me (?:the |that |those )?(?:file|content|output|result)s?)",
-    re.IGNORECASE,
-)
-
-
-class ContinuityTracker:
-    """Track re-mentions of file paths and commands across a scenario run.
-
-    Scans each arm response for file paths / commands first seen in earlier
-    turns.  Records repeat_file_reads and repeat_diagnostics.
-
-    decision_retention is derived from final-turn fact probes: for each
-    expected keyword, did the arm recall it at least as well as the direct
-    baseline?  A decision is "retained" if keyword recall is not degraded.
-
-    verification_continuity is derived from whether the last-turn response
-    refers to a previously stated conclusion, plan, or next step (heuristic:
-    the last user message is about wrapping up / verifying; the response
-    should reference prior work rather than starting from scratch).
-    """
-
-    def __init__(self) -> None:
-        self._seen_files: dict[str, int] = {}
-        self._seen_commands: dict[str, int] = {}
-        self._repeat_file_reads: int = 0
-        self._repeat_diagnostics: int = 0
-        self._decision_retained: int = 0
-        self._decision_total: int = 0
-        self._verification_continued: int = 0
-        self._verification_total: int = 0
-
-    def observe_turn(self, turn: int, response: str) -> dict:
-        """Scan a response, update internal state, and return per-turn stats."""
-        files_in_response = set(_FILE_PATH_RE.findall(response))
-        commands_in_response = set(_COMMAND_RE.findall(response))
-
-        repeat_files = 0
-        new_files = 0
-        for f in files_in_response:
-            if f in self._seen_files:
-                repeat_files += 1
-                self._repeat_file_reads += 1
-            else:
-                new_files += 1
-                self._seen_files[f] = turn
-
-        repeat_cmds = 0
-        new_cmds = 0
-        for c in commands_in_response:
-            if c in self._seen_commands:
-                repeat_cmds += 1
-                self._repeat_diagnostics += 1
-            else:
-                new_cmds += 1
-                self._seen_commands[c] = turn
-
-        return {
-            "turn": turn,
-            "files_mentioned": len(files_in_response),
-            "repeat_files": repeat_files,
-            "new_files": new_files,
-            "commands_mentioned": len(commands_in_response),
-            "repeat_commands": repeat_cmds,
-            "new_commands": new_cmds,
-        }
-
-    def record_probe_result(self, direct_recall: float, arm_recall: float) -> None:
-        """Record whether a fact-probe decision was retained (arm >= direct)."""
-        self._decision_total += 1
-        if arm_recall >= direct_recall:
-            self._decision_retained += 1
-
-    def record_verification(self, response: str, prior_files: set[str], prior_commands: set[str]) -> None:
-        """Record whether a final-turn response references prior work.
-
-        Verification is "continued" if the response mentions at least one
-        previously-seen file path or command without expressing intent to
-        re-read it (which would indicate information loss).
-        """
-        self._verification_total += 1
-        mentions_prior_file = any(f.lower() in response.lower() for f in prior_files)
-        mentions_prior_cmd = any(c.lower() in response.lower() for c in prior_commands)
-        wants_reread = bool(_REREAD_PHRASES.search(response))
-        if (mentions_prior_file or mentions_prior_cmd) and not wants_reread:
-            self._verification_continued += 1
-
-    def compute(self, final_response: str = "", known_files: set | None = None, known_commands: set | None = None) -> ContinuityMetrics:
-        decision_retention = (
-            self._decision_retained / self._decision_total
-            if self._decision_total else 0.0
-        )
-        if self._verification_total == 0 and final_response and known_files is not None:
-            self.record_verification(final_response, known_files, known_commands or set())
-        verification_continuity = (
-            self._verification_continued / self._verification_total
-            if self._verification_total else 0.0
-        )
-        return ContinuityMetrics(
-            repeat_file_reads=self._repeat_file_reads,
-            repeat_diagnostics=self._repeat_diagnostics,
-            decision_retention=decision_retention,
-            verification_continuity=verification_continuity,
-        )
-
-
-# ---------------------------------------------------------------------------
-# Restart / Bootstrap runner
-# ---------------------------------------------------------------------------
-
-def run_restart_bootstrap(
-    client: httpx.Client,
-    scenario: Scenario,
-    proxy_url: str,
-    direct_url: str,
-    model: str,
-    api_key: str,
-    arm_config: dict | None = None,
-) -> dict:
-    """Replay a scenario, then start a fresh conversation in the same proxy
-    session and score turn_one_orientation_score.
-
-    The orientation prompt asks the model to recall the last blocker/next step.
-    A good response should reference key facts from earlier turns (high keyword
-    overlap with the last response) WITHOUT expressing intent to re-read files
-    (which indicates information loss).
-    """
-    _key = api_key or API_KEY
-    system_msg = {"role": "system", "content": scenario.system_prompt}
-    history = [system_msg]
-
-    for i, user_msg in enumerate(scenario.turns, 1):
-        history.append({"role": "user", "content": user_msg})
-        text, _, _ = send_chat(client, proxy_url, _key, history, model, session_config=arm_config)
-        history.append({"role": "assistant", "content": text})
-
-    last_response = history[-1]["content"] if history else ""
-    last_files = set(_FILE_PATH_RE.findall(last_response))
-    last_commands = set(_COMMAND_RE.findall(last_response))
-
-    all_keywords: set[str] = set()
-    for turn_text in [m["content"] for m in history if m["role"] == "assistant"]:
-        words = turn_text.lower().split()
-        all_keywords.update(w for w in words if len(w) >= 4)
-    last_keywords = set(last_response.lower().split())
-    key_facts = last_keywords & all_keywords
-
-    orientation_prompt = (
-        "This is a new conversation in the same project. Without re-reading any "
-        "files, what was the last blocker or next step we were working on, and "
-        "what should we do next?"
-    )
-
-    fresh_history = [system_msg, {"role": "user", "content": orientation_prompt}]
-    orientation_text, _, _ = send_chat(client, proxy_url, _key, fresh_history, model, session_config=arm_config)
-
-    orientation_lower = orientation_text.lower()
-
-    if key_facts:
-        facts_recalled = sum(1 for kw in key_facts if kw in orientation_lower)
-        fact_recovery = facts_recalled / len(key_facts)
-    else:
-        fact_recovery = 1.0 if orientation_text.strip() else 0.0
-
-    explicit_reread = bool(_REREAD_PHRASES.search(orientation_text))
-
-    if fact_recovery > 0 and not explicit_reread:
-        orientation_score = min(fact_recovery * 1.2, 1.0)
-    elif fact_recovery > 0 and explicit_reread:
-        orientation_score = fact_recovery * 0.5
-    else:
-        orientation_score = 0.0
-
-    return {
-        "orientation_prompt": orientation_prompt,
-        "orientation_response_preview": orientation_text[:500],
-        "orientation_score": round(orientation_score, 4),
-        "fact_recovery": round(fact_recovery, 4),
-        "key_facts_count": len(key_facts),
-        "facts_recalled": facts_recalled if key_facts else 0,
-        "explicit_reread": explicit_reread,
-        "last_files_count": len(last_files),
-        "last_commands_count": len(last_commands),
-    }
-
-
-# ---------------------------------------------------------------------------
-# Checkpoint helpers
-# ---------------------------------------------------------------------------
-
-def _checkpoint_path(output_dir: Path, scenario_name: str, arm: str, budget: int | None) -> Path:
-    budget_str = f"_{budget}b" if budget else ""
-    return output_dir / f".checkpoint_{scenario_name}_{arm}{budget_str}.json"
-
-
-def _save_checkpoint(
-    path: Path, scenario_name: str, arm: str, budget: int | None,
-    results: list, probe_results: list,
-    direct_history: list, arm_history: list,
-    proxy_session_id: str | None,
-) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump({
-            "scenario": scenario_name,
-            "arm": arm,
-            "budget": budget,
-            "results": results,
-            "probe_results": probe_results,
-            "direct_history": direct_history,
-            "arm_history": arm_history,
-            "proxy_session_id": proxy_session_id,
-        }, f)
-
-
-def _load_checkpoint(path: Path) -> dict | None:
-    if path.exists():
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    return None
-
-
-# ---------------------------------------------------------------------------
-# Fact probe evaluation
-# ---------------------------------------------------------------------------
-
-def _run_fact_probes(
-    client: httpx.Client,
-    scenario: Scenario,
-    direct_history: list[dict],
-    arm_history: list[dict],
-    proxy_url: str,
-    direct_url: str,
-    model: str,
-    current_turn: int,
-    api_key: str = "",
-    proxy_session_id: str | None = None,
-    arm_config: dict | None = None,
-) -> list[dict]:
-    _key = api_key or API_KEY
-    results = []
-    for probe in scenario.fact_probes:
-        if probe.after_turn != current_turn:
-            continue
-        probe_msg = {"role": "user", "content": probe.question}
-        direct_messages = direct_history + [probe_msg]
-        direct_text, _, _ = send_chat(client, direct_url, _key, direct_messages, model)
-        arm_messages = arm_history + [probe_msg]
-        arm_text, _, _ = send_chat(
-            client, proxy_url, _key, arm_messages, model,
-            session_id=proxy_session_id, session_config=arm_config,
-        )
-        direct_hits = sum(1 for kw in probe.expected_keywords if kw.lower() in direct_text.lower())
-        arm_hits = sum(1 for kw in probe.expected_keywords if kw.lower() in arm_text.lower())
-        total_kw = len(probe.expected_keywords)
-        result = {
-            "after_turn": probe.after_turn,
-            "question": probe.question,
-            "expected_keywords": probe.expected_keywords,
-            "direct_recall": round(direct_hits / total_kw, 3) if total_kw else 0,
-            "arm_recall": round(arm_hits / total_kw, 3) if total_kw else 0,
-            "direct_hits": direct_hits,
-            "arm_hits": arm_hits,
-            "total_keywords": total_kw,
-            "direct_response_preview": direct_text[:200],
-            "arm_response_preview": arm_text[:200],
-        }
-        results.append(result)
-        status = "PASS" if arm_hits >= direct_hits else "DEGRADED"
-        print(f"  [probe]  After turn {current_turn}: {status} -- "
-              f"arm {arm_hits}/{total_kw} vs direct {direct_hits}/{total_kw} keywords recalled")
-    return results
 
 
 # ---------------------------------------------------------------------------
@@ -368,10 +80,10 @@ def run_benchmark(
     consecutive_collapses = 0
     tracker = ContinuityTracker()
 
-    ckpt_path = _checkpoint_path(output_dir, scenario.name, arm, budget)
+    ckpt_path = checkpoint_path(output_dir, scenario.name, arm, budget)
 
     if resume:
-        ckpt = _load_checkpoint(ckpt_path)
+        ckpt = load_checkpoint(ckpt_path)
         if ckpt and ckpt["scenario"] == scenario.name and ckpt.get("arm") == arm and ckpt.get("budget") == budget:
             results = ckpt["results"]
             probe_results = ckpt["probe_results"]
@@ -543,7 +255,7 @@ def run_benchmark(
             results.append(result)
 
             if run_probes:
-                probes = _run_fact_probes(
+                probes = run_fact_probes(
                     client, scenario, direct_history, arm_history,
                     proxy_url, direct_url, model, i, api_key=_key,
                     proxy_session_id=proxy_session_id, arm_config=arm_config,
@@ -555,7 +267,7 @@ def run_benchmark(
                         arm_recall=p.get("arm_recall", 0.0),
                     )
 
-            _save_checkpoint(
+            save_checkpoint(
                 ckpt_path, scenario.name, arm, budget,
                 results, probe_results,
                 direct_history, arm_history, proxy_session_id,

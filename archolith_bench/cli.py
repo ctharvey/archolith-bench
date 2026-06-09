@@ -9,8 +9,31 @@ from pathlib import Path
 
 from .arms import ARMS, PROXY_FAMILY_ARMS
 from .core.api import API_KEY, DIRECT_URL, MODEL, PROXY_URL, check_proxy_health
-from .core.report import print_cross_scenario_summary, print_summary, save_results
+from .core.display import print_cross_scenario_summary, print_four_way_table, print_summary
+from .core.report import save_results
 from .core.scenario import Scenario, list_scenarios
+
+
+def _add_common_proxy_args(parser: argparse.ArgumentParser) -> None:
+    """Add shared arguments for proxy and stack subcommands.
+
+    These args are common to both proxy and stack suites:
+    scenario selection, budget, turns, endpoints, model, output, api-key,
+    fact probes, and restart scoring.
+    """
+    parser.add_argument("--scenario", type=Path, help="Path to scenario JSON file")
+    parser.add_argument("--all", action="store_true", help="Run all scenarios in scenarios/")
+    parser.add_argument("--list", action="store_true", help="List available scenarios and exit")
+    parser.add_argument("--budget", type=int, default=None, help="Token budget")
+    parser.add_argument("--turns", type=int, default=None, help="Limit number of turns")
+    parser.add_argument("--proxy", default=PROXY_URL, help="Proxy URL")
+    parser.add_argument("--direct", default=DIRECT_URL, help="Direct upstream URL")
+    parser.add_argument("--model", default=MODEL, help="Model to use")
+    parser.add_argument("--output-dir", type=Path, default=Path("results"),
+                        help="Output directory for results")
+    parser.add_argument("--api-key", default=None, help="API key")
+    parser.add_argument("--no-probes", action="store_true", help="Skip fact probes")
+    parser.add_argument("--no-restart", action="store_true", help="Skip restart/bootstrap scoring")
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -22,28 +45,16 @@ def main(argv: list[str] | None = None) -> None:
 
     # ---- proxy subcommand ----
     proxy_p = subparsers.add_parser("proxy", help="Proxy suite: multi-turn token savings + continuity")
-    proxy_p.add_argument("--scenario", type=Path, help="Path to scenario JSON file")
-    proxy_p.add_argument("--all", action="store_true", help="Run all scenarios in scenarios/")
-    proxy_p.add_argument("--list", action="store_true", help="List available scenarios and exit")
+    _add_common_proxy_args(proxy_p)
     proxy_p.add_argument("--arms", type=str, default="proxy_plus_filter",
                          help=f"Comma-separated arms to run. Available: {', '.join(ARMS)}")
-    proxy_p.add_argument("--budget", type=int, default=None, help="Token budget (sets context_token_budget)")
     proxy_p.add_argument("--budgets", type=str, default=None,
                          help="Comma-separated budgets for matrix run (e.g., 4000,8000,15000)")
-    proxy_p.add_argument("--turns", type=int, default=None, help="Limit number of turns to run")
-    proxy_p.add_argument("--proxy", default=PROXY_URL, help="Proxy URL")
-    proxy_p.add_argument("--direct", default=DIRECT_URL, help="Direct upstream URL")
-    proxy_p.add_argument("--model", default=MODEL, help="Model to use")
-    proxy_p.add_argument("--output-dir", type=Path, default=Path("results"),
-                         help="Output directory for results")
     proxy_p.add_argument("--resume", action="store_true", help="Resume from last checkpoint")
-    proxy_p.add_argument("--api-key", default=None, help="API key (overrides UPSTREAM_API_KEY)")
     proxy_p.add_argument("--experiment", type=str, default=None,
                          help="Named experiment -- snapshots proxy config, saves to experiments/<name>/")
     proxy_p.add_argument("--config", type=str, default=None,
                          help="JSON proxy config overrides")
-    proxy_p.add_argument("--no-probes", action="store_true", help="Skip fact probes")
-    proxy_p.add_argument("--no-restart", action="store_true", help="Skip restart/bootstrap scoring")
 
     # ---- filter subcommand ----
     filter_p = subparsers.add_parser("filter", help="Filter suite: compression-ratio measurement via archolith-filter")
@@ -56,19 +67,7 @@ def main(argv: list[str] | None = None) -> None:
 
     # ---- stack subcommand ----
     stack_p = subparsers.add_parser("stack", help="Stack suite: four-way comparison (direct/filter/proxy/proxy+filter)")
-    stack_p.add_argument("--scenario", type=Path, help="Path to scenario JSON file")
-    stack_p.add_argument("--all", action="store_true", help="Run all scenarios in scenarios/")
-    stack_p.add_argument("--list", action="store_true", help="List available scenarios and exit")
-    stack_p.add_argument("--budget", type=int, default=None, help="Token budget")
-    stack_p.add_argument("--turns", type=int, default=None, help="Limit number of turns")
-    stack_p.add_argument("--proxy", default=PROXY_URL, help="Proxy URL")
-    stack_p.add_argument("--direct", default=DIRECT_URL, help="Direct upstream URL")
-    stack_p.add_argument("--model", default=MODEL, help="Model to use")
-    stack_p.add_argument("--output-dir", type=Path, default=Path("results"),
-                         help="Output directory for results")
-    stack_p.add_argument("--api-key", default=None, help="API key")
-    stack_p.add_argument("--no-probes", action="store_true", help="Skip fact probes")
-    stack_p.add_argument("--no-restart", action="store_true", help="Skip restart/bootstrap scoring")
+    _add_common_proxy_args(stack_p)
 
     # ---- audit subcommand ----
     audit_p = subparsers.add_parser("audit", help="Audit suite: MCP token-waste before/after comparison")
@@ -292,7 +291,6 @@ def _run_stack(args: argparse.Namespace) -> None:
         run_restart=not args.no_restart,
     )
 
-    from .core.report import print_four_way_table
     print_four_way_table(all_arm_results)
 
 

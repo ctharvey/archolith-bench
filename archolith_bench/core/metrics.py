@@ -2,17 +2,27 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
-@dataclass
-class TokenMetrics:
-    direct_input: int = 0
-    arm_input: int = 0
-    rewritten_tokens: int = 0
-    savings_ratio: float = 0.0
-    extraction_cost: int = 0
-    net_savings: int = 0
+def estimate_tokens(text: str | None) -> int:
+    """Estimate token count from text using a simple heuristic."""
+    if not text:
+        return 1
+    return max(1, len(text) // 4)
+
+
+def estimate_messages_tokens(messages: list[dict]) -> int:
+    """Estimate total token count from a list of message dicts."""
+    total = 0
+    for m in messages:
+        c = m.get("content", "")
+        if isinstance(c, str):
+            total += estimate_tokens(c)
+        elif isinstance(c, list):
+            for part in c:
+                total += estimate_tokens(part.get("text", ""))
+    return max(1, total)
 
 
 @dataclass
@@ -23,42 +33,3 @@ class ContinuityMetrics:
     verification_continuity: float = 0.0
     turn_one_orientation_score: float = 0.0
     snippet_hit_rate: float = 0.0
-
-
-@dataclass
-class QualityPerfMetrics:
-    fact_recall_accuracy: float = 0.0
-    response_similarity: float = 0.0
-    assembly_latency_ms: float = 0.0
-    total_latency_ms: float = 0.0
-
-
-@dataclass
-class TurnResult:
-    turn: int
-    user_msg_preview: str = ""
-    user_msg: str = ""
-    direct: dict = field(default_factory=dict)
-    proxy: dict = field(default_factory=dict)
-    trace: dict = field(default_factory=dict)
-    token_metrics: TokenMetrics = field(default_factory=TokenMetrics)
-    continuity: ContinuityMetrics = field(default_factory=ContinuityMetrics)
-
-
-@dataclass
-class ScenarioResult:
-    scenario: str = ""
-    description: str = ""
-    model: str = ""
-    budget: int | None = None
-    arm: str = ""
-    turns_run: int = 0
-    turns_total: int = 0
-    aborted: bool = False
-    abort_reason: str = ""
-    timestamp: str = ""
-    summary: dict = field(default_factory=dict)
-    quality: dict = field(default_factory=dict)
-    continuity: ContinuityMetrics = field(default_factory=ContinuityMetrics)
-    turns: list[TurnResult] = field(default_factory=list)
-    fact_probes: list[dict] = field(default_factory=list)

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 
-CORPORA_DIR = Path(__file__).resolve().parent.parent.parent / "corpora"
+_env_corpora = os.environ.get("ARCHOLITH_BENCH_CORPORA_DIR")
+CORPORA_DIR = Path(_env_corpora) if _env_corpora else Path(__file__).resolve().parent.parent.parent / "corpora"
 
 CATEGORY_MAP: dict[str, str] = {
     "git_diff": "git_diff",

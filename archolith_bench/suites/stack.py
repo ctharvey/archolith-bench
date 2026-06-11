@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..arms import ARMS
+from ..core.metrics import PricingModel
 from ..core.scenario import Scenario
 from .proxy import run_benchmark
 
@@ -27,6 +28,7 @@ def run_stack_suite(
     max_turns: int | None = None,
     run_probes: bool = True,
     run_restart: bool = True,
+    pricing: PricingModel | None = None,
 ) -> list[dict]:
     """Run each scenario through the four stack arms and collect results."""
     all_arm_results: list[dict] = []
@@ -48,6 +50,7 @@ def run_stack_suite(
                 max_turns=max_turns,
                 run_probes=run_probes,
                 run_restart=run_restart,
+                pricing=pricing,
             )
             data["stack_arm"] = arm
             all_arm_results.append(data)

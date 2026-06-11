@@ -81,21 +81,77 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
     proxy_results = sorted(results_dir.glob("benchmark_*proxy*.json"))
     if proxy_results:
         lines.append("## Proxy Suite\n")
-        lines.append("Multi-turn token savings and continuity metrics across proxy experiment arms.\n")
-        lines.append("| Scenario | Arm | Budget | Direct In | Arm In | Savings | Recall Pres. |\n")
-        lines.append("|----------|-----|--------|-----------|--------|---------|-------------|\n")
+        lines.append("Multi-turn token savings, effective cost, and continuity metrics across proxy experiment arms.\n")
+
+        # Check if any results have cost data
+        has_cost = False
+        for rp in proxy_results:
+            with open(rp, encoding="utf-8") as f:
+                d = json.load(f)
+            if "total_effective_cost_usd" in d.get("summary", {}):
+                has_cost = True
+                break
+
+        if has_cost:
+            lines.append("| Scenario | Arm | Budget | Direct In | Arm In | Savings | Eff Cost | Cache | Recall Pres. |\n")
+            lines.append("|----------|-----|--------|-----------|--------|---------|----------|-------|-------------|\n")
+        else:
+            lines.append("| Scenario | Arm | Budget | Direct In | Arm In | Savings | Recall Pres. |\n")
+            lines.append("|----------|-----|--------|-----------|--------|---------|-------------|\n")
+
+        cost_passthrough: dict[str, float] = {}  # scenario -> passthrough cost for delta
+
         for rp in proxy_results:
             with open(rp, encoding="utf-8") as f:
                 d = json.load(f)
             s = d.get("summary", {})
             q = d.get("quality", {})
             recall = f"{q.get('recall_preservation', 0):.0%}" if q else "N/A"
-            lines.append(
+            line = (
                 f"| {d.get('scenario', '?')} | {d.get('arm', '?')} | "
                 f"{d.get('budget', 'default')} | {s.get('total_direct_input_tokens', 0):,} | "
-                f"{s.get('total_proxy_input_tokens', 0):,} | {s.get('overall_savings_ratio', 0):.1%} | "
-                f"{recall} |\n"
+                f"{s.get('total_proxy_input_tokens', 0):,} | {s.get('overall_savings_ratio', 0):.1%} |"
             )
+            if has_cost and "total_effective_cost_usd" in s:
+                cost_str = f" ${s['total_effective_cost_usd']:.4f}"
+                cache_str = "yes" if s.get("cache_data_available") else "no"
+                line += f" {cost_str} | {cache_str} |"
+            if has_cost and not s.get("cache_data_available"):
+                line += " ⚠ no cache data |"
+            line += f" {recall} |\n"
+            lines.append(line)
+
+            # Track passthrough cost for verdict
+            arm = d.get("arm", "")
+            scenario = d.get("scenario", "")
+            if has_cost and arm in ("direct",) and "total_effective_cost_usd" in s:
+                cost_passthrough[scenario] = s["total_effective_cost_usd"]
+
+        if has_cost and cost_passthrough:
+            lines.append("\n### Cost Verdict\n\n")
+            for rp in proxy_results:
+                with open(rp, encoding="utf-8") as f:
+                    d = json.load(f)
+                s = d.get("summary", {})
+                arm = d.get("arm", "")
+                scenario = d.get("scenario", "")
+                if arm in ("direct",) or "total_effective_cost_usd" not in s:
+                    continue
+                proxy_cost = s["total_effective_cost_usd"]
+                passthrough_cost = cost_passthrough.get(scenario)
+                if passthrough_cost is not None:
+                    delta = proxy_cost - passthrough_cost
+                    cache_ok = s.get("cache_data_available", False)
+                    if not cache_ok:
+                        verdict = "INCONCLUSIVE (no cache data)"
+                    elif delta < 0:
+                        verdict = f"**PROXY CHEAPER** by ${abs(delta):.4f}"
+                    else:
+                        verdict = f"**PROXY MORE EXPENSIVE** by ${delta:.4f}"
+                    lines.append(
+                        f"- **{scenario}** [{arm}]: ${proxy_cost:.4f} vs passthrough "
+                        f"${passthrough_cost:.4f} — {verdict}\n"
+                    )
         lines.append("\n")
     else:
         lines.append("## Proxy Suite\n")

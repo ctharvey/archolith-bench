@@ -10,6 +10,7 @@ from pathlib import Path
 from .arms import ARMS, PROXY_FAMILY_ARMS
 from .core.api import API_KEY, DIRECT_URL, MODEL, PROXY_URL, check_proxy_health
 from .core.display import print_cross_scenario_summary, print_four_way_table, print_summary
+from .core.metrics import PRICING_DEFAULTS, PricingModel
 from .core.report import save_results
 from .core.scenario import Scenario, list_scenarios
 
@@ -19,7 +20,7 @@ def _add_common_proxy_args(parser: argparse.ArgumentParser) -> None:
 
     These args are common to both proxy and stack suites:
     scenario selection, budget, turns, endpoints, model, output, api-key,
-    fact probes, and restart scoring.
+    fact probes, restart scoring, and pricing configuration.
     """
     parser.add_argument("--scenario", type=Path, help="Path to scenario JSON file")
     parser.add_argument("--all", action="store_true", help="Run all scenarios in scenarios/")
@@ -34,6 +35,32 @@ def _add_common_proxy_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--api-key", default=None, help="API key")
     parser.add_argument("--no-probes", action="store_true", help="Skip fact probes")
     parser.add_argument("--no-restart", action="store_true", help="Skip restart/bootstrap scoring")
+    parser.add_argument("--provider", default=None,
+                        help=f"Pricing provider. Available: {', '.join(PRICING_DEFAULTS)}")
+    parser.add_argument("--pricing-file", type=Path, default=None,
+                        help="Path to a JSON file overriding provider pricing rates")
+
+
+def _load_pricing(args: argparse.Namespace) -> PricingModel | None:
+    """Resolve pricing model from --provider, --pricing-file, or neither.
+
+    Returns None when the user supplied no pricing flags (cost columns are
+    omitted and the report caveats accordingly).
+    """
+    if args.pricing_file:
+        with open(args.pricing_file, encoding="utf-8") as f:
+            raw = json.load(f)
+        return PricingModel(**raw)
+
+    if args.provider:
+        provider = args.provider.lower()
+        if provider not in PRICING_DEFAULTS:
+            print(f"ERROR: Unknown provider '{args.provider}'. "
+                  f"Available: {', '.join(PRICING_DEFAULTS)}", file=sys.stderr)
+            sys.exit(1)
+        return PRICING_DEFAULTS[provider]
+
+    return None
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -122,6 +149,7 @@ def _run_proxy(args: argparse.Namespace) -> None:
         return
 
     api_key = args.api_key or API_KEY
+    pricing = _load_pricing(args)
 
     arm_names = [a.strip() for a in args.arms.split(",")]
     for arm_name in arm_names:
@@ -147,6 +175,9 @@ def _run_proxy(args: argparse.Namespace) -> None:
     print(f"  Direct: {args.direct}")
     print(f"  Model:  {args.model}")
     print(f"  Arms:   {', '.join(arm_names)}")
+    if pricing:
+        print(f"  Pricing: {pricing.provider} (input={pricing.input_full}/M, "
+              f"cache_hit={pricing.input_cache_hit}/M, output={pricing.output}/M)")
 
     needs_proxy = any(ARMS[a]["proxy_enabled"] for a in arm_names)
     if needs_proxy:
@@ -184,6 +215,7 @@ def _run_proxy(args: argparse.Namespace) -> None:
             resume=args.resume,
             api_key=api_key,
             max_turns=args.turns,
+            pricing=pricing,
         )
         return
 
@@ -208,6 +240,7 @@ def _run_proxy(args: argparse.Namespace) -> None:
                     max_turns=args.turns,
                     run_probes=not args.no_probes,
                     run_restart=not args.no_restart,
+                    pricing=pricing,
                 )
                 print_summary(data)
                 save_results(data, args.output_dir)
@@ -261,6 +294,8 @@ def _run_stack(args: argparse.Namespace) -> None:
         print("ERROR: Set UPSTREAM_API_KEY in .env or pass --api-key", file=sys.stderr)
         sys.exit(1)
 
+    pricing = _load_pricing(args)
+
     scenarios: list[Scenario] = []
     if args.all:
         scenarios = [Scenario.from_file(p) for p in list_scenarios()]
@@ -277,6 +312,9 @@ def _run_stack(args: argparse.Namespace) -> None:
     print(f"  Proxy health: {health}")
 
     print(f"Stack suite: {len(scenarios)} scenario(s) x 4 arms (direct/filter_only/proxy_only/proxy_plus_filter)")
+    if pricing:
+        print(f"  Pricing: {pricing.provider} (input={pricing.input_full}/M, "
+              f"cache_hit={pricing.input_cache_hit}/M, output={pricing.output}/M)")
 
     all_arm_results = run_stack_suite(
         scenarios=scenarios,
@@ -289,6 +327,7 @@ def _run_stack(args: argparse.Namespace) -> None:
         max_turns=args.turns,
         run_probes=not args.no_probes,
         run_restart=not args.no_restart,
+        pricing=pricing,
     )
 
     print_four_way_table(all_arm_results)

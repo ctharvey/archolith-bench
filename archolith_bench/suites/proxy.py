@@ -33,7 +33,14 @@ from ..core.api import (
     snapshot_proxy_config,
 )
 from ..core.display import COLLAPSE_TOKEN_THRESHOLD, print_cross_scenario_summary, print_summary
-from ..core.metrics import ContinuityMetrics, estimate_messages_tokens, estimate_tokens
+from ..core.metrics import (
+    ContinuityMetrics,
+    PricingModel,
+    compute_arm_cost,
+    compute_turn_cost,
+    estimate_messages_tokens,
+    estimate_tokens,
+)
 from ..core.report import save_results
 from ..core.scenario import Scenario
 from .checkpoints import checkpoint_path, load_checkpoint, save_checkpoint
@@ -61,6 +68,7 @@ def run_benchmark(
     max_turns: int | None = None,
     run_probes: bool = True,
     run_restart: bool = True,
+    pricing: PricingModel | None = None,
 ) -> dict:
     """Run the benchmark for a single scenario/arm/budget combination."""
     arm_def = ARMS.get(arm, ARMS["direct"])
@@ -167,6 +175,11 @@ def run_benchmark(
                     "assembly_latency_ms": 0.0,
                     "extraction_latency_ms": 0.0,
                     "session_id": "",
+                    "cache_hit_tokens": 0,
+                    "cache_miss_tokens": 0,
+                    "prompt_tokens_actual": arm_input,
+                    "output_tokens": arm_output,
+                    "turn": i,
                 }
             elif is_direct_arm:
                 arm_text, arm_latency, arm_usage = direct_text, direct_latency, direct_usage
@@ -182,6 +195,11 @@ def run_benchmark(
                     "assembly_latency_ms": 0.0,
                     "extraction_latency_ms": 0.0,
                     "session_id": "",
+                    "cache_hit_tokens": 0,
+                    "cache_miss_tokens": 0,
+                    "prompt_tokens_actual": direct_input,
+                    "output_tokens": direct_output,
+                    "turn": i,
                 }
             else:
                 print(f"  [arm={arm}] Sending {len(arm_history)} messages (~{arm_est} tokens)...")
@@ -217,6 +235,13 @@ def run_benchmark(
                     "assembly_latency_ms": trace_turn.get("assembly_latency_ms", 0.0),
                     "extraction_latency_ms": trace_turn.get("extraction_latency_ms", 0.0),
                     "session_id": proxy_session_id or "",
+                    "cache_hit_tokens": trace_turn.get("cache_hit_tokens", 0),
+                    "cache_miss_tokens": trace_turn.get("cache_miss_tokens", 0),
+                    "prompt_tokens_actual": trace_turn.get(
+                        "prompt_tokens_actual", trace_turn.get("input_tokens", 0)
+                    ),
+                    "output_tokens": arm_output,
+                    "turn": i,
                 }
 
             continuity_turn = tracker.observe_turn(i, arm_text)
@@ -252,6 +277,12 @@ def run_benchmark(
                 "trace": trace_turn,
                 "continuity": continuity_turn,
             }
+
+            if pricing is not None:
+                turn_cost = compute_turn_cost(trace_turn, pricing)
+                result["effective_cost_usd"] = turn_cost.effective_cost_usd
+                result["cache_data_available"] = turn_cost.cache_data_available
+
             results.append(result)
 
             if run_probes:
@@ -317,6 +348,21 @@ def run_benchmark(
     if not results:
         final_continuity = tracker.compute()
 
+    # ---- effective cost (cache-weighted) ----
+    arm_cost = None
+    if pricing is not None and results:
+        trace_turns = [r["trace"] for r in results]
+        arm_cost = compute_arm_cost(trace_turns, pricing)
+        arm_cost_dict: dict = {
+            "total_effective_cost_usd": arm_cost.total_effective_cost_usd,
+            "cache_data_available": arm_cost.cache_data_available,
+            "upstream_input_cost": arm_cost.upstream_input_cost,
+            "upstream_output_cost": arm_cost.upstream_output_cost,
+            "helper_cost": arm_cost.helper_cost,
+        }
+    else:
+        arm_cost_dict = {}
+
     bootstrap_result = None
     if run_restart and not is_direct_arm:
         try:
@@ -330,6 +376,16 @@ def run_benchmark(
             print(f"  [WARN] Restart/bootstrap failed: {e}")
             bootstrap_result = {"error": str(e)}
 
+    summary: dict = {
+        "total_direct_input_tokens": total_direct_input,
+        "total_proxy_input_tokens": total_arm_input,
+        "total_savings_tokens": total_savings,
+        "overall_savings_ratio": round(total_savings / total_direct_input, 4) if total_direct_input else 0,
+        "collapsed_turns": collapsed_turns,
+        "collapse_rate": round(len(collapsed_turns) / len(results), 3) if results else 0,
+    }
+    summary.update(arm_cost_dict)
+
     data = {
         "scenario": scenario.name,
         "description": scenario.description,
@@ -341,14 +397,7 @@ def run_benchmark(
         "aborted": aborted,
         "abort_reason": f"output_collapse_{COLLAPSE_CONSECUTIVE_LIMIT}_consecutive" if aborted else "",
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "summary": {
-            "total_direct_input_tokens": total_direct_input,
-            "total_proxy_input_tokens": total_arm_input,
-            "total_savings_tokens": total_savings,
-            "overall_savings_ratio": round(total_savings / total_direct_input, 4) if total_direct_input else 0,
-            "collapsed_turns": collapsed_turns,
-            "collapse_rate": round(len(collapsed_turns) / len(results), 3) if results else 0,
-        },
+        "summary": summary,
         "quality": probe_summary,
         "continuity": asdict(final_continuity),
         "bootstrap": bootstrap_result,
@@ -372,6 +421,7 @@ def run_experiment(
     resume: bool,
     api_key: str,
     max_turns: int | None = None,
+    pricing: PricingModel | None = None,
 ) -> Path:
     """Run a named experiment across scenarios x arms x budgets."""
     experiment_dir = output_dir / "experiments" / experiment_name
@@ -393,7 +443,7 @@ def run_experiment(
                 data = run_benchmark(
                     scenario, arm_name, proxy_url, direct_url, model,
                     budget, experiment_dir, resume, api_key=api_key,
-                    max_turns=max_turns,
+                    max_turns=max_turns, pricing=pricing,
                 )
                 data["experiment"] = experiment_name
                 print_summary(data)

@@ -1,0 +1,11 @@
+{
+  "provider": "anthropic-opus-4-8",
+  "input_full": 5.00,
+  "input_cache_hit": 0.50,
+  "input_cache_miss": 5.00,
+  "output": 25.00,
+  "input_cache_write": 6.25,
+  "helper_input": 0.40,
+  "helper_output": 1.60,
+  "comment": "Upstream = claude-opus-4-8 (Anthropic API skill, cached 2026-06): input $5 / output $25 per Mtok; cache read 0.1x = $0.50; cache write 5m TTL 1.25x = $6.25. cache_miss == full input rate. Helper = gpt-4.1-mini (extractor + curator); embeddings text-embedding-3-small approximated at the helper rate (overcounts slightly -> conservative, biases against the proxy). VERIFY helper_input/helper_output against OpenAI's current gpt-4.1-mini pricing before citing the verdict. REQUIRES input_cache_write to be wired into compute_turn_cost (currently stored-but-unused) or the curator's cache-bust penalty is ignored and this verdict is biased in the proxy's favor."
+}

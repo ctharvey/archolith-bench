@@ -51,6 +51,41 @@ from .restart import run_restart_bootstrap
 COLLAPSE_CONSECUTIVE_LIMIT = 2
 
 
+def _compute_cost_summary(results: list[dict], pricing: PricingModel) -> dict:
+    """Proxy-arm effective cost + passthrough (direct-arm) delta.
+
+    ``results`` are per-turn dicts carrying ``trace`` (the proxy/arm trace, with
+    cache breakdown) and ``direct`` (the passthrough arm's raw token counts).
+    Returns the machine-readable cost fields persisted in the run summary so the
+    go/no-go verdict (proxy cheaper or not) is queryable, not buried in markdown.
+
+    The passthrough arm has no cache breakdown, so its cost falls back to the
+    full input rate -- ``passthrough_cache_data_available`` flags that.
+    """
+    arm_cost = compute_arm_cost([r["trace"] for r in results], pricing)
+    passthrough_cost = compute_arm_cost(
+        [r["direct"] for r in results if "direct" in r], pricing
+    )
+
+    total = arm_cost.total_effective_cost_usd
+    passthrough = passthrough_cost.total_effective_cost_usd
+    delta = round(total - passthrough, 6)
+    ratio = round(delta / passthrough, 6) if passthrough else 0.0
+
+    return {
+        "total_effective_cost_usd": total,
+        "cache_data_available": arm_cost.cache_data_available,
+        "upstream_input_cost": arm_cost.upstream_input_cost,
+        "upstream_output_cost": arm_cost.upstream_output_cost,
+        "helper_cost": arm_cost.helper_cost,
+        "passthrough_effective_cost_usd": passthrough,
+        "passthrough_cache_data_available": passthrough_cost.cache_data_available,
+        "cost_delta_usd": delta,
+        "cost_delta_vs_passthrough": delta,
+        "cost_delta_ratio": ratio,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Main benchmark runner (arm-aware)
 # ---------------------------------------------------------------------------
@@ -348,18 +383,9 @@ def run_benchmark(
     if not results:
         final_continuity = tracker.compute()
 
-    # ---- effective cost (cache-weighted) ----
-    arm_cost = None
+    # ---- effective cost (cache-weighted) + passthrough delta ----
     if pricing is not None and results:
-        trace_turns = [r["trace"] for r in results]
-        arm_cost = compute_arm_cost(trace_turns, pricing)
-        arm_cost_dict: dict = {
-            "total_effective_cost_usd": arm_cost.total_effective_cost_usd,
-            "cache_data_available": arm_cost.cache_data_available,
-            "upstream_input_cost": arm_cost.upstream_input_cost,
-            "upstream_output_cost": arm_cost.upstream_output_cost,
-            "helper_cost": arm_cost.helper_cost,
-        }
+        arm_cost_dict: dict = _compute_cost_summary(results, pricing)
     else:
         arm_cost_dict = {}
 

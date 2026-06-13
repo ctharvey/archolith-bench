@@ -78,7 +78,9 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
         lines.append("*No filter results found. Run `archolith-bench filter --corpora corpora/` to generate.*\n\n")
 
     # ---- Proxy section ----
-    proxy_results = sorted(results_dir.glob("benchmark_*proxy*.json"))
+    # Glob ALL benchmark arm files (incl. *_direct.json baselines) -- the cost
+    # verdict needs the passthrough/direct arm, not just *proxy* files.
+    proxy_results = sorted(results_dir.glob("benchmark_*.json"))
     if proxy_results:
         lines.append("## Proxy Suite\n")
         lines.append("Multi-turn token savings, effective cost, and continuity metrics across proxy experiment arms.\n")
@@ -99,7 +101,7 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
             lines.append("| Scenario | Arm | Budget | Direct In | Arm In | Savings | Recall Pres. |\n")
             lines.append("|----------|-----|--------|-----------|--------|---------|-------------|\n")
 
-        cost_passthrough: dict[str, float] = {}  # scenario -> passthrough cost for delta
+        cost_passthrough: dict[str, dict] = {}  # scenario -> {"cost", "cache_ok"}
 
         for rp in proxy_results:
             with open(rp, encoding="utf-8") as f:
@@ -109,7 +111,7 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
             recall = f"{q.get('recall_preservation', 0):.0%}" if q else "N/A"
             line = (
                 f"| {d.get('scenario', '?')} | {d.get('arm', '?')} | "
-                f"{d.get('budget', 'default')} | {s.get('total_direct_input_tokens', 0):,} | "
+                f"{d.get('budget') or 'default'} | {s.get('total_direct_input_tokens', 0):,} | "
                 f"{s.get('total_proxy_input_tokens', 0):,} | {s.get('overall_savings_ratio', 0):.1%} |"
             )
             if has_cost and "total_effective_cost_usd" in s:
@@ -121,11 +123,14 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
             line += f" {recall} |\n"
             lines.append(line)
 
-            # Track passthrough cost for verdict
+            # Track passthrough cost + cache availability for verdict
             arm = d.get("arm", "")
             scenario = d.get("scenario", "")
             if has_cost and arm in ("direct",) and "total_effective_cost_usd" in s:
-                cost_passthrough[scenario] = s["total_effective_cost_usd"]
+                cost_passthrough[scenario] = {
+                    "cost": s["total_effective_cost_usd"],
+                    "cache_ok": s.get("cache_data_available", False),
+                }
 
         if has_cost and cost_passthrough:
             lines.append("\n### Cost Verdict\n\n")
@@ -138,10 +143,13 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
                 if arm in ("direct",) or "total_effective_cost_usd" not in s:
                     continue
                 proxy_cost = s["total_effective_cost_usd"]
-                passthrough_cost = cost_passthrough.get(scenario)
-                if passthrough_cost is not None:
+                pt = cost_passthrough.get(scenario)
+                if pt is not None:
+                    passthrough_cost = pt["cost"]
                     delta = proxy_cost - passthrough_cost
-                    cache_ok = s.get("cache_data_available", False)
+                    # A valid comparison needs cache data on BOTH sides; if the
+                    # passthrough cost is a full-rate estimate, stay INCONCLUSIVE.
+                    cache_ok = s.get("cache_data_available", False) and pt["cache_ok"]
                     if not cache_ok:
                         verdict = "INCONCLUSIVE (no cache data)"
                     elif delta < 0:

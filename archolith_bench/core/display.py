@@ -52,7 +52,7 @@ def print_summary(data: dict) -> None:
         f"{'Rewritten':>10}  {'Savings':>14}  {'Assembly':>14}  {'Facts':>5}  "
         f"{'D Out':>6}  {'P Out':>6}  "
         f"{'D ms':>7}  {'P ms':>7}"
-        f"{'  Cost':>8}" if has_cost else ""
+        + (f"{'  Cost':>8}" if has_cost else "")
     )
     print(header)
     print("-" * (134 if has_cost else 126))

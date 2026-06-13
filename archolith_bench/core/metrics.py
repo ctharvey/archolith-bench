@@ -54,16 +54,6 @@ class PricingModel:
 
 
 PRICING_DEFAULTS: dict[str, PricingModel] = {
-    "deepseek": PricingModel(
-        provider="deepseek",
-        input_full=0.27,
-        input_cache_hit=0.014,
-        input_cache_miss=0.27,
-        output=1.10,
-        comment="STALE / deprecated deepseek-chat alias. Superseded by "
-                "deepseek-v4-flash. Kept only so legacy tests stay valid; "
-                "use --provider deepseek-v4-flash or a --pricing-file.",
-    ),
     "deepseek-v4-flash": PricingModel(
         provider="deepseek-v4-flash",
         input_full=0.14,

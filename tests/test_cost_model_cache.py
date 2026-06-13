@@ -94,6 +94,32 @@ def test_arm_with_no_cache_activity_stays_unavailable() -> None:
     assert ac.cache_data_available is False
 
 
+def test_present_but_none_token_keys_coerce_to_zero() -> None:
+    """A cold-start proxy trace can carry present-but-None token fields.
+
+    dict.get(key, default) returns None (not the default) when the key exists
+    with a None value, which previously crashed compute_turn_cost on
+    `None * rate`. All token reads must coerce None -> 0.
+    """
+    pricing = PRICING_DEFAULTS["deepseek-v4-flash"]
+    turn = {
+        "turn": 0,
+        "assembly_mode": "unknown",
+        "cache_hit_tokens": None,
+        "cache_miss_tokens": None,
+        "prompt_tokens_actual": None,
+        "input_tokens": None,
+        "output_tokens": None,
+        "curator_prompt_tokens": None,
+        "curator_completion_tokens": None,
+        "extractor_cached_tokens": None,
+    }
+    tc = compute_turn_cost(turn, pricing)  # must not raise
+    assert tc.effective_cost_usd == 0.0
+    assert tc.helper_cost == 0.0
+    assert tc.cache_data_available is False
+
+
 def test_opus_default_carries_cache_write() -> None:
     """The opus-4-8 default models the cache-write premium."""
     a = PRICING_DEFAULTS["opus-4-8"]

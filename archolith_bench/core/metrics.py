@@ -144,12 +144,17 @@ def compute_turn_cost(trace_turn: dict, pricing: PricingModel) -> TurnCost:
     full-rate pricing on prompt_tokens_actual (or input_tokens) when the
     provider does not report cache data.
     """
-    cache_hit = trace_turn.get("cache_hit_tokens", 0)
-    cache_miss = trace_turn.get("cache_miss_tokens", 0)
-    prompt_actual = trace_turn.get(
-        "prompt_tokens_actual", trace_turn.get("input_tokens", 0)
+    # Coerce with `or 0`: a trace key may be PRESENT but None (e.g. an early
+    # cold-start proxy turn with prompt_tokens_actual=None), in which case
+    # dict.get(key, default) returns None, not the default. None tokens == 0.
+    cache_hit = trace_turn.get("cache_hit_tokens") or 0
+    cache_miss = trace_turn.get("cache_miss_tokens") or 0
+    prompt_actual = (
+        trace_turn.get("prompt_tokens_actual")
+        or trace_turn.get("input_tokens")
+        or 0
     )
-    output = trace_turn.get("output_tokens", 0)
+    output = trace_turn.get("output_tokens") or 0
 
     if cache_hit + cache_miss > 0:
         residual = max(0, prompt_actual - cache_hit - cache_miss)
@@ -230,9 +235,10 @@ def _compute_helper_spend(trace_turn: dict, pricing: PricingModel) -> float:
     hc = pricing.helper_cache_hit if pricing.helper_cache_hit else hi
     total = 0.0
     for prefix in ("extractor", "curator", "embedding"):
-        h_in = trace_turn.get(f"{prefix}_prompt_tokens", 0)
-        h_out = trace_turn.get(f"{prefix}_completion_tokens", 0)
-        h_cached = trace_turn.get(f"{prefix}_cached_tokens", 0)
+        # `or 0`: keys may be present-but-None on direct/cold-start trace turns.
+        h_in = trace_turn.get(f"{prefix}_prompt_tokens") or 0
+        h_out = trace_turn.get(f"{prefix}_completion_tokens") or 0
+        h_cached = trace_turn.get(f"{prefix}_cached_tokens") or 0
         h_uncached = max(0, h_in - h_cached)
         total += h_uncached * hi / _PER_M
         total += h_cached * hc / _PER_M

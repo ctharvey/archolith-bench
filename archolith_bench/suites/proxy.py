@@ -51,6 +51,24 @@ from .restart import run_restart_bootstrap
 COLLAPSE_CONSECUTIVE_LIMIT = 2
 
 
+def _upstream_cache_split(usage: dict, prompt_tokens: int) -> tuple[int, int]:
+    """Extract (cache_hit, cache_miss) from an upstream usage dict.
+
+    DeepSeek reports prompt_cache_hit_tokens / prompt_cache_miss_tokens. When
+    the hit key is present we trust it and derive miss from prompt_tokens if the
+    miss key is absent. When neither key is present (provider doesn't report
+    cache), returns (0, 0) -- the no-cache-telemetry signal, so the arm stays
+    correctly marked as having no cache data.
+    """
+    if not usage or "prompt_cache_hit_tokens" not in usage:
+        return 0, 0
+    hit = usage.get("prompt_cache_hit_tokens", 0) or 0
+    miss = usage.get("prompt_cache_miss_tokens")
+    if miss is None:
+        miss = max(0, prompt_tokens - hit)
+    return hit, miss
+
+
 def _compute_cost_summary(results: list[dict], pricing: PricingModel) -> dict:
     """Proxy-arm effective cost + passthrough (direct-arm) delta.
 
@@ -199,6 +217,7 @@ def run_benchmark(
                 )
                 arm_input = arm_usage.get("prompt_tokens", arm_est)
                 arm_output = arm_usage.get("completion_tokens", estimate_tokens(arm_text))
+                arm_hit, arm_miss = _upstream_cache_split(arm_usage, arm_input)
                 print(f"  [arm={arm}] {arm_input} in / {arm_output} out in {arm_latency:.0f}ms (filter-only)")
                 trace_turn = {
                     "assembly_mode": "filter_only",
@@ -210,8 +229,8 @@ def run_benchmark(
                     "assembly_latency_ms": 0.0,
                     "extraction_latency_ms": 0.0,
                     "session_id": "",
-                    "cache_hit_tokens": 0,
-                    "cache_miss_tokens": 0,
+                    "cache_hit_tokens": arm_hit,
+                    "cache_miss_tokens": arm_miss,
                     "prompt_tokens_actual": arm_input,
                     "output_tokens": arm_output,
                     "turn": i,
@@ -219,6 +238,7 @@ def run_benchmark(
             elif is_direct_arm:
                 arm_text, arm_latency, arm_usage = direct_text, direct_latency, direct_usage
                 arm_input, arm_output = direct_input, direct_output
+                direct_hit, direct_miss = _upstream_cache_split(direct_usage, direct_input)
                 print(f"  [arm={arm}] Using direct baseline (no proxy)")
                 trace_turn = {
                     "assembly_mode": "direct",
@@ -230,8 +250,12 @@ def run_benchmark(
                     "assembly_latency_ms": 0.0,
                     "extraction_latency_ms": 0.0,
                     "session_id": "",
-                    "cache_hit_tokens": 0,
-                    "cache_miss_tokens": 0,
+                    # Record the REAL upstream cache split (DeepSeek reports
+                    # prompt_cache_hit_tokens). Without this the passthrough
+                    # baseline has no cache telemetry and the verdict is always
+                    # INCONCLUSIVE.
+                    "cache_hit_tokens": direct_hit,
+                    "cache_miss_tokens": direct_miss,
                     "prompt_tokens_actual": direct_input,
                     "output_tokens": direct_output,
                     "turn": i,

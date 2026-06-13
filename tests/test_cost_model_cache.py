@@ -10,6 +10,7 @@ import pytest
 from archolith_bench.core.metrics import (
     PRICING_DEFAULTS,
     PricingModel,
+    compute_arm_cost,
     compute_turn_cost,
 )
 
@@ -60,6 +61,37 @@ def test_cache_miss_priced_at_miss_rate_when_write_none() -> None:
     tc = compute_turn_cost(turn, pricing)
     # hit: 1M * 0.0028/M = 0.0028 ; miss: 1M * 0.14/M = 0.14
     assert tc.upstream_input_cost == pytest.approx(0.1428, abs=1e-6)
+
+
+def test_cold_start_turn_does_not_poison_arm_cache_availability() -> None:
+    """A cold-start turn-0 (0 hit / 0 miss) must not force the arm to no-cache.
+
+    Defect A regression: the first request of any session is unavoidably a cache
+    miss with no cache split reported as activity; AND-ing availability across
+    turns made every proxy arm read INCONCLUSIVE. OR semantics fix it.
+    """
+    pricing = PRICING_DEFAULTS["deepseek-v4-flash"]
+    turns = [
+        # turn 0: cold start - keys present but both zero
+        {"turn": 0, "cache_hit_tokens": 0, "cache_miss_tokens": 0,
+         "prompt_tokens_actual": 300, "output_tokens": 50},
+        # turn 1+: real cache activity
+        {"turn": 1, "cache_hit_tokens": 256, "cache_miss_tokens": 100,
+         "prompt_tokens_actual": 356, "output_tokens": 50},
+    ]
+    ac = compute_arm_cost(turns, pricing)
+    assert ac.cache_data_available is True
+
+
+def test_arm_with_no_cache_activity_stays_unavailable() -> None:
+    """When NO turn reports cache activity, the arm is still no-cache (OR of none)."""
+    pricing = PRICING_DEFAULTS["deepseek-v4-flash"]
+    turns = [
+        {"turn": 0, "input_tokens": 300, "output_tokens": 50},
+        {"turn": 1, "input_tokens": 400, "output_tokens": 50},
+    ]
+    ac = compute_arm_cost(turns, pricing)
+    assert ac.cache_data_available is False
 
 
 def test_opus_default_carries_cache_write() -> None:

@@ -236,7 +236,10 @@ def test_compute_arm_cost_aggregates_turns() -> None:
     ]
     ac = compute_arm_cost(turns, pricing)
 
-    assert ac.cache_data_available is False  # turn 2 had no cache data
+    # OR semantics: turn 1 reports cache activity, so the arm has cache telemetry
+    # even though turn 2 (no cache keys) does not. A single no-cache turn must not
+    # poison the arm (the cold-start turn is unavoidably a miss).
+    assert ac.cache_data_available is True
     # turn 1: 500K*0.0028 + 100K*0.14 = 0.0014 + 0.014 = 0.0154 input
     #         + 50K*0.28/M = 0.014 output
     # turn 2: 400K*0.14 = 0.056 input + 30K*0.28/M = 0.0084 output

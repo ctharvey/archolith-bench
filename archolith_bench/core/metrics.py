@@ -192,15 +192,20 @@ def compute_arm_cost(turns: list[dict], pricing: PricingModel) -> ArmCost:
     total_input = 0.0
     total_output = 0.0
     total_helper = 0.0
-    cache_available = True
+    # An arm has cache telemetry if ANY turn reports cache activity. The first
+    # turn of any session is unavoidably a cold-start cache miss (nothing is
+    # cached yet), so AND-ing availability across turns would mark every proxy
+    # arm "no cache data" and force an INCONCLUSIVE verdict. Per-turn pricing is
+    # still correct either way (cold-start turns price at full rate).
+    cache_available = False
 
     for t in turns:
         tc = compute_turn_cost(t, pricing)
         total_input += tc.upstream_input_cost
         total_output += tc.upstream_output_cost
         total_helper += tc.helper_cost
-        if not tc.cache_data_available:
-            cache_available = False
+        if tc.cache_data_available:
+            cache_available = True
 
     return ArmCost(
         total_effective_cost_usd=round(total_input + total_output + total_helper, 6),

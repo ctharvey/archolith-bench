@@ -6,5 +6,6 @@
   "output": 0.28,
   "helper_input": 0.40,
   "helper_output": 1.60,
+  "helper_cache_hit": 0.10,
   "comment": "Upstream = deepseek-v4-flash (api-docs.deepseek.com/quick_start/pricing, fetched 2026-06-13): cache hit $0.0028 / cache miss $0.14 / output $0.28 per Mtok. Thinking and non-thinking modes priced identically; 1M ctx, no length tiers. This is what the deprecated deepseek-chat alias maps to (non-thinking v4-flash) and what the live bench upstream currently is. Helper = gpt-4.1-mini (verified 2026-06-13 vs OpenAI: $0.40 in / $1.60 out); embeddings approximated at helper rate. WORST case for the proxy: helper per-token rate ($0.40 in) EXCEEDS the upstream input rate ($0.14)."
 }

@@ -6,5 +6,6 @@
   "output": 0.87,
   "helper_input": 0.40,
   "helper_output": 1.60,
+  "helper_cache_hit": 0.10,
   "comment": "Upstream = deepseek-v4-pro (api-docs.deepseek.com/quick_start/pricing, fetched 2026-06-13): cache hit $0.003625 / cache miss $0.435 / output $0.87 per Mtok. Thinking and non-thinking modes priced identically; 1M ctx, no length tiers. Mid-rung of the price ladder (flash $0.14 -> pro $0.435 -> opus-4-8 $5.00 input). Helper = gpt-4.1-mini (verified 2026-06-13 vs OpenAI: $0.40 in / $1.60 out); embeddings approximated at helper rate. Near the crossover: upstream input rate ($0.435) is roughly the helper input rate ($0.40), so this is where the proxy is expected to break even."
 }

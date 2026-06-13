@@ -48,6 +48,7 @@ class PricingModel:
     output: float
     helper_input: float = 0.0
     helper_output: float = 0.0
+    helper_cache_hit: float = 0.0
     input_cache_write: float | None = None
     comment: str = ""
 
@@ -59,7 +60,46 @@ PRICING_DEFAULTS: dict[str, PricingModel] = {
         input_cache_hit=0.014,
         input_cache_miss=0.27,
         output=1.10,
-        comment="Rates as of 2026-06: deepseek-chat",
+        comment="STALE / deprecated deepseek-chat alias. Superseded by "
+                "deepseek-v4-flash. Kept only so legacy tests stay valid; "
+                "use --provider deepseek-v4-flash or a --pricing-file.",
+    ),
+    "deepseek-v4-flash": PricingModel(
+        provider="deepseek-v4-flash",
+        input_full=0.14,
+        input_cache_hit=0.0028,
+        input_cache_miss=0.14,
+        output=0.28,
+        helper_input=0.40,
+        helper_output=1.60,
+        helper_cache_hit=0.10,
+        comment="api-docs.deepseek.com/quick_start/pricing (2026-06-13). "
+                "Helper = gpt-4.1-mini ($0.40/$1.60, cached $0.10).",
+    ),
+    "deepseek-v4-pro": PricingModel(
+        provider="deepseek-v4-pro",
+        input_full=0.435,
+        input_cache_hit=0.003625,
+        input_cache_miss=0.435,
+        output=0.87,
+        helper_input=0.40,
+        helper_output=1.60,
+        helper_cache_hit=0.10,
+        comment="api-docs.deepseek.com/quick_start/pricing (2026-06-13). "
+                "Helper = gpt-4.1-mini ($0.40/$1.60, cached $0.10).",
+    ),
+    "opus-4-8": PricingModel(
+        provider="opus-4-8",
+        input_full=5.00,
+        input_cache_hit=0.50,
+        input_cache_miss=5.00,
+        output=25.00,
+        input_cache_write=6.25,
+        helper_input=0.40,
+        helper_output=1.60,
+        helper_cache_hit=0.10,
+        comment="claude-opus-4-8 (Anthropic API skill, 2026-06): $5/$25, "
+                "cache read $0.50, cache write 5m $6.25. Helper = gpt-4.1-mini.",
     ),
     "openai": PricingModel(
         provider="openai",
@@ -123,9 +163,19 @@ def compute_turn_cost(trace_turn: dict, pricing: PricingModel) -> TurnCost:
 
     if cache_hit + cache_miss > 0:
         residual = max(0, prompt_actual - cache_hit - cache_miss)
+        # On write-asymmetric providers (Anthropic), cache misses are
+        # cache-creation events priced ABOVE the full input rate. When
+        # input_cache_write is set, price the whole miss bucket at the write
+        # rate. This slightly overstates cost (some misses are never cached),
+        # biasing AGAINST the proxy -- the safe direction for a go/no-go verdict.
+        miss_rate = (
+            pricing.input_cache_write
+            if pricing.input_cache_write is not None
+            else pricing.input_cache_miss
+        )
         upstream_input = (
             cache_hit * pricing.input_cache_hit
-            + cache_miss * pricing.input_cache_miss
+            + cache_miss * miss_rate
             + residual * pricing.input_full
         ) / _PER_M
         cache_available = True
@@ -179,11 +229,18 @@ def _compute_helper_spend(trace_turn: dict, pricing: PricingModel) -> float:
     """
     hi = pricing.helper_input if pricing.helper_input else pricing.input_full
     ho = pricing.helper_output if pricing.helper_output else pricing.output
+    # Cached helper prompt tokens (OpenAI prompt-cache hits) bill at a lower
+    # rate. Falls back to the full helper-input rate when helper_cache_hit is
+    # unset, so this is a no-op until archolith-context emits *_cached_tokens.
+    hc = pricing.helper_cache_hit if pricing.helper_cache_hit else hi
     total = 0.0
     for prefix in ("extractor", "curator", "embedding"):
         h_in = trace_turn.get(f"{prefix}_prompt_tokens", 0)
         h_out = trace_turn.get(f"{prefix}_completion_tokens", 0)
-        total += h_in * hi / _PER_M
+        h_cached = trace_turn.get(f"{prefix}_cached_tokens", 0)
+        h_uncached = max(0, h_in - h_cached)
+        total += h_uncached * hi / _PER_M
+        total += h_cached * hc / _PER_M
         total += h_out * ho / _PER_M
     return total
 

@@ -35,6 +35,10 @@ def _add_common_proxy_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--api-key", default=None, help="API key")
     parser.add_argument("--no-probes", action="store_true", help="Skip fact probes")
     parser.add_argument("--no-restart", action="store_true", help="Skip restart/bootstrap scoring")
+    parser.add_argument("--no-collapse-abort", action="store_true",
+                        help="Don't abort an arm on consecutive short-output turns "
+                             "(the collapse guard mis-fires on agentic scenarios with "
+                             "legitimately terse tool-continuation responses)")
     parser.add_argument("--provider", default=None,
                         help=f"Pricing provider. Available: {', '.join(PRICING_DEFAULTS)}")
     parser.add_argument("--pricing-file", type=Path, default=None,
@@ -241,6 +245,7 @@ def _run_proxy(args: argparse.Namespace) -> None:
                     run_probes=not args.no_probes,
                     run_restart=not args.no_restart,
                     pricing=pricing,
+                    collapse_abort=not args.no_collapse_abort,
                 )
                 print_summary(data)
                 save_results(data, args.output_dir)

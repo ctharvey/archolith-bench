@@ -122,6 +122,7 @@ def run_benchmark(
     run_probes: bool = True,
     run_restart: bool = True,
     pricing: PricingModel | None = None,
+    collapse_abort: bool = True,
 ) -> dict:
     """Run the benchmark for a single scenario/arm/budget combination."""
     arm_def = ARMS.get(arm, ARMS["direct"])
@@ -372,7 +373,7 @@ def run_benchmark(
                 direct_history, arm_history, proxy_session_id,
             )
 
-            if consecutive_collapses >= COLLAPSE_CONSECUTIVE_LIMIT:
+            if collapse_abort and consecutive_collapses >= COLLAPSE_CONSECUTIVE_LIMIT:
                 print(f"\n  [ABORT]  Output collapsed for {COLLAPSE_CONSECUTIVE_LIMIT} "
                       f"consecutive turns. Stopping.")
                 break

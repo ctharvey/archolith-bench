@@ -129,3 +129,53 @@ but not exhaustive.
 Across all three, the curator has yet to demonstrate a NET win. Its plausible niche narrows to:
 long sessions that overflow raw history, in front of an expensive upstream, where a frozen
 front-loaded prefix (per the strategy plan) -- not per-turn re-curation -- is the cache-friendly form.
+
+---
+
+# DESIGN ANALYSIS (2026-06-14): why the curator cost what it did, and the levers
+
+Looked hard at the curator implementation + the Run-2 trace. The "108k curator tokens / strictly
+worse" headline is misleading; the real cost structure is fixable. Findings:
+
+## What actually drives curator cost (from the Run-2 trace)
+- **It made ZERO tool calls** this run (`curator_tool_log` empty every turn). The multi-iteration
+  tool-calling loop is NOT the cost here -- it ran as a single LLM pass per turn.
+- **It is already 85% prompt-cached** (`curator_cached_tokens` = 78-93%/turn). The stable prefix
+  (system prompt 1111 tok + 15 tool schemas) is cached at the provider; only ~14.6k of 101.5k prompt
+  tokens were uncached.
+- **Real dollar cost is small:** curator+extractor = **$0.05** total on gpt-4.1-mini (85% cached);
+  **$0.011** if the curator ran on deepseek-v4-flash. The token COUNT is scary; the dollars are not.
+- **The actual costs that hurt:** (1) **latency 2.6x** (210s vs 80s -- a serial gpt-4.1-mini round
+  trip before each upstream call), and (2) **+12% upstream tokens** -- on this no-pressure task the
+  curator INJECTED context instead of compressing.
+
+## THE smoking gun: the size gate is effectively disabled
+`ASSEMBLY_MIN_INPUT_TOKENS=100`. The curator eligibility gate EXISTS (chat.py:490 skips assembly
+below the threshold) but is set to 100 tokens -- so the curator fires on basically every user turn.
+On Run-2 (max ~9k raw history) it should never have run. **Raise the gate to ~15-20k and the curator
+becomes a no-op on any session that fits comfortably in context** -- removing the +12% upstream, the
+$0.05, AND the 2.6x latency. The curator only engages once raw history is genuinely large enough that
+it might help. This single tuning change removes the universal downside.
+
+## Concrete levers (ranked) to make the curator worth investigating
+1. **Raise ASSEMBLY_MIN_INPUT_TOKENS 100 -> ~15-20k (trivial, biggest win).** Makes "curator on"
+   strictly <= passthrough on normal sessions (no-op when it can't help). The gate already exists;
+   it's just mistuned. After this, the curator only costs anything when there's real context pressure.
+2. **Cheaper curator model (deepseek-v4-flash vs gpt-4.1-mini): 4.6x cheaper helper $, same-provider
+   = lower latency.** Verify curation quality holds on the weaker model.
+3. **Net-reducer injection gate.** The curator ADDED 12% upstream here. Only inject curated context
+   when it DROPS more tokens than it adds (it should be a net reducer, not adder) -- else passthrough.
+4. **Trim the tool surface.** 15 tool schemas re-sent (cached, but they bloat the cache-write +
+   uncached churn); it made 0 tool calls this run. A leaner schema set shrinks the prefix.
+5. **Extractor: ~30% of helper cost, runs EVERY turn** (incl. cold-start passthrough turns). Confirm
+   extraction-batching actually batches (it fired every turn here); batch to user-turn boundaries.
+6. **Run curator in background/parallel** to hide the latency (it currently blocks the upstream call).
+
+## Revised conclusion
+The curator is NOT fundamentally a loser -- on Run-2 it was mostly a TUNING ARTIFACT: an eligibility
+gate set to 100 tokens made it run where it had nothing to do, adding latency + a little upstream
+bloat for $0.05. **Fix the gate (lever 1) and it has no downside on normal sessions.** The genuinely
+worthwhile, scoped investigation: with the gate raised, a cheaper curator model, and a net-reducer
+injection rule, does the curator net POSITIVE on the regime it's actually for -- long sessions
+(40+ turns / >20k raw history) that pressure the context window, in front of an expensive upstream?
+That is now a clean experiment with the downside engineered out first.

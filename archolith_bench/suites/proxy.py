@@ -42,7 +42,7 @@ from ..core.metrics import (
     estimate_tokens,
 )
 from ..core.report import save_results
-from ..core.scenario import Scenario, build_turn_messages
+from ..core.scenario import Scenario, build_turn_messages, is_tool_turn
 from .checkpoints import checkpoint_path, load_checkpoint, save_checkpoint
 from .continuity import ContinuityTracker
 from .probes import run_fact_probes
@@ -307,7 +307,14 @@ def run_benchmark(
 
             continuity_turn = tracker.observe_turn(i, arm_text)
 
-            if arm_output < COLLAPSE_TOKEN_THRESHOLD:
+            # Agent-solo tool-continuation turns naturally produce short
+            # responses (the model just acknowledges the tool result before the
+            # next step). That is normal agent behavior, NOT output collapse /
+            # degeneration, so the collapse guard must not count them. Leave the
+            # streak unchanged on tool-loop turns (neither increment nor reset).
+            if is_tool_turn(turn):
+                pass
+            elif arm_output < COLLAPSE_TOKEN_THRESHOLD:
                 consecutive_collapses += 1
                 print(f"  [WARN]   Output collapse: {arm_output} tokens "
                       f"(consecutive: {consecutive_collapses}/{COLLAPSE_CONSECUTIVE_LIMIT})")

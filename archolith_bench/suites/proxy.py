@@ -42,7 +42,7 @@ from ..core.metrics import (
     estimate_tokens,
 )
 from ..core.report import save_results
-from ..core.scenario import Scenario
+from ..core.scenario import Scenario, build_turn_messages
 from .checkpoints import checkpoint_path, load_checkpoint, save_checkpoint
 from .continuity import ContinuityTracker
 from .probes import run_fact_probes
@@ -178,16 +178,18 @@ def run_benchmark(
 
         config_snapshot = snapshot_proxy_config(client, proxy_url)
 
-        for i, user_msg in enumerate(turns, 1):
+        for i, turn in enumerate(turns, 1):
             if i <= start_turn:
                 continue
+            user_display = turn["user"] if isinstance(turn, dict) else turn
+            turn_messages = build_turn_messages(turn)
             print(f"\n{'='*60}")
             print(f"  TURN {i}/{len(turns)}: {scenario.name} [{arm}]")
-            print(f"  User: {user_msg[:80]}...")
+            print(f"  User: {user_display[:80]}...")
             print(f"{'='*60}")
 
-            direct_history.append({"role": "user", "content": user_msg})
-            arm_history.append({"role": "user", "content": user_msg})
+            direct_history.extend(turn_messages)
+            arm_history.extend(turn_messages)
 
             direct_est = estimate_messages_tokens(direct_history)
             arm_est = estimate_messages_tokens(arm_history)
@@ -317,8 +319,8 @@ def run_benchmark(
 
             result = {
                 "turn": i,
-                "user_msg_preview": user_msg[:80],
-                "user_msg": user_msg,
+                "user_msg_preview": user_display[:80],
+                "user_msg": user_display,
                 "direct": {
                     "input_tokens": direct_input,
                     "output_tokens": direct_output,

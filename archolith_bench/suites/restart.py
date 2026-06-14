@@ -7,6 +7,7 @@ import re
 import httpx
 
 from ..core.api import API_KEY, send_chat
+from ..core.scenario import build_turn_messages
 from .continuity import _COMMAND_RE, _FILE_PATH_RE, _REREAD_PHRASES
 
 
@@ -31,8 +32,8 @@ def run_restart_bootstrap(
     system_msg = {"role": "system", "content": scenario.system_prompt}
     history = [system_msg]
 
-    for i, user_msg in enumerate(scenario.turns, 1):
-        history.append({"role": "user", "content": user_msg})
+    for i, turn in enumerate(scenario.turns, 1):
+        history.extend(build_turn_messages(turn))
         text, _, _ = send_chat(client, proxy_url, _key, history, model, session_config=arm_config)
         history.append({"role": "assistant", "content": text})
 

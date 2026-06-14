@@ -70,3 +70,62 @@ context-strategy effect. N=1; do not over-read the quality delta.
 4. If testing the agent case: the real arms are **passthrough vs mechanical** (curator on/off makes
    ~no difference for agents) -- confirm the curator-off vs curator-on traces are near-identical for an
    agentic client, which would close the question.
+
+---
+
+# RUN 2 (2026-06-14): VALID multi-turn curator test
+
+Fixed the Run-1 flaw. This is a **12-turn complex task, lead-driven** (I send each user turn; later
+turns CALL BACK to decisions/field-names the model made earlier -- testing cross-turn coherence).
+Identical turn-script for both arms; only the proxy context mode varies. Recall TOOL disabled
+(SESSION_RECALL_TOOL_ENABLED=false) so a plain driver works; CURATOR_ENABLED=true.
+
+**This time the curator ACTUALLY RAN** (verified): full arm = 10/12 turns `curator` mode,
+**108,804 curator tokens + 41,065 extractor tokens**. A real curator-vs-passthrough comparison.
+
+## Result
+
+| metric | passthrough | full (curator) |
+|---|---|---|
+| product works (__main__ runs) | yes | yes |
+| cross-turn callbacks honored (8 structural) | 8/8 | 8/8 |
+| Item contract (functional, 5 checks) | 5/5 | 5/5 |
+| upstream input tokens | 33,253 | **37,188 (+12%)** |
+| upstream output tokens | 8,222 | 8,966 |
+| helper tokens (curator+extractor) | 0 | **149,869** |
+| walltime | **80s** | 210s (2.6x) |
+
+## Verdict: on this task the curator is strictly worse -- equal quality, higher cost
+
+- **Zero quality gain:** both products are functionally equivalent. Every cross-turn decision (uuid
+  string ids, integer-cents money, exact field names id/sku/name/quantity/unit_price/reserved,
+  available(), to_dict with all keys, transfer-logging, from_json) was honored by BOTH arms. The
+  curated context did not make the weak model more coherent than raw history did.
+- **Higher cost:** the curator did not even COMPRESS here -- it sent +12% MORE upstream tokens
+  (it injects recalled context), plus ~150k helper tokens, at 2.6x the walltime. Net strongly
+  negative.
+
+## The load-bearing caveat (why this isn't the curator's death knell)
+
+At 12 turns the raw history maxed at ~7-9k input tokens -- **well within deepseek's context window**,
+so passthrough never suffered lost-in-the-middle / overflow. With no context PRESSURE, curation has
+nothing to fix, so it can only add cost. The curator's value proposition only kicks in when the
+session is long enough that raw history DEGRADES the model (overflow, or attention dilution at much
+greater length). This task did not reach that regime.
+
+**So the honest finding:** for short-to-moderate sessions (within the model's comfortable context),
+curation is pure overhead -- equal output, +cost, +latency. To find where (if) it wins, the next test
+needs a session long enough to put real pressure on raw history (e.g. 40+ turns, or a deliberately
+small-context model, or huge per-turn tool outputs). N=1; coherence checks are structural+functional
+but not exhaustive.
+
+## Combined Phase-4 + Run-1 + Run-2 picture
+
+1. **Cost bench (Phase-4):** curator more expensive at every rung (cache-bust + helper).
+2. **Run-1 (agentic build):** curator structurally bypassed (agent turns -> mechanical path).
+3. **Run-2 (multi-turn chat, curator engaged):** equal quality, +12% upstream, +150k helper, 2.6x
+   slower -- because the session never pressured the context window.
+
+Across all three, the curator has yet to demonstrate a NET win. Its plausible niche narrows to:
+long sessions that overflow raw history, in front of an expensive upstream, where a frozen
+front-loaded prefix (per the strategy plan) -- not per-turn re-curation -- is the cache-friendly form.

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — Series</title>
+  <link rel="stylesheet" href="../mobile.css">
+  <script type="module" src="../api.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Back-header -->
+    <header style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg-secondary);position:sticky;top:0;z-index:10">
+      <a href="#" onclick="history.back()" style="font-size:1.25rem;line-height:1;text-decoration:none;color:var(--text-primary)">←</a>
+      <h1 id="series-title" style="font-size:1rem;font-weight:600;flex:1">Series</h1>
+    </header>
+
+    <!-- Sets in this series (reuses sets.html list-row) -->
+    <section style="padding:16px">
+      <h2 class="muted" style="font-size:.8125rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Sets</h2>
+      <div id="series-sets" style="display:flex;flex-direction:column;gap:2px"></div>
+    </section>
+  </div>
+
+  <script type="module">
+    import { series } from '../api.js';
+
+    const id = new URLSearchParams(location.search).get('id');
+    if (id) {
+      series({ id }).then(s => {
+        document.getElementById('series-title').textContent = s.name ?? 'Series';
+        const c = document.getElementById('series-sets');
+        for (const set of s.sets ?? []) {
+          const r = document.createElement('div');
+          r.className = 'list-row';
+          r.innerHTML = `<img src="${set.logo ?? ''}" alt="" style="width:36px;height:36px;border-radius:4px;object-fit:cover;flex-shrink:0">
+            <span style="flex:1;font-weight:500">${set.name ?? '—'}</span>
+            <span style="color:var(--text-secondary);font-size:.8125rem">${set.card_count ?? ''} cards</span>
+            <span style="color:var(--text-secondary);font-size:.75rem">${set.year ?? ''}</span>`;
+          c.appendChild(r);
+        }
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — Market Report</title>
+  <link rel="stylesheet" href="../mobile.css">
+  <script type="module" src="../api.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Breadth-over-time summary -->
+    <header class="full-width" style="padding:16px;display:flex;flex-direction:column;gap:8px">
+      <div id="breadth-summary" class="card" style="display:flex;gap:24px;font-size:.875rem">
+        <div><span class="muted" style="display:block;font-size:.75rem">24h</span><span id="b24">—</span></div>
+        <div><span class="muted" style="display:block;font-size:.75rem">7d</span><span id="b7">—</span></div>
+        <div><span class="muted" style="display:block;font-size:.75rem">30d</span><span id="b30">—</span></div>
+      </div>
+    </header>
+
+    <!-- Gainers / Losers -->
+    <section style="padding:0 16px 80px">
+      <h2 class="muted" style="font-size:.8125rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Top Movers</h2>
+      <div id="movers" style="display:flex;flex-direction:column;gap:2px"></div>
+    </section>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="#/pulse" class="active" data-icon="📊">Pulse</a>
+    <a href="#/cards"  data-icon="🃏">Cards</a>
+    <a href="#/sealed" data-icon="📦">Sealed</a>
+    <a href="#/sets"   data-icon="🗂️">Sets</a>
+    <a href="#/vs"     data-icon="⚔️">VS</a>
+  </nav>
+
+  <script type="module">
+    import { marketBreadth, setsMatrix } from '../api.js';
+
+    // ── Breadth ──
+    marketBreadth({ days: 1  }).then(d => document.getElementById('b24').textContent = d.avg ?? '—');
+    marketBreadth({ days: 7  }).then(d => document.getElementById('b7').textContent  = d.avg ?? '—');
+    marketBreadth({ days: 30 }).then(d => document.getElementById('b30').textContent = d.avg ?? '—');
+
+    // ── Top movers ──
+    setsMatrix({ sort: 'change', limit: 25 }).then(rows => {
+      const c = document.getElementById('movers');
+      for (const s of rows) {
+        const r = document.createElement('div');
+        r.className = 'list-row';
+        r.innerHTML = `<span style="flex:1;font-weight:500">${s.name}</span>
+          <span style="color:var(--text-secondary);font-size:.8125rem">$${s.price ?? '—'}</span>
+          <span style="color:${(s.change ?? 0) >= 0 ? 'var(--accent)' : 'var(--accent-bright)'};font-weight:600">${(s.change ?? 0) >= 0 ? '+' : ''}${(s.change ?? 0).toFixed(1)}%</span>`;
+        c.appendChild(r);
+      }
+    });
+  </script>
+</body>
+</html>

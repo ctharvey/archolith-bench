@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — Sealed</title>
+  <link rel="stylesheet" href="../mobile.css">
+  <script type="module" src="../api.js"></script>
+</head>
+<body>
+  <div id="app">
+    <section class="full-width" style="padding:24px 16px 80px">
+      <h2 class="muted" style="font-size:.8125rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Sealed Products</h2>
+      <div id="sealed-list" style="display:flex;flex-direction:column;gap:2px"></div>
+    </section>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="#/pulse"   data-icon="📊">Pulse</a>
+    <a href="#/cards"  data-icon="🃏">Cards</a>
+    <a href="#/sealed" class="active" data-icon="📦">Sealed</a>
+    <a href="#/sets"   data-icon="🗂️">Sets</a>
+    <a href="#/vs"     data-icon="⚔️">VS</a>
+  </nav>
+
+  <script type="module">
+    import { sealedList } from '../api.js';
+
+    // Reuse cards.html's card-row pattern with EV badge
+    function sealedRow(p) {
+      const r = document.createElement('div');
+      r.className = 'list-row';
+      r.innerHTML = `<img src="${p.image ?? ''}" alt="" style="width:36px;height:36px;border-radius:4px;object-fit:cover;flex-shrink:0">
+        <span style="flex:1;font-weight:500">${p.name ?? '—'}</span>
+        <span style="color:var(--text-secondary);font-size:.8125rem;white-space:nowrap">${p.set ?? ''}</span>
+        <span style="color:var(--accent);font-weight:600;font-size:.8125rem">$${p.ev ?? '—'}</span>`;
+      return r;
+    }
+
+    sealedList().then(items => {
+      const c = document.getElementById('sealed-list');
+      for (const i of items) c.appendChild(sealedRow(i));
+    });
+  </script>
+</body>
+</html>

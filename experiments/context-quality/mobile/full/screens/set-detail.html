@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — Set Detail</title>
+  <link rel="stylesheet" href="../mobile.css">
+  <script type="module" src="../api.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Reusable back-header (identical to card-detail/sealed-detail) -->
+    <header style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg-secondary);position:sticky;top:0;z-index:10">
+      <a href="#" onclick="history.back()" style="font-size:1.25rem;line-height:1;text-decoration:none;color:var(--text-primary)">←</a>
+      <span id="page-title" style="font-size:1rem;font-weight:600;flex:1">Set Detail</span>
+    </header>
+
+    <!-- Set header -->
+    <section class="full-width" style="padding:16px;display:flex;align-items:center;gap:12px">
+      <img id="set-logo" src="" alt="" style="width:48px;height:48px;border-radius:6px;object-fit:cover">
+      <div>
+        <h1 id="set-name" style="font-size:1.125rem;font-weight:700">—</h1>
+        <span id="set-meta" class="muted" style="font-size:.8125rem">—</span>
+      </div>
+    </section>
+
+    <!-- Cards in set (reuses card-row pattern) -->
+    <section style="padding:0 16px 80px">
+      <h2 class="muted" style="font-size:.8125rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Cards</h2>
+      <div id="cards" style="display:flex;flex-direction:column;gap:2px"></div>
+    </section>
+  </div>
+
+  <script type="module">
+    import { setDetail } from '../api.js';
+
+    const id = new URLSearchParams(location.search).get('id');
+    if (id) {
+      setDetail({ id }).then(d => {
+        document.getElementById('page-title').textContent = d.name ?? 'Set Detail';
+        document.getElementById('set-logo').src = d.logo ?? '';
+        document.getElementById('set-name').textContent = d.name ?? '—';
+        document.getElementById('set-meta').textContent = `${d.year ?? ''} · ${d.card_count ?? ''} cards`;
+
+        const cards = document.getElementById('cards');
+        for (const c of d.cards ?? []) {
+          const r = document.createElement('div');
+          r.className = 'list-row';
+          r.innerHTML = `<img src="${c.image ?? ''}" alt="" style="width:36px;height:36px;border-radius:4px;object-fit:cover;flex-shrink:0">
+            <span style="flex:1;font-weight:500">${c.name ?? '—'}</span>
+            <span style="color:var(--text-secondary);font-size:.8125rem;white-space:nowrap">${c.rarity ?? ''}</span>
+            <span style="font-weight:600;font-size:.875rem">$${c.price ?? '—'}</span>`;
+          cards.appendChild(r);
+        }
+      });
+    }
+  </script>
+</body>
+</html>

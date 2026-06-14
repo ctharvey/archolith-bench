@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — Graded</title>
+  <link rel="stylesheet" href="../mobile.css">
+  <script type="module" src="../api.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Grade filter chips -->
+    <div class="full-width" style="display:flex;gap:8px;overflow-x:auto;padding:12px 16px;background:var(--bg-primary);-webkit-overflow-scrolling:touch" id="grade-chips">
+      <button class="button" data-grade="PSA 10" style="flex-shrink:0">PSA 10</button>
+      <button class="button" data-grade="PSA 9"  style="flex-shrink:0">PSA 9</button>
+      <button class="button" data-grade="PSA 8"  style="flex-shrink:0">PSA 8</button>
+      <button class="button" data-grade="BGS 10" style="flex-shrink:0">BGS 10</button>
+      <button class="button" data-grade="BGS 9"  style="flex-shrink:0">BGS 9</button>
+    </div>
+
+    <!-- Graded results list -->
+    <section style="padding:0 16px 80px">
+      <div id="graded-list" style="display:flex;flex-direction:column;gap:2px"></div>
+    </section>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="#/pulse"   data-icon="📊">Pulse</a>
+    <a href="#/cards"  data-icon="🃏">Cards</a>
+    <a href="#/sealed" data-icon="📦">Sealed</a>
+    <a href="#/sets" class="active" data-icon="🗂️">Sets</a>
+    <a href="#/vs"     data-icon="⚔️">VS</a>
+  </nav>
+
+  <script type="module">
+    import { graded } from '../api.js';
+
+    // Reuse card-row with grade badge
+    function gradedRow(p) {
+      const r = document.createElement('div');
+      r.className = 'list-row';
+      r.innerHTML = `<img src="${p.image ?? ''}" alt="" style="width:36px;height:36px;border-radius:4px;object-fit:cover;flex-shrink:0">
+        <span style="flex:1;font-weight:500">${p.name ?? '—'}</span>
+        <span style="color:var(--text-secondary);font-size:.8125rem;white-space:nowrap">${p.set ?? ''}</span>
+        <span style="color:var(--accent);font-weight:600;font-size:.75rem;background:var(--accent-bg);padding:0 6px;border-radius:4px">${p.grade ?? '—'}</span>`;
+      return r;
+    }
+
+    // ── Grade filter toggle ──
+    let activeGrade = null;
+    document.querySelectorAll('#grade-chips .button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#grade-chips .button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeGrade = btn.dataset.grade;
+        render();
+      });
+    });
+
+    function render() {
+      const container = document.getElementById('graded-list');
+      container.innerHTML = '';
+      // TODO: filter by activeGrade once graded() returns structured data
+      for (const p of window.__graded) container.appendChild(gradedRow(p));
+    }
+
+    graded().then(items => {
+      window.__graded = items;
+      render();
+    });
+  </script>
+</body>
+</html>

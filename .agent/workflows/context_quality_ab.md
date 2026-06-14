@@ -102,22 +102,48 @@ the result can't be rationalized post-hoc.
   `oc/<arm>/` (each arm's deliverable + agent.log).
 - Cost model + pricing ladder: `archolith_bench/core/metrics.py`, `pricing/*.json`.
 
-## CRITICAL GOTCHA (learned 2026-06-14): the curator does NOT run for agentic clients
+## CRITICAL: exactly when the curator fires (and why naive runs see curator_tokens=0)
 
-An autonomous tool-using agent (opencode building something) produces almost entirely
-TOOL-CONTINUATION turns, not user turns. Dispatch is `is_agent_solo = ... and not is_user_turn`
-(chat.py:459) -> every tool-loop turn routes to the agent-solo/mechanical path and **bypasses the
-LLM curator**. Observed: a "full curator" arm ran 18/20 turns agent_solo, **0 curator turns,
-curator_tokens=0**. So for an agentic task, "full" and "mechanical" collapse to the SAME path.
+CORRECTED 2026-06-14 (an earlier version of this note wrongly concluded "the curator never runs for
+agentic clients" -- that was a misdiagnosis: those runs simply never cleared COLD START).
 
-Implications:
-- To test the **curator's** value, use a **CHAT-style task with many real user turns**, NOT an
-  autonomous agent build. Otherwise you're testing the mechanical levers and mislabeling it "curator."
-- For the **agent use case**, the curator is structurally moot; the only meaningful arms are
-  **passthrough vs mechanical**. Confirm by checking curator-on vs curator-off traces are
-  near-identical for an agentic client.
-- Always VERIFY the intended path actually ran: check `assembly_mode` counts + `curator_prompt_tokens`
-  in the arm's trace before trusting an arm label. A "full" arm with curator_tokens=0 did not test
-  the curator.
-- Passthrough mode skips detailed per-turn tracing -> log the chat-response `usage` to get that arm's
-  tokens.
+The curator fires on a request only when ALL of these hold (chat.py):
+1. **is_user_turn** -- the request's LAST message is a user message (line 430/488). opencode's
+   tool-CONTINUATION requests end in a tool result -> is_user_turn=False -> they take the
+   agent-solo/mechanical path (line 459), NOT the curator. That is correct and expected.
+2. **past cold start** -- `user_turn_count >= COLD_START_TURNS` (default 3, line 537). The first 3
+   USER turns of a session always passthrough (`_curator_skip="cold_start"`), regardless of size.
+3. **input >= ASSEMBLY_MIN_INPUT_TOKENS** (default/bench 5000, line 490). Below the gate -> passthrough.
+
+So a real agentic session DOES exercise the curator -- on its USER turns, once past the 3-turn cold
+start with >=5k input. The tool-continuation turns in between still get the mechanical path (the
+realistic mix). What fooled earlier runs: a one-shot autonomous task = only 1-2 user turns total
+(all inside cold start) + many tool turns -> curator_tokens=0, NOT because "agents bypass the curator"
+but because **we never reached user turn 4**.
+
+### How to actually exercise the curator via the harness (the proper method)
+- Use a harness opencode session and **LEAD it page-by-page**: each `harness_resume_session(message=...)`
+  is a fresh USER turn. Direct ENOUGH steps (>=4-5+ user turns) to clear cold start.
+- From user turn 4 onward, with accumulated history >=5k, the curator fires on each directed user
+  turn. Verify: the session's `ses_*.jsonl` trace should show `assembly_mode=curator` +
+  `curator_prompt_tokens>0` on the later user turns (early ones show passthrough = cold start).
+- Don't bail after 1-3 turns and conclude the curator "doesn't run" -- that is just cold start.
+
+### Always verify the path
+Check `assembly_mode` counts + `curator_prompt_tokens` in the trace before trusting an arm label.
+curator_tokens=0 on a SHORT session = cold start (expected), not "curator broken." Passthrough mode
+skips detailed per-turn tracing -> fall back to chat-response `usage` for that arm's tokens.
+
+### CONFIRMED 2026-06-14 (mobile-build run): the harness DOES exercise the curator
+Lead-directed opencode session `ses_1379d1f4e`, verified via `proxy_status.py turns <ses>`:
+```
+turns=23  max_user_turns=4  modes={passthrough:3, agent_solo:18, curator:2}
+USER 0,1,2 -> passthrough   (cold start, COLD_START_TURNS=3)
+USER 3     -> curator        (14,047 input tokens: past cold start AND > 5000 gate)  <-- curator fires
+```
+Each `harness_resume_session(message=...)` = one new USER turn (the USER counter climbs); opencode's
+tool-loop requests inside each turn are agent_solo. The curator engages from user turn 3 onward once
+input exceeds the gate. KEY: a one-shot `opencode run` autonomous task registers only ~2 user turns
+total (e.g. ses_138b368b9: 20 turns but USER=2) -> never clears cold start -> 0 curator. To exercise
+the curator you must LEAD many separate resume turns. VERIFY with `proxy_status.py turns <ses>` (look
+for mode=curator rows), not just curator_tokens in the raw jsonl.

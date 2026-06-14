@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — Sets</title>
+  <link rel="stylesheet" href="../mobile.css">
+  <script type="module" src="../api.js"></script>
+</head>
+<body>
+  <div id="app">
+    <section class="full-width" style="padding:24px 16px 80px">
+      <h2 class="muted" style="font-size:.8125rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">TCG Sets</h2>
+      <div id="sets-list" style="display:flex;flex-direction:column;gap:2px"></div>
+    </section>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="#/pulse"   data-icon="📊">Pulse</a>
+    <a href="#/cards"  data-icon="🃏">Cards</a>
+    <a href="#/sealed" data-icon="📦">Sealed</a>
+    <a href="#/sets" class="active" data-icon="🗂️">Sets</a>
+    <a href="#/vs"     data-icon="⚔️">VS</a>
+  </nav>
+
+  <script type="module">
+    import { setsList } from '../api.js';
+
+    setsList().then(sets => {
+      const c = document.getElementById('sets-list');
+      for (const s of sets) {
+        const r = document.createElement('div');
+        r.className = 'list-row';
+        r.innerHTML = `<img src="${s.logo ?? ''}" alt="" style="width:36px;height:36px;border-radius:4px;object-fit:cover;flex-shrink:0">
+          <span style="flex:1;font-weight:500">${s.name ?? '—'}</span>
+          <span style="color:var(--text-secondary);font-size:.8125rem">${s.card_count ?? ''} cards</span>
+          <span style="color:var(--text-secondary);font-size:.75rem">${s.year ?? ''}</span>`;
+        c.appendChild(r);
+      }
+    });
+  </script>
+</body>
+</html>

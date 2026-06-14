@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — EV Explorer</title>
+  <link rel="stylesheet" href="../mobile.css">
+  <script type="module" src="../api.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Filter panel -->
+    <header class="full-width" style="display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--bg-primary);position:sticky;top:0;z-index:10">
+      <label style="font-size:.8125rem;font-weight:600">Min EV</label>
+      <input type="range" id="min-ev" min="0" max="100" value="0" class="form-range">
+      <div style="display:flex;gap:12px">
+        <select id="set-select" class="button" style="flex:1"><option value="">All Sets</option></select>
+        <select id="type-select" class="button" style="flex:1"><option value="">All Types</option></select>
+      </div>
+    </header>
+
+    <!-- Results list (reuses sealed card-row pattern with EV badge) -->
+    <section style="padding:0 16px 80px">
+      <div id="results" style="display:flex;flex-direction:column;gap:2px"></div>
+    </section>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="#/pulse"   data-icon="📊">Pulse</a>
+    <a href="#/cards"  data-icon="🃏">Cards</a>
+    <a href="#/sealed" class="active" data-icon="📦">Sealed</a>
+    <a href="#/sets"   data-icon="🗂️">Sets</a>
+    <a href="#/vs"     data-icon="⚔️">VS</a>
+  </nav>
+
+  <script type="module">
+    import { sealedList } from '../api.js';
+
+    // Reuse the sealed card-row EV badge pattern from sealed.html
+    function evRow(p) {
+      const r = document.createElement('div');
+      r.className = 'list-row';
+      r.innerHTML = `<img src="${p.image ?? ''}" alt="" style="width:36px;height:36px;border-radius:4px;object-fit:cover;flex-shrink:0">
+        <span style="flex:1;font-weight:500">${p.name ?? '—'}</span>
+        <span style="color:var(--text-secondary);font-size:.8125rem;white-space:nowrap">${p.set ?? ''}</span>
+        <span style="color:var(--accent);font-weight:600;font-size:.8125rem">$${p.ev ?? '—'}</span>`;
+      return r;
+    }
+
+    // ── Build filter options ──
+    function populateSelects(categories) {
+      const setEl = document.getElementById('set-select');
+      const typeEl = document.getElementById('type-select');
+      const seenSets = new Set(), seenTypes = new Set();
+      for (const p of categories) {
+        if (p.set)  seenSets.add(p.set);
+        if (p.type) seenTypes.add(p.type);
+      }
+      for (const s of seenSets)  setEl.appendChild(new Option(s, s));
+      for (const t of seenTypes) typeEl.appendChild(new Option(t, t));
+    }
+
+    // ── Filter & render ──
+    function render(items) {
+      const minEv = Number(document.getElementById('min-ev').value);
+      const set   = document.getElementById('set-select').value;
+      const type  = document.getElementById('type-select').value;
+      const container = document.getElementById('results');
+      container.innerHTML = '';
+      for (const p of items) {
+        if (p.ev < minEv || (set && p.set !== set) || (type && p.type !== type)) continue;
+        container.appendChild(evRow(p));
+      }
+    }
+
+    // ── Init ──
+    sealedList().then(items => {
+      populateSelects(items);
+      render(items);
+      document.getElementById('min-ev').addEventListener('input', () => render(items));
+      document.getElementById('set-select').addEventListener('change', () => render(items));
+      document.getElementById('type-select').addEventListener('change', () => render(items));
+    });
+  </script>
+</body>
+</html>

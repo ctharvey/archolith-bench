@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — VS</title>
+  <link rel="stylesheet" href="../mobile.css">
+  <script type="module" src="../api.js"></script>
+</head>
+<body>
+  <div id="app">
+    <header class="full-width" style="padding:16px">
+      <h1 style="font-size:1.25rem;font-weight:700">VS Compare</h1>
+      <p class="muted" style="font-size:.8125rem">Pick two cards to compare</p>
+    </header>
+
+    <!-- Slot A -->
+    <section class="full-width" style="margin-bottom:12px">
+      <label class="muted" style="font-size:.8125rem;font-weight:600;display:block;margin-bottom:4px">Card A</label>
+      <input id="pick-a" type="search" placeholder="Search card A…"
+        style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;font-size:.9375rem;color:var(--text-primary);outline:none;width:100%">
+    </section>
+    <div id="slot-a-results" style="display:flex;flex-direction:column;gap:2px;margin:0 16px"></div>
+
+    <!-- Slot B -->
+    <section class="full-width" style="margin-bottom:12px">
+      <label class="muted" style="font-size:.8125rem;font-weight:600;display:block;margin-bottom:4px">Card B</label>
+      <input id="pick-b" type="search" placeholder="Search card B…"
+        style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;font-size:.9375rem;color:var(--text-primary);outline:none;width:100%">
+    </section>
+    <div id="slot-b-results" style="display:flex;flex-direction:column;gap:2px;margin:0 16px"></div>
+
+    <!-- Comparison panel -->
+    <div id="compare-panel" class="card" style="display:none;margin:16px;flex-direction:column;gap:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div><span class="muted">Price</span><span id="c-price-a" style="font-weight:700;color:var(--accent)" data-vs="—">—</span></div>
+        <div><span class="muted">Price</span><span id="c-price-b" style="font-weight:700;color:var(--accent)" data-vs="—">—</span></div>
+        <div><span class="muted">Trend</span><span id="c-trend-a" style="font-weight:600" data-vs="—">—</span></div>
+        <div><span class="muted">Trend</span><span id="c-trend-b" style="font-weight:600" data-vs="—">—</span></div>
+        <div><span class="muted">Set</span><span id="c-set-a" class="muted">—</span></div>
+        <div><span class="muted">Set</span><span id="c-set-b" class="muted">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="#/pulse"   data-icon="📊">Pulse</a>
+    <a href="#/cards"  data-icon="🃏">Cards</a>
+    <a href="#/sealed" data-icon="📦">Sealed</a>
+    <a href="#/sets"   data-icon="🗂️">Sets</a>
+    <a href="#/vs"     class="active" data-icon="⚔️">VS</a>
+  </nav>
+
+  <script type="module">
+    import { cardSearch, vsCompare } from '../api.js';
+
+    let aId, bId;
+
+    // Search inputs (reuses cards.html search pattern)
+    function bindSearch(inputId, resultId, onPick) {
+      let last = '';
+      document.getElementById(inputId).addEventListener('input', e => {
+        const q = e.target.value.trim();
+        if (q === last || !q) { last = q; return; }
+        last = q;
+        cardSearch({ q }).then(cards => {
+          const c = document.getElementById(resultId);
+          c.innerHTML = '';
+          for (const card of cards.slice(0, 5)) {
+            const r = document.createElement('div');
+            r.className = 'list-row';
+            r.innerHTML = `<img src="${card.image ?? ''}" alt="" style="width:36px;height:36px;border-radius:4px;object-fit:cover;flex-shrink:0">
+              <span style="flex:1;font-weight:500">${card.name ?? '—'}</span>
+              <span style="color:var(--text-secondary);font-size:.8125rem">${card.set ?? ''}</span>
+              <span style="font-weight:600;font-size:.875rem">$${card.price ?? '—'}</span>`;
+            r.addEventListener('click', () => { onPick(card); c.innerHTML = ''; });
+            c.appendChild(r);
+          }
+        });
+      });
+    }
+
+    bindSearch('pick-a', 'slot-a-results', card => {
+      aId = card.id;
+      document.getElementById('pick-a').value = card.name;
+      if (bId) vs();
+    });
+    bindSearch('pick-b', 'slot-b-results', card => {
+      bId = card.id;
+      document.getElementById('pick-b').value = card.name;
+      if (aId) vs();
+    });
+
+    function vs() {
+      vsCompare({ a: aId, b: bId }).then(res => {
+        document.getElementById('compare-panel').style.display = 'flex';
+        document.getElementById('c-price-a').textContent  = `$${res.a.price ?? '—'}`;
+        document.getElementById('c-price-b').textContent  = `$${res.b.price ?? '—'}`;
+        document.getElementById('c-trend-a').textContent   = `${(res.a.change ?? 0) >= 0 ? '+' : ''}${(res.a.change ?? 0).toFixed(1)}%`;
+        document.getElementById('c-trend-b').textContent   = `${(res.b.change ?? 0) >= 0 ? '+' : ''}${(res.b.change ?? 0).toFixed(1)}%`;
+        document.getElementById('c-set-a').textContent     = res.a.set ?? '—';
+        document.getElementById('c-set-b').textContent     = res.b.set ?? '—';
+      });
+    }
+  </script>
+</body>
+</html>

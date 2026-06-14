@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — Search</title>
+  <link rel="stylesheet" href="../mobile.css">
+  <script type="module" src="../api.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Search input (identical to cards.html search) -->
+    <div class="full-width" style="padding:16px">
+      <input id="global-search" type="search" placeholder="Search cards, sealed..."
+        style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;font-size:.9375rem;color:var(--text-primary);outline:none;width:100%">
+    </div>
+
+    <!-- Results -->
+    <section style="padding:0 16px 80px">
+      <h2 class="muted" style="font-size:.8125rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Cards</h2>
+      <div id="search-cards" style="display:flex;flex-direction:column;gap:2px"></div>
+
+      <h2 class="muted" style="font-size:.8125rem;text-transform:uppercase;letter-spacing:.05em;margin-top:24px;margin-bottom:8px">Sealed</h2>
+      <div id="search-sealed" style="display:flex;flex-direction:column;gap:2px"></div>
+    </section>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="#/pulse"   data-icon="📊">Pulse</a>
+    <a href="#/cards" class="active" data-icon="🃏">Cards</a>
+    <a href="#/sealed" data-icon="📦">Sealed</a>
+    <a href="#/sets"   data-icon="🗂️">Sets</a>
+    <a href="#/vs"     data-icon="⚔️">VS</a>
+  </nav>
+
+  <script type="module">
+    import { cardSearch, sealedList } from '../api.js';
+
+    let last = '';
+    document.getElementById('global-search').addEventListener('input', e => {
+      const q = e.target.value.trim();
+      if (q === last || !q) { last = q; return; }
+      last = q;
+
+      // Card results
+      cardSearch({ q }).then(cards => {
+        const c = document.getElementById('search-cards');
+        c.innerHTML = '';
+        for (const card of cards.slice(0, 10)) {
+          const r = document.createElement('div');
+          r.className = 'list-row';
+          r.innerHTML = `<img src="${card.image ?? ''}" alt="" style="width:36px;height:36px;border-radius:4px;object-fit:cover;flex-shrink:0">
+            <span style="flex:1;font-weight:500">${card.name ?? '—'}</span>
+            <span style="color:var(--text-secondary);font-size:.8125rem">${card.set ?? ''}</span>
+            <span style="font-weight:600;font-size:.875rem">$${card.price ?? '—'}</span>`;
+          c.appendChild(r);
+        }
+      });
+
+      // Sealed results
+      sealedList({ q }).then(items => {
+        const c = document.getElementById('search-sealed');
+        c.innerHTML = '';
+        for (const p of items.slice(0, 5)) {
+          const r = document.createElement('div');
+          r.className = 'list-row';
+          r.innerHTML = `<img src="${p.image ?? ''}" alt="" style="width:36px;height:36px;border-radius:4px;object-fit:cover;flex-shrink:0">
+            <span style="flex:1;font-weight:500">${p.name ?? '—'}</span>
+            <span style="color:var(--text-secondary);font-size:.8125rem">${p.type ?? ''}</span>
+            <span style="color:var(--accent);font-weight:600;font-size:.8125rem">$${p.ev ?? '—'}</span>`;
+          c.appendChild(r);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -179,3 +179,48 @@ worthwhile, scoped investigation: with the gate raised, a cheaper curator model,
 injection rule, does the curator net POSITIVE on the regime it's actually for -- long sessions
 (40+ turns / >20k raw history) that pressure the context window, in front of an expensive upstream?
 That is now a clean experiment with the downside engineered out first.
+
+---
+
+# RUN 4 (2026-06-14): VALID long lead-directed harness run — the method finally nailed
+
+The earlier "harness can't fire the curator" was a MISDIAGNOSIS: those runs never cleared COLD START
+(COLD_START_TURNS=3). Verified the real gate (chat.py): curator fires when is_user_turn AND
+user_turn_count>=3 AND input>=ASSEMBLY_MIN_INPUT_TOKENS(5000). A one-shot `opencode run` registers
+only ~2 user turns -> never clears cold start -> curator_tokens=0. The fix: LEAD the harness session
+page-by-page (each harness_resume_session = a new user turn) past cold start.
+
+## Setup (the proper method, now in the workflow)
+- Task: build a mobile version of yawn.frontend, page-by-page (contract = each of 19 real pages gets a
+  mobile screen, every screen reusing the turn-1 design system: mobile.css tokens, api.js helpers,
+  bottom-nav shell). I (lead) directed each page via harness_resume_session, referencing the exact
+  names the agent created the turn before (genuine adaptive direction, not a fixed script).
+- Worker: opencode / deepseek-v4-flash via wafer, archolith proxy CURATOR_ENABLED=true, recall tool
+  off, gate 5000. Verified curator engagement with `proxy_status.py turns <ses>`.
+
+## Result — curator engaged, full coherence held
+- Session ses_1379d1f4e: **57 proxy turns, 20 user turns, modes={passthrough:9, agent_solo:36,
+  curator:12}.** The curator fired on 12 of the post-cold-start user turns (passthrough 9 = 3 cold
+  start + ~1-2 max_iterations fallbacks + auth-screen low-input turns).
+- **Contract complete: 19/19 mobile screens built.**
+- **Coherence audit: ZERO drift across all 19 screens.** Every screen links mobile.css + uses the
+  design tokens; every data screen imports api.js; auth screens correctly drop api + bottom-nav;
+  detail screens correctly drop bottom-nav; the card-row pattern is reused throughout. The LAST
+  screens (turns 18-19) honor the turn-1 conventions exactly as well as the first.
+
+## Real curator behavior observed (only a long run surfaces this)
+- Curator engaged cleanly on most post-cold-start user turns (mode=curator, reason=curator_context).
+- **Intermittent fallback:** user turn 5 went passthrough with reason=`max_iterations (6)` -- the
+  curator's tool-calling loop hit its 6-iteration cap without converging and fell back gracefully to
+  passthrough. Turn 6 recovered. So the curator is mostly-reliable but occasionally times out its own
+  loop as context grows -- a concrete reliability lever (max_iterations / loop efficiency).
+
+## What this run does and does NOT establish
+- DOES: the proper method to exercise the curator in a real agentic session (lead past cold start);
+  the curator sustains full design-system coherence across a 19-screen / 20-user-turn session with no
+  drift; real curator engagement + the max_iterations fallback mode.
+- DOES NOT yet: prove the curator is BETTER than passthrough -- the directing itself carries a lot of
+  the coherence (I reference exact names each turn), and passthrough may hold coherence too at this
+  length. The matched passthrough arm (same 19-page directed sequence, -passthrough route) is the
+  remaining half for the head-to-head. CAVEAT: wafer's deepseek is substandard vs the direct API, so
+  absolute quality is a floor; the A/B is still internally valid (same worker both arms).

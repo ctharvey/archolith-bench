@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — Card Detail</title>
+  <link rel="stylesheet" href="../mobile.css">
+  <script type="module" src="../api.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- ────── Reusable Back-Header ────── (also used by Sealed/Set detail) -->
+    <header style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg-secondary);position:sticky;top:0;z-index:10">
+      <a href="#" onclick="history.back()" style="font-size:1.25rem;line-height:1;text-decoration:none;color:var(--text-primary)">←</a>
+      <span id="page-title" style="font-size:1rem;font-weight:600;flex:1">Card Detail</span>
+    </header>
+
+    <!-- ────── Hero ────── -->
+    <section class="full-width" style="padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px">
+      <img id="hero-img" src="" alt="" style="width:120px;height:120px;border-radius:var(--radius);object-fit:cover">
+      <h1 id="hero-name" style="font-size:1.125rem;font-weight:700">—</h1>
+      <span id="hero-set" class="muted" style="font-size:.875rem">—</span>
+      <span id="hero-price" style="font-size:1.5rem;font-weight:700;color:var(--accent)">$—</span>
+    </section>
+
+    <!-- ────── Price-History Placeholder ────── -->
+    <div class="card" style="margin:0 16px;height:160px;display:flex;align-items:center;justify-content:center" id="chart-placeholder">
+      <span class="muted">Price history chart</span>
+    </div>
+
+    <!-- ────── Buy Links ────── -->
+    <div style="display:flex;gap:12px;padding:16px;flex-wrap:wrap">
+      <a class="button" href="#" id="tcgplayer">TCGplayer</a>
+      <a class="button button-outline" href="#" id="ebay">eBay</a>
+    </div>
+  </div>
+
+  <script type="module">
+    import { cardDetail } from '../api.js';
+
+    // ── Load from URL param ──
+    const id = new URLSearchParams(location.search).get('id');
+    if (id) {
+      cardDetail({ id }).then(d => {
+        document.getElementById('page-title').textContent = d.name ?? 'Card Detail';
+        document.getElementById('hero-img').src = d.image ?? '';
+        document.getElementById('hero-name').textContent = d.name ?? '—';
+        document.getElementById('hero-set').textContent = d.set ?? '—';
+        document.getElementById('hero-price').textContent = `$${d.price ?? '—'}`;
+        if (d.tcgplayer) document.getElementById('tcgplayer').href = d.tcgplayer;
+        if (d.ebay)      document.getElementById('ebay').href = d.ebay;
+      });
+    }
+  </script>
+</body>
+</html>

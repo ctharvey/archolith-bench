@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — Sealed Detail</title>
+  <link rel="stylesheet" href="../mobile.css">
+  <script type="module" src="../api.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Reusable back-header (identical to card-detail.html) -->
+    <header style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg-secondary);position:sticky;top:0;z-index:10">
+      <a href="#" onclick="history.back()" style="font-size:1.25rem;line-height:1;text-decoration:none;color:var(--text-primary)">←</a>
+      <span id="page-title" style="font-size:1rem;font-weight:600;flex:1">Sealed Detail</span>
+    </header>
+
+    <!-- Hero -->
+    <section class="full-width" style="padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px">
+      <img id="hero-img" src="" alt="" style="width:120px;height:120px;border-radius:var(--radius);object-fit:cover">
+      <h1 id="hero-name" style="font-size:1.125rem;font-weight:700">—</h1>
+    </section>
+
+    <!-- EV Breakdown -->
+    <section class="card" style="margin:0 16px 16px;padding:16px">
+      <h3 style="font-size:.875rem;font-weight:600;margin-bottom:12px">Contents</h3>
+      <div id="ev-items" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div id="ev-total" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-weight:700;color:var(--accent);font-size:1.125rem"></div>
+    </section>
+
+    <!-- Current Price -->
+    <section style="padding:0 16px">
+      <span id="sealed-price" style="font-size:1.5rem;font-weight:700;color:var(--accent)">$—</span>
+    </section>
+
+    <!-- Buy Buttons -->
+    <div style="display:flex;gap:12px;padding:16px;flex-wrap:wrap">
+      <a class="button" href="#" id="tcgplayer">TCGplayer</a>
+      <a class="button button-outline" href="#" id="ebay">eBay</a>
+    </div>
+  </div>
+
+  <script type="module">
+    import { sealedDetail } from '../api.js';
+
+    const id = new URLSearchParams(location.search).get('id');
+    if (id) {
+      sealedDetail({ id }).then(d => {
+        document.getElementById('page-title').textContent = d.name ?? 'Sealed Detail';
+        document.getElementById('hero-img').src = d.image ?? '';
+        document.getElementById('hero-name').textContent = d.name ?? '—';
+        document.getElementById('sealed-price').textContent = `$${d.price ?? '—'}`;
+
+        // EV breakdown
+        const items = document.getElementById('ev-items');
+        items.innerHTML = '';
+        let total = 0;
+        for (const item of d.contents ?? []) {
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex;justify-content:space-between;font-size:.875rem';
+          row.innerHTML = `<span>${item.name}</span><span style="color:var(--accent);font-weight:600">$${item.value ?? '—'}</span>`;
+          items.appendChild(row);
+          total += item.value ?? 0;
+        }
+        document.getElementById('ev-total').textContent = `Total EV: $${total.toFixed(2)}`;
+
+        if (d.tcgplayer) document.getElementById('tcgplayer').href = d.tcgplayer;
+        if (d.ebay)      document.getElementById('ebay').href = d.ebay;
+      });
+    }
+  </script>
+</body>
+</html>

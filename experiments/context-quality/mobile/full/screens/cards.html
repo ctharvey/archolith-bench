@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — Cards</title>
+  <link rel="stylesheet" href="../mobile.css">
+  <script type="module" src="../api.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- ────── Sticky Search ────── -->
+    <header class="full-width" style="position:sticky;top:0;z-index:10;background:var(--bg-primary);padding:12px 16px 8px">
+      <input id="q" type="search" placeholder="Search cards…" class="full-width"
+        style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;font-size:.9375rem;color:var(--text-primary);outline:none">
+    </header>
+
+    <!-- ────── Reusable Card Row Pattern ────── -->
+    <section class="full-width" style="padding:0 16px 80px">
+      <div id="results" style="display:flex;flex-direction:column;gap:2px"></div>
+    </section>
+  </div>
+
+  <!-- ────── Bottom Navigation ────── -->
+  <nav class="bottom-nav">
+    <a href="#/pulse"   data-icon="📊">Pulse</a>
+    <a href="#/cards"  class="active" data-icon="🃏">Cards</a>
+    <a href="#/sealed" data-icon="📦">Sealed</a>
+    <a href="#/sets"   data-icon="🗂️">Sets</a>
+    <a href="#/vs"     data-icon="⚔️">VS</a>
+  </nav>
+
+  <script type="module">
+    import { cardSearch } from '../api.js';
+
+    // Reusable card-row factory — used by Cards, Sealed, Set Detail, etc.
+    function cardRow(card) {
+      const r = document.createElement('div');
+      r.className = 'list-row';
+      r.innerHTML = `<img src="${card.image ?? ''}" alt="" style="width:36px;height:36px;border-radius:4px;object-fit:cover;flex-shrink:0">
+        <span style="flex:1;font-weight:500">${card.name ?? '—'}</span>
+        <span style="color:var(--text-secondary);font-size:.8125rem;white-space:nowrap">${card.set ?? ''}</span>
+        <span style="font-weight:600;font-size:.875rem">$${card.price ?? '—'}</span>`;
+      return r;
+    }
+
+    // ── Live search ──
+    let lastQ = '';
+    document.getElementById('q').addEventListener('input', e => {
+      const q = e.target.value.trim();
+      if (q === lastQ) return;
+      lastQ = q;
+      if (!q) { document.getElementById('results').innerHTML = ''; return; }
+      cardSearch({ q }).then(cards => {
+        const container = document.getElementById('results');
+        container.innerHTML = '';
+        for (const c of cards) container.appendChild(cardRow(c));
+      });
+    });
+  </script>
+</body>
+</html>

@@ -101,3 +101,23 @@ the result can't be rationalized post-hoc.
 - `experiments/context-quality/PROTOCOL.md` (pre-registered), `RESULT.md` (verdict),
   `oc/<arm>/` (each arm's deliverable + agent.log).
 - Cost model + pricing ladder: `archolith_bench/core/metrics.py`, `pricing/*.json`.
+
+## CRITICAL GOTCHA (learned 2026-06-14): the curator does NOT run for agentic clients
+
+An autonomous tool-using agent (opencode building something) produces almost entirely
+TOOL-CONTINUATION turns, not user turns. Dispatch is `is_agent_solo = ... and not is_user_turn`
+(chat.py:459) -> every tool-loop turn routes to the agent-solo/mechanical path and **bypasses the
+LLM curator**. Observed: a "full curator" arm ran 18/20 turns agent_solo, **0 curator turns,
+curator_tokens=0**. So for an agentic task, "full" and "mechanical" collapse to the SAME path.
+
+Implications:
+- To test the **curator's** value, use a **CHAT-style task with many real user turns**, NOT an
+  autonomous agent build. Otherwise you're testing the mechanical levers and mislabeling it "curator."
+- For the **agent use case**, the curator is structurally moot; the only meaningful arms are
+  **passthrough vs mechanical**. Confirm by checking curator-on vs curator-off traces are
+  near-identical for an agentic client.
+- Always VERIFY the intended path actually ran: check `assembly_mode` counts + `curator_prompt_tokens`
+  in the arm's trace before trusting an arm label. A "full" arm with curator_tokens=0 did not test
+  the curator.
+- Passthrough mode skips detailed per-turn tracing -> log the chat-response `usage` to get that arm's
+  tokens.

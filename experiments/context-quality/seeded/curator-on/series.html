@@ -1,0 +1,19 @@
+<!-- series.html — Card series -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Series · Yawn</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<div id="series-list"></div>
+<nav class="bottom-nav">
+  <a href="home.html">Pulse</a><a href="cards.html">Cards</a>
+  <a href="sealed.html">Sealed</a><a class="active" href="series.html">Series</a><a href="sets.html">Sets</a><a href="market.html">Market</a><a href="graded.html">Graded</a><a href="vs.html">VS</a>
+</nav>
+<script type="module">
+import { series } from './api.js';
+const list = document.getElementById('series-list');
+series().then(items => { list.innerHTML = items.map(s =>
+  `<a class="list-row" href="sets.html?series=${s.id}"><div class="row-thumb"></div>`+
+  `<div class="row-body"><div class="row-name">${s.name}</div></div>`+
+  `<div class="row-meta">${s.setCount} sets</div></a>`).join(''); });
+</script>
+</body></html>

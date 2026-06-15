@@ -1,0 +1,27 @@
+<!-- transactions.html — Recent transactions -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Transactions · Yawn</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<div class="search-sticky"><input class="search-input" type="search" placeholder="Search transactions…"></div>
+<div id="txn-list">
+  <a class="list-row" href="card-detail.html">
+    <div class="row-thumb"></div>
+    <div class="row-body"><div class="row-name">Charizard</div><div class="row-sub">Base Set · #4</div></div>
+    <div class="row-meta">$420</div>
+  </a>
+</div>
+<nav class="bottom-nav">
+  <a href="home.html">Pulse</a><a href="cards.html">Cards</a>
+  <a href="market.html">Market</a><a href="sealed.html">Sealed</a><a href="graded.html">Graded</a><a href="series.html">Series</a><a class="active" href="transactions.html">Activity</a><a href="vs.html">VS</a>
+</nav>
+<script type="module">
+import { transactions } from './api.js';
+const list = document.getElementById('txn-list');
+async function load(q){ const data = await transactions({ q }); list.innerHTML = data.map(t =>
+  `<a class="list-row" href="card-detail.html?id=${t.id}"><div class="row-thumb"></div>`+
+  `<div class="row-body"><div class="row-name">${t.name}</div><div class="row-sub">${t.detail ?? ''}</div></div>`+
+  `<div class="row-meta">$${t.price}</div></a>`).join(''); }
+document.querySelector('.search-input').addEventListener('input', e => load(e.target.value));
+</script>
+</body></html>

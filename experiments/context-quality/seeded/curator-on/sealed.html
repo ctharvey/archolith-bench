@@ -1,0 +1,19 @@
+<!-- sealed.html — Sealed products browse -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sealed · Yawn</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<div id="sealed-list"></div>
+<nav class="bottom-nav">
+  <a href="home.html">Pulse</a><a href="cards.html">Cards</a>
+  <a class="active" href="sealed.html">Sealed</a><a href="sets.html">Sets</a><a href="market.html">Market</a><a href="vs.html">VS</a>
+</nav>
+<script type="module">
+import { sealedList } from './api.js';
+const list = document.getElementById('sealed-list');
+sealedList().then(products => { list.innerHTML = products.map(p =>
+  `<a class="list-row" href="sealed-detail.html?id=${p.id}"><div class="row-thumb"></div>`+
+  `<div class="row-body"><div class="row-name">${p.name}</div><div class="row-sub">${p.releaseYear}</div></div>`+
+  `<div class="row-meta">$${p.ev}</div></a>`).join(''); });
+</script>
+</body></html>

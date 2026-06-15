@@ -1,0 +1,27 @@
+<!-- graded.html — Graded cards browse -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Graded · Yawn</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<div class="search-sticky"><input class="search-input" type="search" placeholder="Search graded…"></div>
+<div id="graded-list">
+  <a class="list-row" href="card-detail.html">
+    <div class="row-thumb"></div>
+    <div class="row-body"><div class="row-name">Charizard</div><div class="row-sub">PSA 9</div></div>
+    <div class="row-meta">$1,200</div>
+  </a>
+</div>
+<nav class="bottom-nav">
+  <a href="home.html">Pulse</a><a href="cards.html">Cards</a>
+  <a href="market.html">Market</a><a href="sealed.html">Sealed</a><a class="active" href="graded.html">Graded</a><a href="vs.html">VS</a>
+</nav>
+<script type="module">
+import { graded } from './api.js';
+const list = document.getElementById('graded-list');
+async function load(q){ const cards = await graded({ q }); list.innerHTML = cards.map(c =>
+  `<a class="list-row" href="card-detail.html?id=${c.id}"><div class="row-thumb"></div>`+
+  `<div class="row-body"><div class="row-name">${c.name}</div><div class="row-sub">${c.grade}</div></div>`+
+  `<div class="row-meta">$${c.price}</div></a>`).join(''); }
+document.querySelector('.search-input').addEventListener('input', e => load(e.target.value));
+</script>
+</body></html>

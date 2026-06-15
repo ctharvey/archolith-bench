@@ -1,0 +1,27 @@
+<!-- market.html — Market breadth browse -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Market · Yawn</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<div class="search-sticky"><input class="search-input" type="search" placeholder="Search sets…"></div>
+<div id="market-list">
+  <a class="list-row" href="set-detail.html">
+    <div class="row-thumb"></div>
+    <div class="row-body"><div class="row-name">Base Set</div><div class="row-sub">7d change</div></div>
+    <div class="row-meta" style="color:var(--accent)">+12.4%</div>
+  </a>
+</div>
+<nav class="bottom-nav">
+  <a href="home.html">Pulse</a><a href="cards.html">Cards</a>
+  <a class="active" href="market.html">Market</a><a href="sets.html">Sets</a><a href="vs.html">VS</a>
+</nav>
+<script type="module">
+import { marketBreadth } from './api.js';
+const list = document.getElementById('market-list');
+async function load(q){ const data = await marketBreadth({ q }); list.innerHTML = data.map(s =>
+  `<a class="list-row" href="set-detail.html?id=${s.id}"><div class="row-thumb"></div>`+
+  `<div class="row-body"><div class="row-name">${s.name}</div><div class="row-sub">7d change</div></div>`+
+  `<div class="row-meta" style="color:${s.change >= 0 ? 'var(--accent)' : '#ef4444'}">${s.change >= 0 ? '+' : ''}${s.change}%</div></a>`).join(''); }
+document.querySelector('.search-input').addEventListener('input', e => load(e.target.value));
+</script>
+</body></html>

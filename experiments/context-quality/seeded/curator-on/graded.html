@@ -1,0 +1,19 @@
+<!-- graded.html — Graded cards -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Graded · Yawn</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<div id="graded-list"></div>
+<nav class="bottom-nav">
+  <a href="home.html">Pulse</a><a href="cards.html">Cards</a>
+  <a href="sealed.html">Sealed</a><a href="sets.html">Sets</a><a href="market.html">Market</a><a class="active" href="graded.html">Graded</a><a href="vs.html">VS</a>
+</nav>
+<script type="module">
+import { graded } from './api.js';
+const list = document.getElementById('graded-list');
+graded().then(items => { list.innerHTML = items.map(g =>
+  `<a class="list-row" href="card-detail.html?id=${g.id}"><div class="row-thumb"></div>`+
+  `<div class="row-body"><div class="row-name">${g.name}</div><div class="row-sub">${g.grade}</div></div>`+
+  `<div class="row-meta">$${g.lastSale}</div></a>`).join(''); });
+</script>
+</body></html>

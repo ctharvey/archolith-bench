@@ -1,0 +1,23 @@
+<!-- market.html — Market breadth -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Market · Yawn</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<div id="market-list"></div>
+<nav class="bottom-nav">
+  <a href="home.html">Pulse</a><a href="cards.html">Cards</a>
+  <a href="sealed.html">Sealed</a><a href="sets.html">Sets</a><a class="active" href="market.html">Market</a><a href="vs.html">VS</a>
+</nav>
+<script type="module">
+import { marketBreadth } from './api.js';
+const list = document.getElementById('market-list');
+marketBreadth().then(sets => { list.innerHTML = sets.map(s => {
+  const pct = s.changePercent;
+  const color = pct >= 0 ? 'var(--accent)' : '#ef4444';
+  const arrow = pct >= 0 ? '↑' : '↓';
+  return `<a class="list-row" href="set-detail.html?id=${s.id}"><div class="row-thumb"></div>`+
+    `<div class="row-body"><div class="row-name">${s.name}</div><div class="row-sub">Last 7 days</div></div>`+
+    `<div class="row-meta" style="color:${color}">${arrow} ${Math.abs(pct).toFixed(1)}%</div></a>`;
+}).join(''); });
+</script>
+</body></html>

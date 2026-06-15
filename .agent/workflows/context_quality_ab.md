@@ -147,3 +147,68 @@ input exceeds the gate. KEY: a one-shot `opencode run` autonomous task registers
 total (e.g. ses_138b368b9: 20 turns but USER=2) -> never clears cold start -> 0 curator. To exercise
 the curator you must LEAD many separate resume turns. VERIFY with `proxy_status.py turns <ses>` (look
 for mode=curator rows), not just curator_tokens in the raw jsonl.
+
+---
+
+## RESUME / HANDOFF (2026-06-15 00:15Z) — two_curator seeded recall test IN PROGRESS
+
+### The big correction (read first)
+All curator runs through Run-4 tested the WRONG mode. `curation_mode` defaulted to **`two_pass`**
+(the turn-curator does its OWN 6-iteration tool-calling per turn -> hit `max_iterations(6)` and fell
+back to passthrough). The intended architecture is **`two_curator`**: a background **prepper**
+(`run_prepper`, generous iteration budget) pre-builds a `SessionBriefing`; a lightweight per-turn
+**assembler** (`run_assembler`) just SELECTS from the briefing (shouldn't re-fetch). Set
+`CURATION_MODE=two_curator` in archolith-context/.env. Verified registered in
+data/proxy_latest_err.log: `curation_mode_configured mode=two_curator prepper/assembler=gpt-4.1-mini`.
+STILL TODO: verify the prepper background pass actually FIRES on a curated turn (look for
+prepper/briefing events in the trace/err-log once a session is past cold start), not just registered.
+
+### Current proxy config (archolith-context/.env) — all verified
+- CURATION_MODE=two_curator, CURATOR_ENABLED=true, BACKGROUND_PASS_ENABLED=true
+- COLD_START_TURNS=3, ASSEMBLY_MIN_INPUT_TOKENS=5000, SESSION_RECALL_TOOL_ENABLED=false
+- CURATOR_MODEL=EXTRACTOR_MODEL=gpt-4.1-mini (OpenAI); EMBEDDING_MODEL=text-embedding-3-small (OpenAI)
+- Upstream = wafer deepseek-v4-flash. (User: wafer deepseek is SUBSTANDARD vs direct API — quality floor.)
+- Backups to revert: .env.pre-twocurator-bak, .env.pre-testkey-bak, .env.curator-on-bak, .env.pre-wafer-bak
+- Proxy on :9800. Restart: `python scripts/proxy_restart.py`. Logs: data/proxy_latest{,_err}.log
+- Verify curator engagement: `python scripts/proxy_status.py turns <ses>` (mode=curator rows) and
+  `proxy_status.py sessions` (USER/CURATOR counts). assembly_reason=max_iterations(N) = assembler fell back.
+
+### COST: metered key + how to calculate (validated)
+A DEDICATED OpenAI key (project proj_HarxQbRu) is set on EXTRACTOR_API_KEY + CURATOR_API_KEY +
+EMBEDDING_API_KEY so ALL helper spend lands on one project = ground truth. VALIDATED: trace token
+counts MATCH the OpenAI dashboard (trace ~54-60k vs dashboard 53.5k). The earlier "$0.11" estimate was
+a STALE-KEY artifact (old key wasn't billing); real cost is ~$0.02/partial-run. Pricing gpt-4.1-mini:
+$0.40/M input, $0.10/M CACHED input (curator prefix ~85% cached), $1.60/M output; text-embedding-3-small
+$0.02/M. **Meter baseline before the seeded test = 75.001K input tokens** (read the dashboard delta after).
+SECURITY: the metered key was pasted in plaintext in chat — user should ROTATE it after testing.
+
+### The SEEDED recall test (the clean design, fixes all prior confounds)
+WHY: prior runs were confounded — (1) each arm coined a DIFFERENT row convention at turn 2 in
+cold-start passthrough (variance, not curator effect), then stayed self-consistent; (2) the two_pass
+curator fell back to passthrough mid-test. FIX: seed BOTH arms with byte-identical starting files so
+the recall target is the same; only context management varies.
+- Files: experiments/context-quality/seeded/_seed/ = canonical mobile.css (.list-row + tokens
+  --accent/--muted), api.js (named helpers setsMatrix/cardSearch/sealedList/...), cards.html (USES
+  .list-row + cardSearch), card-detail.html (back-header pattern). Copied into seeded/full and seeded/pass.
+- Arms: full = `archolith/deepseek-v4-flash` (two_curator), pass = `archolith/deepseek-v4-flash-passthrough`.
+- METHOD (lead page-by-page via harness_resume_session; each resume = 1 USER turn):
+  - Turn 1: "Read the 4 existing files, confirm conventions, write nothing." (loads conventions into history)
+  - Turns 2-3: under-specified pages (cold-start passthrough on BOTH arms — build history, not differentiating)
+  - Turn 4+: under-specified pages -> full=curator, pass=passthrough = THE comparison. Run ~4-5 curated pages.
+  - Under-specified prompt style (NO anchor names): "Now add the Sealed products browse screen,
+    consistent with the rest of the app. It lists sealed products, each showing its expected value (EV)."
+    NEVER name .list-row / --accent / the api helper / the file — force RECALL from context.
+- RECALL METRIC per page (grep each new screen): reused .list-row? used --accent token? used the
+  correct named api helper? reused back-header (detail screens)? Compare full vs pass on the SAME page.
+- HYPOTHESIS to test: passthrough keeps RAW code so exact .list-row/--accent survive verbatim;
+  curator DISTILLS -> may keep "use api.js helpers" but lose exact class names. Two_curator (prepper
+  briefing) may preserve more than two_pass did. Measure, don't assume.
+- ACTIVE SESSIONS (started, may be alive): seeded-full-20260615 (turn 1 sent, reading files).
+  seeded-pass NOT yet started — start it with the same turn-1 file-review task, forceNew=true.
+
+### Status at handoff
+two_curator enabled+registered, embedding confirmed OpenAI, both arms seeded identically, full arm
+turn-1 (file review) sent. NEXT: confirm full turn-1 done, start the pass arm (same turn-1), then lead
+both through identical under-specified pages past cold start, verify the prepper fires on full,
+recall-audit each page head-to-head, pull cost delta off the meter. Prior results: RESULT.md Runs 1-4
++ DESIGN ANALYSIS (all on the degraded two_pass mode — re-interpret in that light).

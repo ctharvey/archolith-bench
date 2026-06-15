@@ -215,6 +215,49 @@ recall-audit each page head-to-head, pull cost delta off the meter. Prior result
 
 ---
 
+## RESOLVED (2026-06-15) — event-driven curator worker landed; prepper FIRES reliably
+
+The handoff's open question ("verify the prepper background pass actually FIRES on a curated turn,
+not just registered") is ANSWERED, and the firing was made reliable by the event-driven worker.
+
+- **Phases 0-1 of the event-driven-worker plan are implemented** on
+  `archolith-context` branch `feat/event-driven-curator-worker`:
+  - Phase 0 instruments the failure: `/metrics` now has a `curator_worker_diag` block —
+    `prepper_fires`, `prepper_starved` (skipped on tool-call/non-user turns), `prepper_cancels`
+    (killed by next turn), `hot_path_llm_calls`, `avg_briefing_lag_turns`.
+  - Phase 1 adds a long-lived per-session worker (`curator/worker.py`), flag-gated by
+    `CURATOR_WORKER_ENABLED=true`, that feeds the prepper on EVERY turn boundary, debounced and
+    with no cancel-on-next-turn.
+- **The gate caught a real wiring bug first**: the worker enqueue was initially left behind the
+  same `is_user_turn/tool_calls` guard that starves the legacy prepper, so an agentic opencode
+  session reproduced the starvation (`prepper_fires=0, prepper_starved=2`). Fixed by decoupling
+  the enqueue (commit `0f28897`); the legacy guard only applies in worker-off mode.
+- **Live result** (led opencode session `gate-full-20260615`, route `deepseek-v4-flash`,
+  `CURATION_MODE=two_curator`): after the fix the worker fires reliably —
+  `prepper_fires` climbs 1:1 with completed turns, `prepper_starved=0`, `prepper_cancels=0`,
+  the prepper pass completes (`prepper_complete` in the err-log, `background_pass_successes`
+  increments), and the hot path consumed a briefing (`briefing_reads=1`, `avg_briefing_lag_turns=1.0`
+  fresh). This is the steady-state win the plan predicted.
+
+### Metrics now work for the two_curator + worker setup (same session)
+Three `/metrics` gaps this run exposed are fixed:
+- `record_assembly_mode()` was never called in chat.py, so `assembly_modes` was permanently 0.
+  Now counted for curated AND passthrough requests.
+- Helper-LLM token totals (`extractor_*`, `curator_*`, `embedding_tokens`) and
+  `background_pass_successes` were recorded but never returned by `/metrics`. Now surfaced under
+  a `helper_tokens` block + `background_pass_successes`.
+- The background prepper's curator-model token spend is now recorded into `curator_*_tokens_total`,
+  so two_curator cost is visible (was 0 despite the prepper running the curator model).
+
+### Passthrough is now recorded like a non-passthrough session
+Passthrough requests count in `assembly_modes` (`passthrough`) and record
+`total_input_tokens_seen`, so the A/B passthrough arm is recorded symmetrically. (Note: passthrough
+still uses the synthetic benchmark session id with `turn_number=0` by design — per-turn token totals
+still aggregate under that session in the trace store; the chat-response `usage` fallback noted above
+is no longer required just to see passthrough traffic in `/metrics`.)
+
+---
+
 ## Broader thread (umbrella record + architecture direction)
 
 This A/B work is one strand of the archolith **Curator Economics & Architecture Investigation**. The
@@ -226,7 +269,9 @@ Investigation"). Key downstream conclusions that reframe this workflow:
 - Direction: an **event-driven curator worker + deterministic session ledger** (plan:
   `projects/archolith/.agent/plans/archolith-context-event-driven-curator-worker-plan.md`). Once it
   lands, the curator reliably has a briefing and THIS A/B finally yields a fair curator-vs-passthrough
-  answer.
+  answer. **UPDATE 2026-06-15: Phases 0-1 landed** (worker fires reliably — see the RESOLVED section
+  above); Phases 2-5 (deterministic LLM-free hot-path read, WAL durability, ARC eviction, the seeded
+  recall measurement) remain. The fair A/B is now unblocked once a fresh briefing is reliably present.
 - `cth.mcp.memory` (-> `archolith.memory`) already runs the background-maintenance pattern (scheduler
   lease, enrichment queue, decay/lifecycle); the two projects live in tandem with intent to extract
   shared tooling. Reuse, don't reinvent.

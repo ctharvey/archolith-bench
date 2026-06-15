@@ -1,0 +1,18 @@
+/* mobile.css — Yawn mobile design system */
+:root{
+  --bg:#0a0b0d; --bg-2:#0f1014; --bg-3:#14161b;
+  --accent:#16a34a; --accent-light:#4ade80; --muted:#8a909c; --text:#e4e6ea;
+  --radius:10px; --nav-h:56px;
+}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}
+.card{background:var(--bg-2);border-radius:var(--radius);padding:12px;margin:8px}
+.list-row{display:flex;align-items:center;gap:12px;min-height:44px;padding:10px 12px;background:var(--bg-2);border-bottom:1px solid var(--bg-3)}
+.list-row .row-thumb{width:40px;height:40px;border-radius:6px;background:var(--bg-3);flex:0 0 auto}
+.list-row .row-body{flex:1;min-width:0}
+.list-row .row-name{font-weight:600}
+.list-row .row-sub{color:var(--muted);font-size:.8rem}
+.list-row .row-meta{color:var(--accent);font-weight:600}
+.button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;border-radius:var(--radius);background:var(--accent);color:#fff;border:0;font-weight:600}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);display:flex;background:var(--bg-2);border-top:1px solid var(--bg-3)}
+.bottom-nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);text-decoration:none;font-size:.7rem}
+.bottom-nav a.active{color:var(--accent)}

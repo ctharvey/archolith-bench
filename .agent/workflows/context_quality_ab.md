@@ -212,3 +212,23 @@ turn-1 (file review) sent. NEXT: confirm full turn-1 done, start the pass arm (s
 both through identical under-specified pages past cold start, verify the prepper fires on full,
 recall-audit each page head-to-head, pull cost delta off the meter. Prior results: RESULT.md Runs 1-4
 + DESIGN ANALYSIS (all on the degraded two_pass mode — re-interpret in that light).
+
+---
+
+## Broader thread (umbrella record + architecture direction)
+
+This A/B work is one strand of the archolith **Curator Economics & Architecture Investigation**. The
+consolidated cross-project record lives at the umbrella:
+`projects/archolith/.agent/RESEARCH-FINDINGS.md` (section "Curator Economics & Architecture
+Investigation"). Key downstream conclusions that reframe this workflow:
+- The curator's `max_iterations` fallbacks are a **request-coupled SCHEDULING failure** (prepper starved
+  + cancelled), not a curator-logic bug. Mode was `two_pass` (default), not the intended `two_curator`.
+- Direction: an **event-driven curator worker + deterministic session ledger** (plan:
+  `projects/archolith/.agent/plans/archolith-context-event-driven-curator-worker-plan.md`). Once it
+  lands, the curator reliably has a briefing and THIS A/B finally yields a fair curator-vs-passthrough
+  answer.
+- `cth.mcp.memory` (-> `archolith.memory`) already runs the background-maintenance pattern (scheduler
+  lease, enrichment queue, decay/lifecycle); the two projects live in tandem with intent to extract
+  shared tooling. Reuse, don't reinvent.
+- COST: trace token accounting is validated against a metered OpenAI key; helper cost is ~$0.02/run
+  (cheap) -- the real costs are latency + upstream bloat, not dollars.

@@ -256,6 +256,35 @@ still uses the synthetic benchmark session id with `turn_number=0` by design —
 still aggregate under that session in the trace store; the chat-response `usage` fallback noted above
 is no longer required just to see passthrough traffic in `/metrics`.)
 
+### Prepper tuning that made the whole chain reliable (2026-06-15, live-validated)
+The full chain now works end-to-end (worker fires -> prepper completes -> briefing cached -> curator
+engages on a user turn -> deterministic LLM-free read serves it). Two tuning fixes were required:
+- **`PREPPER_LATENCY_BUDGET_MS` 30s -> 60s.** At the 30s default the gpt-4.1-mini prepper timed out on
+  ~every pass, so no briefing was ever cached and `curate_context` always fell back. THIS, not the
+  assembly gating logic, was why `briefing_reads=0` live. 60s lets the pass complete.
+- **Converge prompt** (`PREPPER_SYSTEM_PROMPT` rule 7: call AT MOST 5-7 tools, then emit). Took the
+  live `no_result` rate from ~50% to ~0 — the model was over-fetching files and hitting
+  `max_iterations` without emitting. Iteration count is NOT the binding constraint; tool-call
+  ambition is.
+
+### Tooling: `scripts/prepper_sweep.py` + the offline-sweep limitation
+`prepper_sweep.py` (in archolith-context) sweeps `prepper_max_iterations` x default/converge prompt
+against a COPY of the live graph DB with a real coherence tail loaded from the session trace. It
+reports complete/no_result/timeout + median/max latency. **Caveat (important):** it pre-flights the
+session's cached-file count and WARNS when 0 — the copied DB's `file_cache` is usually empty, so the
+prepper can't fetch files (`files=0`) and the sweep UNDER-REPRESENTS the live file-fetch workload (the
+dominant latency). So the offline sweep cannot measure true prepper latency; the live run is the only
+source for that. `proxy_status.py metrics` now renders the full `curator_worker_diag` + `helper_tokens`
+block (use it instead of raw curl).
+
+### Upstream: wafer vs direct DeepSeek
+Wafer deepseek-v4-flash had a backend outage (HTTP 503 `no_healthy_backends`) mid-session. Swapped the
+proxy upstream back to the direct DeepSeek API (`https://api.deepseek.com/v1`). Both model names
+`deepseek-chat` and `deepseek-v4-flash` return 200 from DeepSeek (their current chat model IS v4-flash;
+names alias), so the existing opencode route `archolith/deepseek-v4-flash` works against DeepSeek with
+NO route/config change. `.env` upstream lines are swappable via the `.env.pre-wafer-bak` /
+`.env.pre-deepseek-swap-bak` backups.
+
 ---
 
 ## Broader thread (umbrella record + architecture direction)

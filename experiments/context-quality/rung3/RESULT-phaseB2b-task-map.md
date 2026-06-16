@@ -46,6 +46,28 @@ GradedV3Page.tsx, ...` read first.
 4. **The in-degree map remains the worst useful arm** (17% exemplar, 24.3 reads of mostly foundations)
    — superseded by map-task.
 
+## B2c — the synthesis: task-map + `list_dir` (the "untested ideal", now tested)
+Added a 5th arm combining the priority map with directory discovery. Result (n=6/arm):
+| arm | reads | list_dir | misses | exemplar % | reads→exemplar |
+|-----|-------|----------|--------|-----------|----------------|
+| map (in-degree) | 23.2 | 0 | 0.8 | 0* | 8.0 |
+| map-task | 16.7 | 0 | 4.8 | 100 | 1.0 |
+| **map-task + ls** | 18.3 | **4.7** | **0.0** | **100** | **1.0** |
+| ls | 10.2 | 11.2 | 0.3 | 100 | 4.0 |
+| blind | 0.0 | 0 | 8.0 | 0 | 8.0 |
+(*in-degree map's exemplar-reach is seed-fragile — 17% in B2b, 0% here; either way the worst useful arm.)
+
+**The synthesis is the best arm on every quality axis at once:**
+- **exemplar 100% in ~1 read** — the task-map's "START HERE" gives the sharp start (kills reads→exemplar).
+- **0.0 misses** — `list_dir` supplies the complete discovery the ranked map lacked (kills the groping
+  that gave bare map-task 4.8 misses).
+- **~4.7 `list_dir` calls vs plain `ls`'s ~11.2** — the map means the agent browses LESS; it already
+  knows where to start, so discovery is confirmatory, not exploratory. The map roughly halves the
+  discovery round-trips.
+So the priority map and directory discovery are complementary, not redundant: the map fixes
+*reaches-the-exemplar* and *discovery cost*; `list_dir` fixes *completeness*. Recommended navigation
+design = **task-ranked map + a `list_dir` tool.**
+
 ## Verdict & next
 - **The owner's "rank by task priority" iteration is validated:** it turns the map from
   navigation-misdirecting (B2) into the FASTEST route to the exemplar — better than `ls` on

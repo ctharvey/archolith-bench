@@ -190,10 +190,10 @@ def run() -> int:
     code_map = render_code_map(briefing_files)
     # ARM_SPECS: (label, map-kind, with_ls) — map-kind: ""|"indeg"|"task"
     ARM_SPECS = [("map", "indeg", False), ("map-task", "task", False),
-                 ("ls", "", True), ("blind", "", False)]
+                 ("map-task+ls", "task", True), ("ls", "", True), ("blind", "", False)]
     print(f"B2 navigation — corpus {len(corpus)} files, indeg-map {len(code_map)//4} tok, "
           f"seeds={SEEDS}, tasks={[t[0] for t in TASKS]}, MAX_TURNS={MAX_TURNS}")
-    print("arms: map (in-degree) / map-task (relevance-ranked) / ls (fair baseline) / blind (floor)")
+    print("arms: map / map-task / map-task+ls (synthesis) / ls (baseline) / blind (floor)")
     print(f"{len(ARM_SPECS)*len(TASKS)*len(SEEDS)} runs\n")
     agg: dict[str, list[dict]] = {a[0]: [] for a in ARM_SPECS}
     try:

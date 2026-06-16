@@ -1,0 +1,38 @@
+/* DecksV3Page.module.css */
+
+.errorMsg {
+    padding: 40px;
+    text-align: center;
+    color: var(--down);
+}
+
+.pageMeta {
+    margin-top: 4px;
+}
+
+.kpiGrid {
+    margin-bottom: 18px;
+}
+
+.filterBar {
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.filterPills {
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.filterPill {
+    cursor: pointer;
+}
+
+.searchSort {
+    gap: 8px;
+}

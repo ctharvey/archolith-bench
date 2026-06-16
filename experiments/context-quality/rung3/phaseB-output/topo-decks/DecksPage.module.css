@@ -1,0 +1,12 @@
+.errorBox {
+    padding: 40px;
+    text-align: center;
+}
+
+.errorText {
+    color: var(--down);
+}
+
+.metaMuted {
+    color: var(--t-4);
+}

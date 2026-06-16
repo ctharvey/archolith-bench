@@ -20,7 +20,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-_CTX_ROOT = Path(r"C:\Users\thron\IdeaProjects\projects\archolith\archolith-context")
+# Ensure local modules are importable.
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+from paths import context_root, corpus_root  # noqa: E402
+
+_CTX_ROOT = context_root()
 sys.path.insert(0, str(_CTX_ROOT))
 
 from archolith_proxy.curator.briefing import PreFetchedFile, SessionBriefing  # noqa: E402
@@ -28,7 +33,7 @@ from archolith_proxy.curator.deterministic_assembler import (  # noqa: E402
     build_deterministic_context,
 )
 
-CORPUS = Path(r"C:\Users\thron\IdeaProjects\projects\forked\yawn.frontend\src")
+CORPUS = corpus_root()
 EXTS = {".ts", ".tsx", ".js", ".jsx", ".css", ".astro", ".mjs"}
 
 # Exemplar feature screens the prepper would plausibly pull for "add a browse screen".

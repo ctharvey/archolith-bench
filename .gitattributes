@@ -1,0 +1,7 @@
+# Normalize line endings: store LF in the repo, check out LF.
+# Silences the "LF will be replaced by CRLF" warning on every commit.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gz binary
+*.db binary

@@ -1,0 +1,76 @@
+# Rung 3 — Deterministic Context-Selection Experiments (START HERE)
+
+This directory is the experimental arm of the archolith **deterministic-layers** research thread:
+*does ordering which files survive a budget-truncated context briefing change what an LLM agent
+recalls and produces?* It is a sequence of pre-registered experiments, each of which **killed a
+hypothesis and sharpened the question** — read the arc, not just the files.
+
+Canonical results record: `archolith/.agent/RESEARCH-FINDINGS.md` §G–§I.
+Direction/spine: `archolith/.agent/plans/archolith-context-deterministic-layers-direction.md`.
+
+## Results at a glance
+
+Recall metric = `feature_contract.py` (F1–F6 anchors; "core" = page+hook+data-layer+css all present).
+Fill strategies: **FIFO** (insertion order), **scored** (keyword relevance), **topological** (dependency
+in-degree, foundations-first), **combo** (exemplar-aware: guarantee a template, then interleave).
+
+| Phase | Question | Regime | Headline result |
+|-------|----------|--------|-----------------|
+| **A** (offline) | Does topological keep load-bearing FOUNDATIONS under budget pressure? | frozen, mechanical | **Yes** — topological 3–5/8 foundations survive; FIFO & scored **0/8**. |
+| **B** (live) | Does that help an agent's recall in a real run? | live agent, re-read allowed | **No difference** — all 3 arms **6/6**. The agent RE-READ source; the filesystem, not the briefing, gated recall. |
+| **C** (frozen) | With re-reading DENIED, which fill recalls conventions best? | frozen briefing, 1 task | **Inverse of A**: topological **WORST (3/6)**, FIFO 4/6, scored **BEST (5/6)**. Foundations ≠ recall-critical; recall needs an EXEMPLAR. |
+| **C-multi** | Is that ranking robust across tasks? | frozen, 3 tasks | topological flat-low (3.00); scored high-variance (6/0/5 — **0/6 when it picks a non-exemplar**); FIFO 3.33. No pure fill is reliable. |
+| **D** (combo) | Can a COMBO beat the pure strategies? | frozen, 3 tasks | **Yes, but only the exemplar-aware combo**: xfcombo **4.67/6, no catastrophic cell**; naive interleave (3.00) does NOT beat scored. |
+| **profiler** | Can the exemplar marker be DERIVED, not hardcoded? | offline, 4 corpora | **Yes** on template-convention corpora (derives `Page.tsx`); cleanly empty elsewhere. Foundations (in-degree) generalize universally. |
+
+## The arc (the falsification cascade — this is the actual finding)
+
+1. **Hypothesis:** topological fill (protect foundations) should improve recall. (From the offline sweep
+   in `../RESULT-pressure-sweep.md`.)
+2. **Phase A** confirms the *mechanism*: topological is the only strategy that keeps foundations alive
+   under pressure. So far so good.
+3. **Phase B** (live) **falsifies the recall claim**: all arms tie, because a tool-using agent re-reads
+   source and bypasses the briefing entirely. → curation's value on file-backed tasks is **cost/latency,
+   not recall**.
+4. **Phase C** (deny re-reading to isolate the briefing) **inverts A**: topological is the *worst* for
+   recall. In-degree finds *foundations*; convention recall needs an *exemplar* (a complete template to
+   imitate). **"Foundation ≠ recall-critical."**
+5. **Phase C-multi** shows no *pure* strategy is reliable — scored finds the exemplar only when the
+   query's vocabulary happens to match one (it scored 0/6 when it didn't).
+6. **Phase D** resolves it: an **exemplar-aware combo** (guarantee a structural template survives, then
+   layer relevance + foundations) wins with no catastrophic failure. Each ingredient does a distinct
+   job: EXEMPLAR = the template, scored = relevance, topological = foundations.
+7. **Profiler** removes the combo's one hardcoded knob: the exemplar marker is **derivable** from the
+   corpus's own repetition (validated across React/Java/TS/Python — fires on template-convention
+   corpora, empty otherwise).
+
+Net thesis (see `RESEARCH-FINDINGS §I`): the deterministic layers' defensible value is **mechanical
+guarantees + economics, not live recall**; CONTENT selection is subvertible by re-reading, while
+MAP and PRIMING are not (and MAP is **not yet surfaced at all** — the open frontier, see
+`../../../.agent/plans/archolith-context-code-map-surface-plan.md`).
+
+## Files
+
+**Protocol & results** (read in arc order above):
+`PROTOCOL-rung3-pressure.md` · `RESULT-phaseA-offline.md` · `RESULT-phaseB-metric.md` ·
+`RESULT-phaseB-live.md` · `RESULT-phaseC-frozen-briefing.md` · `RESULT-phaseC-multi.md` ·
+`RESULT-phaseD-combo.md` · `RESULT-profile-miner.md` · `RESULT-profile-generalization.md` ·
+`RESULT-exemplar-signals-exploration.md`
+
+**Scripts** (paths via `paths.py` — override with `ARCHOLITH_CORPUS` / `ARCHOLITH_CONTEXT_ROOT` env vars):
+| script | phase | offline? |
+|--------|-------|----------|
+| `analyze_corpus.py` | corpus characterization | yes |
+| `phase_a_foundation_survival.py` | A | yes |
+| `feature_contract.py` | recall metric (+ B/C/D scorer) | yes |
+| `phase_c_frozen_briefing.py` | C | **metered** (DeepSeek) |
+| `phase_c_multi.py` | C-multi | **metered** |
+| `phase_d_combo.py` | D | **metered** |
+| `derive_profile.py` | profiler | yes |
+| `explore_exemplar_signals.py` | signal probe | yes |
+
+**Reproducibility notes:** offline scripts need the archolith-context package importable (`paths.py`
+resolves it) + the corpus at `ARCHOLITH_CORPUS`. Metered scripts read `UPSTREAM_API_KEY` from
+`archolith-context/.env`, call `deepseek-chat` at `temperature=0.2, seed=7`. **All quantitative cells
+are N=1** — the load-bearing results (Phase-D ranking, the B/C re-read asymmetry) still need an
+N≥3 + 2nd-corpus confirm before they bear weight (the standing hard gate in `RESEARCH-FINDINGS`).

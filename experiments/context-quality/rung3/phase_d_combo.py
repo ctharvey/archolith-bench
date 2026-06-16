@@ -22,7 +22,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-sys.path.insert(0, r"C:\Users\thron\IdeaProjects\projects\archolith\archolith-context")
+from paths import context_root  # noqa: E402
+
+sys.path.insert(0, str(context_root()))
 
 from archolith_proxy.curator.briefing import SessionBriefing  # noqa: E402
 from archolith_proxy.curator.deterministic_assembler import build_deterministic_context  # noqa: E402

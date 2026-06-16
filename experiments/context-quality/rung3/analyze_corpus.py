@@ -21,10 +21,13 @@ import argparse
 import sys
 from pathlib import Path
 
+# Ensure local modules are importable.
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+from paths import context_root, corpus_root  # noqa: E402
+
 # Make the archolith-context package importable without installing it.
-_CTX_ROOT = Path(
-    r"C:\Users\thron\IdeaProjects\projects\archolith\archolith-context"
-)
+_CTX_ROOT = context_root()
 if _CTX_ROOT.exists():
     sys.path.insert(0, str(_CTX_ROOT))
 
@@ -34,9 +37,7 @@ from archolith_proxy.curator.dependency_graph import (  # noqa: E402
     extract_dependencies,
 )
 
-_DEFAULT_ROOT = Path(
-    r"C:\Users\thron\IdeaProjects\projects\forked\yawn.frontend\src"
-)
+_DEFAULT_ROOT = corpus_root()
 _EXTS = {".ts", ".tsx", ".js", ".jsx", ".css", ".html", ".astro", ".mjs", ".vue",
          ".svelte", ".py", ".kt", ".java", ".go", ".rs"}
 _CHARS_PER_TOKEN = 4  # matches the assembler's estimate

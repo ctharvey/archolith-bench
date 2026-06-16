@@ -25,7 +25,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-_CTX = Path(r"C:\Users\thron\IdeaProjects\projects\archolith\archolith-context")
+from paths import context_root  # noqa: E402
+
+_CTX = context_root()
 sys.path.insert(0, str(_CTX))
 
 from archolith_proxy.curator.deterministic_assembler import build_deterministic_context  # noqa: E402
@@ -71,6 +73,7 @@ def call_deepseek(context_block: str, key: str) -> str:
         ],
         "temperature": 0.2,
         "max_tokens": 4000,
+        "seed": 7,
     }).encode("utf-8")
     req = urllib.request.Request(
         "https://api.deepseek.com/v1/chat/completions", data=body,

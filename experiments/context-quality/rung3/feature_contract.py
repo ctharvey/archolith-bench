@@ -36,7 +36,12 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-CORPUS = Path(r"C:\Users\thron\IdeaProjects\projects\forked\yawn.frontend\src\features")
+# Ensure local modules are importable.
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+from paths import corpus_root  # noqa: E402
+
+CORPUS = corpus_root() / "features"
 # Ground-truth conforming features (the dominant Page + hook + css convention).
 # NOTE: `transactions` is intentionally excluded — it is a real structural VARIANT
 # (table components consumed by pages/transactions.astro, no *Page.tsx). The

@@ -12,12 +12,14 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-sys.path.insert(0, r"C:\Users\thron\IdeaProjects\projects\archolith\archolith-context")
+from paths import context_root, corpus_root  # noqa: E402
+
+sys.path.insert(0, str(context_root()))
 
 from analyze_corpus import load_corpus  # noqa: E402
 from archolith_proxy.curator.corpus_profile import derive_corpus_profile  # noqa: E402
 
-_DEFAULT = Path(r"C:\Users\thron\IdeaProjects\projects\forked\yawn.frontend\src")
+_DEFAULT = corpus_root()
 
 
 def main(argv: list[str]) -> int:

@@ -8,6 +8,12 @@ hypothesis and sharpened the question** — read the arc, not just the files.
 Canonical results record: `archolith/.agent/RESEARCH-FINDINGS.md` §G–§I.
 Direction/spine: `archolith/.agent/plans/archolith-context-deterministic-layers-direction.md`.
 
+**Reproduce the whole offline arm in one command:** `python rung3/run_offline.py`
+(corpus characterization → Phase A → profiler → graded re-score → metric self-check → figure;
+no API, no metered cost. Override paths via `ARCHOLITH_CORPUS` / `ARCHOLITH_CONTEXT_ROOT`).
+
+![rung-3 falsification cascade](figure-cascade.png)
+
 ## Results at a glance
 
 Recall metric = `feature_contract.py` (F1–F6 anchors; "core" = page+hook+data-layer+css all present).
@@ -55,7 +61,7 @@ MAP and PRIMING are not (and MAP is **not yet surfaced at all** — the open fro
 `PROTOCOL-rung3-pressure.md` · `RESULT-phaseA-offline.md` · `RESULT-phaseB-metric.md` ·
 `RESULT-phaseB-live.md` · `RESULT-phaseC-frozen-briefing.md` · `RESULT-phaseC-multi.md` ·
 `RESULT-phaseD-combo.md` · `RESULT-profile-miner.md` · `RESULT-profile-generalization.md` ·
-`RESULT-exemplar-signals-exploration.md`
+`RESULT-exemplar-signals-exploration.md` · `RESULT-graded-rescore.md` (ceiling-effect check)
 
 **Scripts** (paths via `paths.py` — override with `ARCHOLITH_CORPUS` / `ARCHOLITH_CONTEXT_ROOT` env vars):
 | script | phase | offline? |
@@ -68,6 +74,10 @@ MAP and PRIMING are not (and MAP is **not yet surfaced at all** — the open fro
 | `phase_d_combo.py` | D | **metered** |
 | `derive_profile.py` | profiler | yes |
 | `explore_exemplar_signals.py` | signal probe | yes |
+| `rescore_graded.py` | graded re-score of committed outputs | yes |
+| `make_figure.py` | regenerate `figure-cascade.png` | yes |
+| `run_offline.py` | **one-command driver for all offline steps** | yes |
+| `paths.py` | shared path resolver (env-overridable) | — |
 
 **Reproducibility notes:** offline scripts need the archolith-context package importable (`paths.py`
 resolves it) + the corpus at `ARCHOLITH_CORPUS`. Metered scripts read `UPSTREAM_API_KEY` from

@@ -156,6 +156,45 @@ def check_feature(feature_dir: Path) -> FeatureReport:
     return rep
 
 
+def graded_feature_score(feature_dir: Path) -> tuple[float, dict[str, float]]:
+    """Finer-grained recall score (0.0-6.0) for the ceiling-effect re-analysis.
+
+    The binary `check_feature` gates F1-F4 as all-or-nothing AND-conditions, so a
+    near-miss and a perfect feature both read "PASS". This decomposes each anchor
+    into half-credit sub-signals to add resolution (does Phase B's "all 6/6" hide
+    real differences?). It does NOT replace the binary metric — it is a parallel
+    lens. Per-anchor in [0,1]; total in [0,6].
+    """
+    files = _read_all(feature_dir)
+    names = [p.name for p in files]
+    code_text = "\n".join(t for p, t in files.items() if p.suffix in {".ts", ".tsx"})
+    g: dict[str, float] = {}
+
+    # F1 page: file exists (0.5) + default export (0.5)
+    page_files = [p for p in files if p.name.endswith("Page.tsx")]
+    g["F1"] = 0.5 * bool(page_files) + 0.5 * any("export default" in files[p] for p in page_files)
+
+    # F2 hook: file exists (0.5) + exports use<Name>Data (0.5)
+    hook_files = [p for p in files if re.match(r"use.*Data\.ts$", p.name)]
+    g["F2"] = 0.5 * bool(hook_files) + 0.5 * any(
+        re.search(r"export\s+(?:default\s+)?function\s+use\w*Data|export\s+const\s+use\w*Data",
+                  files[p]) for p in hook_files)
+
+    # F3 data layer: uses @/data layer (0.5) + no raw fetch (0.5)
+    g["F3"] = 0.5 * bool(re.search(r"@/data/(apiClient|repository)", code_text)) \
+        + 0.5 * (not re.search(r"\bfetch\s*\(", code_text))
+
+    # F4 css module: file exists (0.5) + imported (0.5)
+    g["F4"] = 0.5 * any(n.endswith(".module.css") for n in names) + 0.5 * bool(
+        re.search(r"import\s+\w+\s+from\s+['\"][^'\"]*\.module\.css['\"]", code_text))
+
+    # F5/F6 soft: binary (already single-signal)
+    g["F5"] = float(bool(re.search(r"from\s+['\"]@/ui", code_text)))
+    g["F6"] = float(bool(re.search(r"from\s+['\"]@/domain", code_text)))
+
+    return sum(g.values()), g
+
+
 def _print(reports: list[FeatureReport], title: str) -> None:
     print(f"\n## {title}")
     hdr = f"  {'feature':<16} " + " ".join(f"{c:>4}" for c in

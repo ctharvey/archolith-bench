@@ -1,0 +1,62 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  padding: 16px 0;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  font-family: var(--display);
+}
+
+.count {
+  font-size: 14px;
+  color: var(--t-4);
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.yearFilter {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.yearSelect {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--t-1);
+  font-size: 13px;
+}
+
+.searchInput {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--t-1);
+  font-size: 13px;
+  width: 200px;
+}
+
+.searchInput::placeholder {
+  color: var(--t-4);
+}

@@ -1,0 +1,9 @@
+.pageMetaMargin {
+  margin-top: 0.25rem;
+}
+
+.errorState {
+  padding: 2rem;
+  color: var(--color-error, #e53e3e);
+  font-size: 0.875rem;
+}

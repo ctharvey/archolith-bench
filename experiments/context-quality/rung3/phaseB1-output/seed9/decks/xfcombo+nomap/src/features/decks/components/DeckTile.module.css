@@ -1,0 +1,54 @@
+.tile {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.format {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stats {
+  display: flex;
+  gap: 24px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.topCards {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cardItem {
+  padding-left: 8px;
+}
+
+.updated {
+  text-align: right;
+}

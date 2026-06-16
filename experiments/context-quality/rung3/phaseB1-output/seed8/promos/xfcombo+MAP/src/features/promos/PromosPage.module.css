@@ -1,0 +1,24 @@
+.pageMetaMargin {
+  margin-top: 0.25rem;
+}
+
+.errorState {
+  padding: 2rem;
+  color: var(--color-error, #e53e3e);
+  text-align: center;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.emptyState {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--color-muted, #888);
+  font-style: italic;
+}

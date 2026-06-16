@@ -1,0 +1,67 @@
+/* PromoGrid.module.css */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  padding: 16px 0;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  font-family: var(--display);
+  margin: 0;
+}
+
+.count {
+  font-size: 13px;
+  color: var(--t-4);
+}
+
+.filterRow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+
+.searchInput {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-2);
+  color: var(--t-1);
+  font-size: 13px;
+  flex: 1;
+  min-width: 160px;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.yearSelect {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-2);
+  color: var(--t-1);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.yearSelect:focus {
+  outline: none;
+  border-color: var(--accent);
+}

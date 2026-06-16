@@ -1,0 +1,19 @@
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.loading {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--t-4);
+  font-size: 16px;
+}
+
+.error {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--red-500);
+  font-size: 16px;
+}

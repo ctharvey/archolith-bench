@@ -1,0 +1,84 @@
+.promosBrowse {
+  padding: 16px;
+}
+
+.header {
+  margin-bottom: 20px;
+}
+
+.title {
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 400;
+  margin: 0 0 4px 0;
+}
+
+.subtitle {
+  color: var(--t-4);
+  font-size: 12px;
+  margin: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.promoCard {
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 12px;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 0.15s ease;
+}
+
+.promoCard:hover {
+  transform: translateY(-2px);
+}
+
+.imageWrapper {
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--surface-3);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.placeholder {
+  font-size: 32px;
+  opacity: 0.3;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.promoName {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.promoYear {
+  font-size: 11px;
+  color: var(--t-4);
+}

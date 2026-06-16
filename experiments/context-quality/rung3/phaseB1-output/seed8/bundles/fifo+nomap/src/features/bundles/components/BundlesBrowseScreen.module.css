@@ -1,0 +1,20 @@
+.screen {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--t-3);
+  text-decoration: none;
+  margin-bottom: 16px;
+  transition: color 0.2s;
+}
+
+.backLink:hover {
+  color: var(--t-1);
+}

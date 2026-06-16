@@ -1,0 +1,36 @@
+.browseScreen {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.pageTitle {
+  font-size: 28px;
+  font-weight: 400;
+  font-family: var(--display);
+  margin: 0 0 4px 0;
+}
+
+.pageSubtitle {
+  font-size: 13px;
+  color: var(--t-4);
+  margin: 0 0 20px 0;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  color: var(--t-4);
+  font-size: 14px;
+}
+
+.error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  color: var(--danger);
+  font-size: 14px;
+}

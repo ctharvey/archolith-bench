@@ -1,0 +1,34 @@
+.accentItalic {
+    font-style: italic;
+    color: var(--color-accent);
+}
+
+.metaText {
+    color: var(--color-text-muted);
+}
+
+.tabBar {
+    margin-bottom: var(--space-md);
+}
+
+.errorBox {
+    padding: var(--space-lg);
+    text-align: center;
+}
+
+.errorMsg {
+    color: var(--color-danger);
+    margin-bottom: var(--space-sm);
+    font-weight: 600;
+}
+
+.emptyBox {
+    padding: var(--space-xl);
+    text-align: center;
+}
+
+.emptyMsg {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--space-sm);
+    color: var(--color-text-secondary);
+}

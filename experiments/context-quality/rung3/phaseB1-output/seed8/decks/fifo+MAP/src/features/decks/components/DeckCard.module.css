@@ -1,0 +1,116 @@
+.deckCard {
+  position: relative;
+  background: var(--surface-2);
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+}
+
+.deckCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.deckCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--accent);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.name {
+  font-size: 16px;
+  font-weight: 600;
+  font-family: var(--display);
+  line-height: 1.2;
+  margin: 0;
+}
+
+.format {
+  font-size: 11px;
+  color: var(--t-4);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statLabel {
+  font-size: 10px;
+  color: var(--t-4);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.statValue {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.topCard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.topCardImage {
+  width: 32px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--surface-3);
+}
+
+.topCardInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.topCardLabel {
+  font-size: 10px;
+  color: var(--t-4);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.topCardName {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.topCardValue {
+  font-size: 11px;
+  color: var(--t-3);
+}

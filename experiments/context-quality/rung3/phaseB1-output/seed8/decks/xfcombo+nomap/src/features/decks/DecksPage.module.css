@@ -1,0 +1,16 @@
+.pageMeta {
+  margin-top: 4px;
+}
+
+.errorMsg {
+  color: var(--color-error, #e63946);
+  padding: 1rem;
+  font-size: 0.9rem;
+}
+
+.deckGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}

@@ -1,0 +1,45 @@
+/* DecksBrowse.module.css */
+
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 0;
+}
+
+.header {
+  padding: 0 14px;
+  margin-bottom: 16px;
+}
+
+.title {
+  font-size: 24px;
+  font-family: var(--display);
+  font-weight: 500;
+  margin: 0 0 4px 0;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--t-4);
+  margin: 0;
+}
+
+.summary {
+  display: flex;
+  gap: 20px;
+  padding: 0 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--t-3);
+}
+
+.summaryItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.summaryValue {
+  font-weight: 600;
+  color: var(--t-1);
+}

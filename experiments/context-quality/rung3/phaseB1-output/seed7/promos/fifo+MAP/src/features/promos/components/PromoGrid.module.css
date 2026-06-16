@@ -1,0 +1,27 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  padding: 16px 0;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--t-1);
+  margin: 0;
+}
+
+.count {
+  font-size: 13px;
+  color: var(--t-4);
+}

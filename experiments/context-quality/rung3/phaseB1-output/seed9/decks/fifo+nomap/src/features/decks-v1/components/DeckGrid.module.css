@@ -1,0 +1,16 @@
+/* DeckGrid.module.css */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+  padding: 0 14px;
+}
+
+.empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px;
+  color: var(--t-4);
+  font-size: 14px;
+}

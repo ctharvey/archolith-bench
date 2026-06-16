@@ -1,0 +1,35 @@
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.pageTitle {
+  font-size: 32px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+}
+
+.pageSubtitle {
+  font-size: 16px;
+  color: var(--t-3);
+  margin: 0 0 24px 0;
+}
+
+.error {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--error);
+  font-size: 16px;
+}
+
+.retryButton {
+  margin-top: 16px;
+  padding: 8px 24px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}

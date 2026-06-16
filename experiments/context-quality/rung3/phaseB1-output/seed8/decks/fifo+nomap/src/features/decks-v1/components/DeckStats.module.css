@@ -1,0 +1,49 @@
+/* DeckStats.module.css */
+
+.container {
+  margin-bottom: 18px;
+}
+
+.headerRow {
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.titleGroup {
+  gap: 10px;
+  align-items: center;
+}
+
+.labelNoMargin {
+  margin: 0;
+}
+
+.statCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.statCard {
+  background: var(--bg-2);
+  border: 1px solid var(--b-2);
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.statLabel {
+  font-size: 10px;
+  color: var(--t-4);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statValue {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--t-1);
+  font-family: var(--display);
+}

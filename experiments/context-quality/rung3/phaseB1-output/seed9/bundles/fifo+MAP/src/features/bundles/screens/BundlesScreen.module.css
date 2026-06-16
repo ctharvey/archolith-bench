@@ -1,0 +1,30 @@
+.screen {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.loading {
+  text-align: center;
+  padding: 64px 16px;
+  color: var(--t-4);
+  font-size: 18px;
+}
+
+.error {
+  text-align: center;
+  padding: 64px 16px;
+  color: var(--error);
+  font-size: 16px;
+}
+
+.retryButton {
+  margin-top: 16px;
+  padding: 8px 24px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}

@@ -1,0 +1,25 @@
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  flex-wrap: wrap;
+}
+
+.left {
+  flex: 1;
+  min-width: 200px;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.count {
+  font-size: 0.8rem;
+  color: var(--color-muted, #888);
+  white-space: nowrap;
+}

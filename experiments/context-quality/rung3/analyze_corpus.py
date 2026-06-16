@@ -37,7 +37,8 @@ from archolith_proxy.curator.dependency_graph import (  # noqa: E402
 _DEFAULT_ROOT = Path(
     r"C:\Users\thron\IdeaProjects\projects\forked\yawn.frontend\src"
 )
-_EXTS = {".ts", ".tsx", ".js", ".jsx", ".css", ".html", ".astro", ".mjs", ".vue", ".svelte"}
+_EXTS = {".ts", ".tsx", ".js", ".jsx", ".css", ".html", ".astro", ".mjs", ".vue",
+         ".svelte", ".py", ".kt", ".java", ".go", ".rs"}
 _CHARS_PER_TOKEN = 4  # matches the assembler's estimate
 
 

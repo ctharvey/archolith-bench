@@ -28,6 +28,11 @@ in-degree, foundations-first), **combo** (exemplar-aware: guarantee a template, 
 | **C-multi** | Is that ranking robust across tasks? | frozen, 3 tasks | topological flat-low (3.00); scored high-variance (6/0/5 — **0/6 when it picks a non-exemplar**); FIFO 3.33. No pure fill is reliable. |
 | **D** (combo) | Can a COMBO beat the pure strategies? | frozen, 3 tasks | **Yes, but only the exemplar-aware combo**: xfcombo **4.67/6, no catastrophic cell**; naive interleave (3.00) does NOT beat scored. |
 | **profiler** | Can the exemplar marker be DERIVED, not hardcoded? | offline, 4 corpora | **Yes** on template-convention corpora (derives `Page.tsx`); cleanly empty elsewhere. Foundations (in-degree) generalize universally. |
+| **D N≥3** | Is the Phase-D ranking robust to seed luck? | frozen, 3 seeds × 3 tasks (n=9) | **Yes** — xfcombo wins on mean (5.00), floor (4.0), AND variance (0.71); scored/naive-combo collapse to floor 1.0. Hard gate cleared. |
+| **B1** (MAP, recall) | Does surfacing a CODE MAP help recall? | frozen | **No** (≈0; recall is the wrong axis for a map — frozen = nothing to navigate to). |
+| **B2** (MAP, navigation) | Does an *in-degree* map help an agent find the template? | live tool-loop, re-read allowed | **No** — in-degree map reaches the exemplar **17%** vs plain `ls` **100%**; it steers to FOUNDATIONS not the template. |
+| **B2b** (MAP, task-ranked) | Does ranking the map by *task relevance* fix it? | live tool-loop | **Yes** — task-ranked map **100%** exemplar in ~1 read, 0 discovery calls (beats `ls`). |
+| **B2c** (MAP, synthesis) | task-ranked map **+** `list_dir`? | live tool-loop | **Best on every axis**: 100% exemplar @ ~1 read, **0.0 misses**, ~4.7 list calls (vs `ls` 11.2). Recommended nav design. |
 
 ## The arc (the falsification cascade — this is the actual finding)
 
@@ -49,19 +54,31 @@ in-degree, foundations-first), **combo** (exemplar-aware: guarantee a template, 
 7. **Profiler** removes the combo's one hardcoded knob: the exemplar marker is **derivable** from the
    corpus's own repetition (validated across React/Java/TS/Python — fires on template-convention
    corpora, empty otherwise).
+8. **MAP arc** (B1→B2c): the §9 finding was that archolith computes a dependency graph only to rank
+   CONTENT, then discards it — so the MAP job (orientation) was never an experimental variable. Surfaced
+   it as a `=== CODE MAP ===` and tested it. **B1**: no recall effect (wrong axis). **B2**: the
+   *in-degree* map is navigation-MISDIRECTING — it leads agents to foundations, losing to plain `ls` on
+   reaching the exemplar (17% vs 100%) — the same "foundation ≠ exemplar" lesson, on the nav axis.
+   **B2b**: ranking the map by **task relevance** fixes it (100%, ~1 read). **B2c**: task-ranked map
+   **+ `list_dir`** is best on every axis (100% exemplar, 0 misses, half the discovery calls of `ls`).
+   **The MAP job is valuable — but only as a task-ranked map paired with a discovery tool, not an
+   in-degree map.**
 
 Net thesis (see `RESEARCH-FINDINGS §I`): the deterministic layers' defensible value is **mechanical
 guarantees + economics, not live recall**; CONTENT selection is subvertible by re-reading, while
-MAP and PRIMING are not (and MAP is **not yet surfaced at all** — the open frontier, see
-`../../../.agent/plans/archolith-context-code-map-surface-plan.md`).
+MAP and PRIMING are not. The MAP job, once surfaced and tested (B1–B2c), pays off **only when
+task-ranked + paired with `list_dir`** — an in-degree map misdirects. Recommended navigation design:
+a task-ranked code map + a `list_dir` tool.
 
 ## Files
 
 **Protocol & results** (read in arc order above):
 `PROTOCOL-rung3-pressure.md` · `RESULT-phaseA-offline.md` · `RESULT-phaseB-metric.md` ·
 `RESULT-phaseB-live.md` · `RESULT-phaseC-frozen-briefing.md` · `RESULT-phaseC-multi.md` ·
-`RESULT-phaseD-combo.md` · `RESULT-profile-miner.md` · `RESULT-profile-generalization.md` ·
-`RESULT-exemplar-signals-exploration.md` · `RESULT-graded-rescore.md` (ceiling-effect check)
+`RESULT-phaseD-combo.md` · `RESULT-phaseD-multiseed.md` (N≥3 confirm) · `RESULT-profile-miner.md` ·
+`RESULT-profile-generalization.md` · `RESULT-exemplar-signals-exploration.md` ·
+`RESULT-graded-rescore.md` (ceiling-effect check) · `RESULT-phaseB1-codemap.md` (MAP/recall) ·
+`RESULT-phaseB2-navigation.md` (MAP/navigation) · `RESULT-phaseB2b-task-map.md` (task-map + B2c synthesis)
 
 **Scripts** (paths via `paths.py` — override with `ARCHOLITH_CORPUS` / `ARCHOLITH_CONTEXT_ROOT` env vars):
 | script | phase | offline? |
@@ -72,6 +89,9 @@ MAP and PRIMING are not (and MAP is **not yet surfaced at all** — the open fro
 | `phase_c_frozen_briefing.py` | C | **metered** (DeepSeek) |
 | `phase_c_multi.py` | C-multi | **metered** |
 | `phase_d_combo.py` | D | **metered** |
+| `phase_d_multiseed.py` | D N≥3 confirm | **metered** |
+| `phase_b1_codemap.py` | B1 (MAP/recall) | **metered** |
+| `phase_b2_navigation.py` | B2 / B2b / B2c (MAP/navigation, tool-loop) | **metered** |
 | `derive_profile.py` | profiler | yes |
 | `explore_exemplar_signals.py` | signal probe | yes |
 | `rescore_graded.py` | graded re-score of committed outputs | yes |

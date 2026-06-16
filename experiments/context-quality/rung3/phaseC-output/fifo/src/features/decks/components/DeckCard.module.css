@@ -1,0 +1,65 @@
+.deckCard {
+  position: relative;
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--bg-2);
+  border: 1px solid var(--b-2);
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.deckCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.name {
+  font-size: 16px;
+  font-weight: 600;
+  font-family: var(--display);
+  line-height: 1.2;
+}
+
+.meta {
+  font-size: 11px;
+  color: var(--t-4);
+  margin-top: 2px;
+}
+
+.value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.statsRow {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--t-3);
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.statLabel {
+  color: var(--t-4);
+}
+
+.colorBar {
+  height: 3px;
+  border-radius: 2px;
+  margin-top: auto;
+}

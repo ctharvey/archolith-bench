@@ -1,0 +1,31 @@
+<!-- sealed.html — DIVERGENT fixture: violates every mechanical convention.
+     Used to prove the contract FLAGS divergence and the auto-fixer repairs the
+     mechanical (auto-fix tier) violations at zero model cost. Not agent output;
+     hand-written for the retro-test. -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sealed</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<div id="sealed-list">
+  <!-- C1: invented row class .card-row (not .list-row); C2: no row-* children;
+       C3: metric not in .row-meta; C4: hardcoded accent hex #16a34a -->
+  <a class="card-row" href="sealed-detail.html">
+    <div class="thumb"></div>
+    <div class="body"><div class="name">Booster Box</div><div class="sub">Base Set</div></div>
+    <div class="price" style="color:#16a34a">$243</div>
+  </a>
+</div>
+<nav class="bottom-nav">
+  <a href="home.html">Pulse</a><a class="active" href="sealed.html">Sealed</a>
+</nav>
+<script type="module">
+const list = document.getElementById('sealed-list');
+// C6: raw fetch() instead of the named sealedList helper from ./api.js
+async function load(){ const r = await fetch('/api/sealed/list'); const items = await r.json();
+  list.innerHTML = items.map(s =>
+    `<a class="card-row" href="sealed-detail.html?id=${s.id}"><div class="thumb"></div>`+
+    `<div class="body"><div class="name">${s.name}</div></div>`+
+    `<div class="price" style="color:#16a34a">$${s.ev}</div></a>`).join(''); }
+load();
+</script>
+</body></html>

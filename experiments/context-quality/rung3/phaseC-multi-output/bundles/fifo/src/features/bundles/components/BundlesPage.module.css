@@ -1,0 +1,36 @@
+/* BundlesPage.module.css */
+
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 16px;
+}
+
+.loading {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--t-4);
+  font-size: 18px;
+}
+
+.error {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--danger);
+  font-size: 16px;
+}
+
+.retryButton {
+  margin-top: 16px;
+  padding: 8px 20px;
+  background: var(--accent);
+  color: var(--accent-text);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.retryButton:hover {
+  opacity: 0.9;
+}

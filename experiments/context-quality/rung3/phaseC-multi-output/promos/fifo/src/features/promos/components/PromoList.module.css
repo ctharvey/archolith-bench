@@ -1,0 +1,38 @@
+/* PromoList.module.css */
+
+.container {
+  padding: 0 14px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 0 2px;
+}
+
+.title {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 400;
+  margin: 0;
+}
+
+.count {
+  font-size: 13px;
+  color: var(--t-4);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--t-4);
+  font-size: 14px;
+}

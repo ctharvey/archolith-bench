@@ -1,0 +1,124 @@
+.deckCard {
+  position: relative;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.deckCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.colorBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 12px 12px 0 0;
+}
+
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.nameGroup {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font-size: 16px;
+  font-weight: 600;
+  font-family: var(--display);
+  line-height: 1.2;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  font-size: 11px;
+  color: var(--t-4);
+  margin-top: 2px;
+}
+
+.valueBadge {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--bg-3);
+}
+
+.statsRow {
+  display: flex;
+  gap: 16px;
+  font-size: 11px;
+  color: var(--t-4);
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.statLabel {
+  color: var(--t-5);
+}
+
+.statValue {
+  color: var(--t-2);
+  font-weight: 500;
+}
+
+.topCard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+}
+
+.topCardImage {
+  width: 32px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--bg-3);
+}
+
+.topCardInfo {
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.topCardName {
+  color: var(--t-2);
+  font-weight: 500;
+}
+
+.topCardValue {
+  color: var(--t-4);
+}
+
+.updatedAt {
+  font-size: 10px;
+  color: var(--t-5);
+  margin-top: auto;
+}

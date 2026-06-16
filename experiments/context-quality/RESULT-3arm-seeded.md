@@ -95,7 +95,7 @@ scored-selection effect** — do not attribute it to Phase 4.
 ## Run cost summary (metered helper key)
 Baseline 1,839,957. Restart A (curator-off) added ~108k input + ~6k output (~$0.04). Restart B
 (curator-on) added ~17k input + ~0.3k output (~$0.007). passthrough arm ~0 helper. Read the dashboard
-delta for ground truth. SECURITY: rotate the metered OpenAI key now that testing is done.
+delta for ground truth.
 
 ---
 _legacy header retained below_

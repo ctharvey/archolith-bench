@@ -52,7 +52,7 @@ finding. **Pre-registered sub-task R3a (offline, optional, before Phase B):** ad
 alias-map support to the extractor and re-measure coverage. Do NOT silently improve the extractor
 mid-experiment; if R3a runs, re-run Phase A on both extractor versions and report both.
 
-## Phase A — OFFLINE mechanism test (free; CAN RUN NOW, not blocked on the key)
+## Phase A — OFFLINE mechanism test (free; runs without the proxy)
 No proxy, no agent, no API calls. Directly tests Q1.
 
 1. **Construct a realistic briefing file-set** for the recall task: the files a prepper would
@@ -72,7 +72,7 @@ No proxy, no agent, no API calls. Directly tests Q1.
 rate >= FIFO at every budget and strictly > FIFO at >=2 budget levels. If topological does NOT beat
 FIFO offline, STOP — do not spend money on Phase B; investigate extraction coverage (R3a) first.
 
-## Phase B — LIVE agent run (BLOCKED until the leaked metered OpenAI key is rotated)
+## Phase B — LIVE agent run
 Tests Q2. Mirrors the Phase-5 harness (`PROTOCOL.md` setup), three arms, byte-identical prompts led
 by Claude via the harness PTY, ONE agent model held constant.
 
@@ -148,4 +148,4 @@ passthrough ~0 helper.
 ## Artifacts
 - `rung3/analyze_corpus.py` — reproducible corpus characterization (run to regenerate the numbers).
 - `rung3/RESULT-phaseA-offline.md` — (to be written when Phase A runs).
-- `rung3/RESULT-phaseB-live.md` — (to be written when Phase B runs, post key-rotation).
+- `rung3/RESULT-phaseB-live.md` — (to be written when Phase B runs).

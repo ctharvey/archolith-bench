@@ -14,6 +14,11 @@ for n in 1 2 3; do
   for scen in long_agent taskflow; do
     OUT="$ROOT/run${n}/${scen}"
     mkdir -p "$OUT"
+    # Idempotent resume: skip a scenario already complete (both arm JSONs present).
+    if [ -f "$OUT/benchmark_${scen}_proxy_plus_filter.json" ] && [ -f "$OUT/benchmark_${scen}_direct.json" ]; then
+      echo "[phase4] run${n} ${scen} already complete — skipping  $(date)" | tee -a "$LOG"
+      continue
+    fi
     echo "[phase4] run${n} ${scen} -> $OUT  $(date)" | tee -a "$LOG"
     python -m archolith_bench.cli proxy \
       --scenario "scenarios/${scen}.json" \
@@ -23,11 +28,11 @@ for n in 1 2 3; do
       --output-dir "$OUT" >> "$LOG" 2>&1
     rc=$?
     echo "[phase4] run${n} ${scen} exit=$rc  $(date)" | tee -a "$LOG"
-    # 429s on DeepSeek/OpenAI are NOT a hard breaker for this run (the metered-API
-    # 429 protocol is for PokemonPriceTracker/eBay/TCGPlayer). The bench degrades
-    # per-turn on an [ERROR 429] anyway; just note it and keep going.
-    if grep -qiE "rate.?limit|429|too many requests" "$LOG"; then
-      echo "[phase4] note: rate-limit text seen in log — continuing (not a hard stop)  $(date)" | tee -a "$LOG"
+    # 429s on DeepSeek/OpenAI are NOT a hard breaker (the metered-API 429 protocol
+    # is for the scraping APIs). Match only ERROR-SHAPED rate-limit markers, not the
+    # bare phrase — long_agent's scenario text literally discusses "rate limiting".
+    if grep -qiE "\[ERROR 429\]|429 Too Many|rate_limit_error|RateLimitError" "$LOG"; then
+      echo "[phase4] note: real rate-limit error seen — continuing (not a hard stop)  $(date)" | tee -a "$LOG"
     fi
     if [ $rc -ne 0 ]; then
       echo "[phase4] non-zero exit — stopping  $(date)" | tee -a "$LOG"

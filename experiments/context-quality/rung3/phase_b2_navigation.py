@@ -38,7 +38,7 @@ sys.path.insert(0, str(context_root()))
 
 from phase_c_frozen_briefing import _api_key  # noqa: E402
 from phase_a_foundation_survival import build_briefing  # noqa: E402
-from archolith_proxy.curator.dependency_graph import render_code_map  # noqa: E402
+from archolith_proxy.curator.dependency_graph import render_code_map, render_task_map  # noqa: E402
 
 SEEDS = [7, 8, 9]
 MAX_TURNS = 8
@@ -93,11 +93,23 @@ def _post(messages, key, seed, tools):
         "model": "deepseek-chat", "messages": messages, "tools": tools,
         "tool_choice": "auto", "temperature": 0.2, "max_tokens": 2000, "seed": seed,
     }).encode("utf-8")
-    req = urllib.request.Request(
-        "https://api.deepseek.com/v1/chat/completions", data=body,
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=180) as r:
-        return json.loads(r.read())["choices"][0]["message"]
+    # Retry transient network errors (IncompleteRead / connection resets); a 429 is
+    # NOT transient — re-raise it so the caller STOPs per protocol.
+    import time
+    last = None
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(
+                "https://api.deepseek.com/v1/chat/completions", data=body,
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=180) as r:
+                return json.loads(r.read())["choices"][0]["message"]
+        except urllib.error.HTTPError:
+            raise  # includes 429 -> caller handles
+        except Exception as e:  # IncompleteRead, URLError, timeout
+            last = e
+            time.sleep(2 * (attempt + 1))
+    raise last
 
 
 def _is_exemplar(path: str) -> bool:
@@ -174,21 +186,25 @@ def run_one(corpus, *, code_map="", with_ls=False, task_noun, key, seed) -> dict
 def run() -> int:
     key = _api_key()
     corpus = _corpus()
-    code_map = render_code_map(build_briefing().files)
-    # arms: (label, code_map, with_ls)
-    ARMS = [("map", code_map, False), ("ls", "", True), ("blind", "", False)]
-    print(f"B2 navigation — corpus {len(corpus)} files, map {len(code_map)//4} tok, "
+    briefing_files = build_briefing().files
+    code_map = render_code_map(briefing_files)
+    # ARM_SPECS: (label, map-kind, with_ls) — map-kind: ""|"indeg"|"task"
+    ARM_SPECS = [("map", "indeg", False), ("map-task", "task", False),
+                 ("ls", "", True), ("blind", "", False)]
+    print(f"B2 navigation — corpus {len(corpus)} files, indeg-map {len(code_map)//4} tok, "
           f"seeds={SEEDS}, tasks={[t[0] for t in TASKS]}, MAX_TURNS={MAX_TURNS}")
-    print(f"arms: map (map+read) / ls (list_dir+read, fair baseline) / blind (read only, floor)")
-    print(f"{len(ARMS)*len(TASKS)*len(SEEDS)} runs\n")
-    agg: dict[str, list[dict]] = {a[0]: [] for a in ARMS}
+    print("arms: map (in-degree) / map-task (relevance-ranked) / ls (fair baseline) / blind (floor)")
+    print(f"{len(ARM_SPECS)*len(TASKS)*len(SEEDS)} runs\n")
+    agg: dict[str, list[dict]] = {a[0]: [] for a in ARM_SPECS}
     try:
         for seed in SEEDS:
             for tkey, noun in TASKS:
-                for label, cm, ls in ARMS:
+                task_map = render_task_map(briefing_files, noun, exemplar_suffixes=("Page.tsx",))
+                for label, kind, ls in ARM_SPECS:
+                    cm = {"indeg": code_map, "task": task_map, "": ""}[kind]
                     r = run_one(corpus, code_map=cm, with_ls=ls, task_noun=noun, key=key, seed=seed)
                     agg[label].append(r)
-                    print(f"  seed{seed} {tkey:<8} {label:<6} "
+                    print(f"  seed{seed} {tkey:<8} {label:<9} "
                           f"reads={r['reads']} lists={r['lists']} miss={r['misses']} "
                           f"exemplar@{r['reads_to_exemplar'] if r['hit_exemplar'] else '-'}")
     except urllib.error.HTTPError as e:
@@ -200,15 +216,14 @@ def run() -> int:
     print("\n" + "=" * 66)
     print(f"{'arm':<8}{'reads':<8}{'lists':<8}{'misses':<8}{'exemplar%':<11}{'reads->exmpl':<12}")
     print("-" * 66)
-    for label, _cm, _ls in ARMS:
+    for label, _kind, _ls in ARM_SPECS:
         rs = agg[label]
-        print(f"{label:<8}{statistics.mean(r['reads'] for r in rs):<8.1f}"
+        print(f"{label:<9}{statistics.mean(r['reads'] for r in rs):<8.1f}"
               f"{statistics.mean(r['lists'] for r in rs):<8.1f}"
               f"{statistics.mean(r['misses'] for r in rs):<8.1f}"
               f"{100*sum(r['hit_exemplar'] for r in rs)/len(rs):<11.0f}"
               f"{statistics.mean(r['reads_to_exemplar'] for r in rs):<12.1f}")
-    # sample of what map-arm actually read (exemplar vs foundation question)
-    print("\nsample map-arm reads (seed7 decks):", agg["map"][0]["read_paths"][:8])
+    print("\nsample map-task reads (seed7 decks):", agg["map-task"][0]["read_paths"][:8])
     print("(lower misses/reads->exemplar = sharper; lists = discovery round-trips the map saves)")
     return 0
 

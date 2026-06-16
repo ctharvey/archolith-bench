@@ -14,11 +14,28 @@ signals on 3 corpus types to learn what would surface exemplars generally. Repro
   generalized from one file to a co-located ROLE SET.
 
 ## Result (the convention lives in a DIFFERENT signal per corpus type)
-| corpus | A (name-varying) | B (fixed-name) | C (dir shape) |
-|--------|------------------|----------------|---------------|
-| yawn.frontend (feature-folder React) | **Page.tsx(15), Data.ts(15), Page.module.css(10)** | adapter.ts(3), types.ts(3) | **{Page.tsx, Data.ts, Page.module.css} x4**, +adapter/types x2 |
+Signal A is reported as **#dirs / #files** (both matter — see Java).
+| corpus | A (name-varying suffix) | B (fixed-name) | C (dir shape) |
+|--------|--------------------------|----------------|---------------|
+| yawn.frontend (feature-folder React) | **Page.tsx 15d/15f, Data.ts 15d/24f, Page.module.css 10d** | adapter.ts(3), types.ts(3) | **{Page.tsx, Data.ts, Page.module.css} x4**, +adapter/types x2 |
+| yawn.rip (Java / Spring layers) | **Service 2d/31f, Repository 4d/27f, DTO 3d/22f, Request 1d/12f, Controller 1d/10f** | — none | — none |
 | opencode (TS domain-modules) | — none | **schema.ts(13), session.ts(10), event.ts(6), error.ts(6), config.ts(5)** | weak (only 2 dirs share a shape) |
 | archolith_proxy (Python) | — none | **registry.py(3), models.py(3), base.py(2), schemas.py(2), router.py(2)** | none |
+
+### Java/Spring is a 4th type: role-suffix by FILE count, cross-cutting features
+- Java's convention IS the layer-role suffix (`Service`/`Repository`/`Controller`/`DTO`/`Request`) —
+  Signal A fires, but **must be ranked by FILE count, not dir count**: `Controller` is `1d/10f` (all
+  controllers live in ONE `controller/` package), so dir-count buries it while file-count surfaces it.
+  Feature-folder corpora want dir-count; layer-package corpora want file-count. A general miner needs
+  BOTH and must recognize which organization it is looking at.
+- **A feature in Java is CROSS-CUTTING**, the inverse of feature-folders: a "Card" feature =
+  `CardController` + `CardService` + `CardRepository` + `CardDto` spread across 4 layer packages. So
+  neither Signal C (dir-shape — layers don't replicate a multi-role dir) nor B (names are name-varying)
+  fires; the "feature template" would need a NEW signal: group files by STEM PREFIX (the entity name)
+  and find stems that appear with multiple role-suffixes across layers (signal E, not built).
+- The **DTO/Dto split (22f + 12f)** is a real naming inconsistency the corpus carries; the acronym-safe
+  tokenizer surfaced it honestly (previously mis-parsed as `O.java`). Acronym-safe tokenization
+  (`CardDTO -> ["Card","DTO"]`) is required for any acronym-heavy language.
 
 ## Findings — what it would take
 1. **No single signal suffices; the corpus TYPE dictates which signal carries the convention.**
@@ -43,14 +60,21 @@ signals on 3 corpus types to learn what would surface exemplars generally. Repro
    judgment and no-recurrence cases — sharpening the design note's phase-3 scope.
 
 ## Concrete recommendation
-Extend the deterministic miner from 1 signal to a small ensemble:
-- keep **A** (name-varying template) — best where it fires (React features);
-- add **B** (fixed-name role recurrence, with the noise filter) — covers domain-module + backend corpora;
-- add **C** (dir-shape) — the principled feature-as-role-set + names an exemplar instance;
-- **rank/merge**: prefer C's shape when a dir template recurs; else A; else B's top role files; emit an
-  empty profile (foundations-only) when nothing recurs.
-Then the **LLM profiler** only handles the judgment/no-recurrence residue. Foundations (in-degree) stay
-universal across all of this (the generalization result).
+Extend the deterministic miner from 1 signal to a small ensemble, with two metric/parse refinements the
+Java corpus forced out:
+- keep **A** (name-varying suffix) — but report BOTH **#dirs and #files** and use an **acronym-safe
+  tokenizer** (`CardDTO -> ["Card","DTO"]`). #dirs surfaces feature-folder corpora; #files surfaces
+  layer-package corpora (Java/Spring `Controller` = 1 dir / 10 files).
+- add **B** (fixed-name role recurrence, noise-filtered) — covers domain-module + backend corpora.
+- add **C** (dir-shape) — the principled feature-as-role-set; names an exemplar instance.
+- (later) **E** cross-layer stem-family — group files by entity stem across layer packages; the Java
+  "feature" (`Card*` across controller/service/repository/dto). Not built.
+- **organization detection + rank/merge**: decide feature-folder vs layer-package vs domain-module
+  (e.g. dir-count-dominant vs file-count-dominant vs fixed-name-dominant) and pick the matching signal;
+  prefer C's shape when a dir template recurs; else A (by the right count); else B; else empty profile
+  (foundations-only).
+Then the **LLM profiler** only handles the judgment/no-recurrence residue (template-vs-boilerplate,
+content-level conventions, one-off corpora). Foundations (in-degree) stay universal across all of this.
 
 ## Limits
 - 3 corpora, one per type; a probe, not a survey. Signals A/B/C are filename/dir heuristics — content

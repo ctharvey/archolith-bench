@@ -27,7 +27,8 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from analyze_corpus import load_corpus, _EXTS  # noqa: E402
 
-_PASCAL = re.compile(r"[A-Z][a-z0-9]*")
+# Tokenizer that keeps ALL-CAPS acronyms whole: "CardDTO" -> ["Card","DTO"] (not ...,"O").
+_PASCAL = re.compile(r"[A-Z]+(?![a-z])|[A-Z][a-z0-9]*")
 # boilerplate / structural files that are conventions but not "templates to imitate"
 _NOISE = {"__init__.py", "index.ts", "index.tsx", "index.js", "mod.ts", "__main__.py"}
 
@@ -57,13 +58,18 @@ def explore(root: Path):
     for p in paths:
         by_dir[posixpath.dirname(p)].append(posixpath.basename(p))
 
-    # Signal A — name-varying PascalCase template suffix, #distinct dirs
-    a = defaultdict(set)
+    # Signal A — name-varying PascalCase template suffix, #distinct dirs AND #files
+    # (#dirs surfaces feature-folder corpora; #files surfaces layer-package corpora
+    #  like Java/Spring where one role fills one package dir).
+    a_dirs = defaultdict(set)
+    a_files = Counter()
     for p in paths:
         pat = _pascal_suffix(posixpath.basename(p))
         if pat:
-            a[pat].add(posixpath.dirname(p))
-    sig_a = sorted(((k, len(v)) for k, v in a.items()), key=lambda kv: -kv[1])
+            a_dirs[pat].add(posixpath.dirname(p))
+            a_files[pat] += 1
+    sig_a = sorted(((k, len(v), a_files[k]) for k, v in a_dirs.items()),
+                   key=lambda t: -t[2])  # rank by file count
 
     # Signal B — fixed-name convention: exact basename across dirs, noise filtered
     b = defaultdict(set)
@@ -86,8 +92,8 @@ def explore(root: Path):
     )
 
     print(f"\n===== {root}  ({len(files)} files) =====")
-    print("A name-varying template (PascalCase suffix x #dirs):",
-          sig_a[:6] or "(none)")
+    print("A name-varying template (suffix: #dirs, #files):",
+          [(k, f"{d}d/{n}f") for k, d, n in sig_a[:6]] or "(none)")
     print("B fixed-name convention (exact basename x #dirs):",
           sig_b[:8] or "(none)")
     print("C recurring DIR SHAPE (top, #dirs x roles):")

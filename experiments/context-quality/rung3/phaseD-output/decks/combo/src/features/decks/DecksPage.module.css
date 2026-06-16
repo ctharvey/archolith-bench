@@ -1,0 +1,70 @@
+.pageMeta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.kpiGrid {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.deckGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.deckTile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: box-shadow 0.2s;
+}
+
+.deckTile:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.deckName {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.deckMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.deckValue {
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--accent);
+}
+
+.deckFormat {
+  background: var(--surface-alt);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.errorMsg {
+  color: var(--error);
+  padding: 16px;
+  background: var(--surface-alt);
+  border-radius: 8px;
+}

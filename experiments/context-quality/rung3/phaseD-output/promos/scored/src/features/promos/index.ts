@@ -1,0 +1,1 @@
+export { PromosBrowsePage } from './PromosBrowsePage';

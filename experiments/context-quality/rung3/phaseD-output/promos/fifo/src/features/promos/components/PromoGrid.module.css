@@ -1,0 +1,40 @@
+/* PromoGrid.module.css */
+
+.container {
+  padding: 16px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.title {
+  font-size: 20px;
+  font-family: var(--display);
+  font-weight: 400;
+  margin: 0;
+}
+
+.count {
+  font-size: 12px;
+  color: var(--t-4);
+  background: var(--bg-3);
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--t-4);
+  font-size: 14px;
+}

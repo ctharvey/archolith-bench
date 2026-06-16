@@ -1,0 +1,29 @@
+.promos-browse-screen {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.promos-browse-screen__content {
+  margin-top: 24px;
+}
+
+.promos-browse-screen__meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.promos-browse-screen__year {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.promos-browse-screen__rarity {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

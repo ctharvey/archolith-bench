@@ -1,0 +1,103 @@
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: box-shadow 0.2s;
+}
+
+.card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.format {
+  font-size: 12px;
+  color: var(--color-muted);
+  background: var(--color-surface-2);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.stats {
+  display: flex;
+  gap: 24px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.statLabel {
+  font-size: 11px;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statValue {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.topCards {
+  border-top: 1px solid var(--color-border);
+  padding-top: 8px;
+}
+
+.topCardsLabel {
+  font-size: 11px;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.topCardsList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.topCardItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  font-size: 13px;
+}
+
+.topCardName {
+  color: var(--color-text);
+}
+
+.topCardPrice {
+  color: var(--color-muted);
+  font-family: monospace;
+}
+
+.footer {
+  margin-top: auto;
+}
+
+.lastUpdated {
+  font-size: 11px;
+  color: var(--color-muted);
+}

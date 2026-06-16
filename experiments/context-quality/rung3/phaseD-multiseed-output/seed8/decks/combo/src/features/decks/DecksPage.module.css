@@ -1,0 +1,73 @@
+.pageMeta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.kpiGrid {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.deckGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.deckTile {
+  background: var(--surface, #1a1a2e);
+  border: 1px solid var(--border, #2a2a4e);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.2s;
+}
+
+.deckTile:hover {
+  border-color: var(--accent, #4a90d9);
+}
+
+.deckName {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text, #e0e0e0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deckMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted, #888);
+}
+
+.deckValue {
+  font-weight: 700;
+  color: var(--accent, #4a90d9);
+}
+
+.deckFormat {
+  background: var(--surface-alt, #2a2a3e);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.errorMsg {
+  color: var(--error, #e63946);
+  padding: 16px;
+  background: var(--surface-alt, #2a2a3e);
+  border-radius: 8px;
+  margin-top: 16px;
+}

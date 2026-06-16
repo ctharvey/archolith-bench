@@ -1,0 +1,22 @@
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.loading {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--text-3);
+  font-size: 1rem;
+}
+
+.error {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--red, #ef4444);
+  font-size: 1rem;
+  background: var(--red-bg, #ef444410);
+  border-radius: 8px;
+  margin: 16px 0;
+}

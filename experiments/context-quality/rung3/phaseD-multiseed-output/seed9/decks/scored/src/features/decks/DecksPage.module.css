@@ -1,0 +1,28 @@
+.pageMeta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.deckListLabel {
+  margin-bottom: 12px;
+}
+
+.deckGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.errorMsg {
+  color: var(--color-error, #e63946);
+  padding: 16px;
+  font-size: 14px;
+}

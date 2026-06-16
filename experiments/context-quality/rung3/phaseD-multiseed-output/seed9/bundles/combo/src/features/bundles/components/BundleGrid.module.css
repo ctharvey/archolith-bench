@@ -1,0 +1,31 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  padding: 16px 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0 8px;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.count {
+  font-size: 0.9rem;
+  color: var(--text-3);
+}
+
+.empty {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--text-3);
+  font-size: 1rem;
+}

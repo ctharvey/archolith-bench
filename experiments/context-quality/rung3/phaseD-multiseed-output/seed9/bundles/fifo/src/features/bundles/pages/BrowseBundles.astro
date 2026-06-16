@@ -1,0 +1,18 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import BundleGrid from '../components/BundleGrid';
+---
+
+<Layout title="Browse Bundles - TCG Tracker">
+  <main class="container">
+    <BundleGrid client:load />
+  </main>
+</Layout>
+
+<style>
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px 16px;
+  }
+</style>

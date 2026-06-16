@@ -1,0 +1,26 @@
+.promos-browse-page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.promos-browse-page__content {
+  margin-top: 24px;
+}
+
+.card-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.card-meta__year {
+  font-weight: 600;
+  color: #333;
+}
+
+.card-meta__rarity {
+  text-transform: capitalize;
+}

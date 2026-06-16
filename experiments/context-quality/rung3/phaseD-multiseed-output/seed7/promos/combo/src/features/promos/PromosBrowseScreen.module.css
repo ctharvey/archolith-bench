@@ -1,0 +1,12 @@
+.promos-browse-screen {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.promo-release-year {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #666);
+  margin-top: 0.25rem;
+  display: block;
+}

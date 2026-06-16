@@ -79,8 +79,23 @@ MAP and PRIMING are not (and MAP is **not yet surfaced at all** — the open fro
 | `run_offline.py` | **one-command driver for all offline steps** | yes |
 | `paths.py` | shared path resolver (env-overridable) | — |
 
-**Reproducibility notes:** offline scripts need the archolith-context package importable (`paths.py`
-resolves it) + the corpus at `ARCHOLITH_CORPUS`. Metered scripts read `UPSTREAM_API_KEY` from
-`archolith-context/.env`, call `deepseek-chat` at `temperature=0.2, seed=7`. **All quantitative cells
-are N=1** — the load-bearing results (Phase-D ranking, the B/C re-read asymmetry) still need an
-N≥3 + 2nd-corpus confirm before they bear weight (the standing hard gate in `RESEARCH-FINDINGS`).
+## Provenance & reproducibility
+
+| field | value |
+|-------|-------|
+| corpus | `forked/yawn.frontend/src` @ `75ca56b` (real Astro+TSX app, 275 src files) |
+| 2nd/3rd corpora (profiler generalization) | `opencode/packages/opencode/src` (TS), `archolith-context/archolith_proxy` (Python), `yawn.rip/src/main/java` (Java) |
+| metered model | DeepSeek `deepseek-chat` via `api.deepseek.com/v1`, `temperature=0.2`, `max_tokens=4000` |
+| offline deps | the `archolith-context` package importable (resolved by `paths.py`); matplotlib for the figure |
+| paths | `ARCHOLITH_CORPUS` / `ARCHOLITH_CONTEXT_ROOT` env overrides; workspace-relative defaults |
+
+**Seed honesty (important):** the committed Phase B/C/D result *docs* describe runs made BEFORE `seed`
+was added (seed=7 landed in `ad67f38`), so those historical numbers are **unseeded single draws**.
+`seed=7` (and `phase_d_multiseed.py`'s `seed ∈ {7,8,9}`) make *future* reruns reproducible — do not
+back-date a seed onto the historical results.
+
+**Sample size:** the original phase cells were **N=1**; the load-bearing Phase-D ranking is now
+**confirmed at N=9** (3 seeds × 3 tasks, `RESULT-phaseD-multiseed.md`): xfcombo wins on mean (5.00),
+floor (4.0), AND variance (stdev 0.71) — the exemplar guarantee removes catastrophic cells. Still
+**open:** a 2nd-corpus *recall* confirm (the profiler's exemplar-*detection* generalization across 4
+corpora is done; recall generalization is not).

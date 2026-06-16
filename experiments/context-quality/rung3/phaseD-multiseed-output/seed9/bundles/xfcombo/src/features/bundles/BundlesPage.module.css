@@ -1,0 +1,24 @@
+.errorBox {
+    padding: var(--space-lg);
+    text-align: center;
+}
+
+.errorMsg {
+    color: var(--color-error);
+    margin-bottom: var(--space-sm);
+    font-weight: 500;
+}
+
+.metaText {
+    color: var(--color-text-muted);
+}
+
+.emptyBox {
+    padding: var(--space-xl);
+    text-align: center;
+}
+
+.emptyMsg {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}

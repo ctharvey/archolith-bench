@@ -1,0 +1,91 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+}
+
+.visualArea {
+  position: relative;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.heroImg {
+  max-height: 80%;
+  max-width: 80%;
+  object-fit: contain;
+  z-index: 1;
+}
+
+.badgeRow {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  gap: 6px;
+  z-index: 2;
+}
+
+.infoArea {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-2);
+}
+
+.productName {
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.priceRow {
+  align-items: center;
+  gap: 8px;
+}
+
+.priceValue {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.highPrice {
+  font-size: 0.8rem;
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.discountRow {
+  align-items: center;
+  gap: 6px;
+}
+
+.discountLabel {
+  opacity: 0.7;
+}
+
+.discountValue {
+  font-weight: 600;
+  color: var(--green);
+}
+
+.discountPill {
+  background: var(--green);
+  color: white;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+}

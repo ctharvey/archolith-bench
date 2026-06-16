@@ -1,0 +1,77 @@
+.pageMeta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.kpiGrid {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.deckGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.deckTile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: box-shadow 0.2s;
+}
+
+.deckTile:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.deckName {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deckFormat {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.deckStats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.deckValue {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.deckMeta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.errorMsg {
+  color: var(--error);
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}

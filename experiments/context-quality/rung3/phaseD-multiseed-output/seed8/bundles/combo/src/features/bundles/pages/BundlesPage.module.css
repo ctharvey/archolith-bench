@@ -1,0 +1,27 @@
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.loading,
+.error {
+  text-align: center;
+  padding: 48px 0;
+  font-size: 1.1rem;
+}
+
+.error {
+  color: var(--red);
+}

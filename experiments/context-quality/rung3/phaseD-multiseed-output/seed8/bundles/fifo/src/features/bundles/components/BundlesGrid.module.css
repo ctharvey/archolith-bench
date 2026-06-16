@@ -1,0 +1,48 @@
+.container {
+  padding: 16px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--t-1);
+  margin: 0;
+}
+
+.stats {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--t-3);
+}
+
+.statValue {
+  font-weight: 600;
+  color: var(--t-1);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.empty {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--t-3);
+  font-size: 16px;
+}
+
+.loading {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--t-3);
+}

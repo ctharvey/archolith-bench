@@ -1,0 +1,43 @@
+/* DeckGrid.module.css */
+
+.container {
+  margin-bottom: 18px;
+}
+
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.titleGroup {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  font-family: var(--display);
+  margin: 0;
+}
+
+.totalValue {
+  font-size: 13px;
+  color: var(--t-4);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--t-4);
+  font-size: 14px;
+}

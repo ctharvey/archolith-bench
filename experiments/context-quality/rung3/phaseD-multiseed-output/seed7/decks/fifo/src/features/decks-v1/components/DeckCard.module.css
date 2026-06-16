@@ -1,0 +1,107 @@
+.deckCard {
+  position: relative;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.deckCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.colorBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.name {
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.meta {
+  font-size: 11px;
+  color: var(--t-4);
+  margin-top: 2px;
+}
+
+.value {
+  font-size: 18px;
+  font-weight: 600;
+  font-family: var(--display);
+  white-space: nowrap;
+}
+
+.stats {
+  display: flex;
+  gap: 16px;
+  font-size: 11px;
+  color: var(--t-4);
+}
+
+.statItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.statLabel {
+  color: var(--t-3);
+}
+
+.statValue {
+  color: var(--t-1);
+  font-weight: 500;
+}
+
+.topCard {
+  width: 60px;
+  height: 84px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--bg-3);
+}
+
+.topCardPlaceholder {
+  width: 60px;
+  height: 84px;
+  border-radius: 6px;
+  background: var(--bg-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: var(--t-4);
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+}
+
+.updated {
+  font-size: 10px;
+  color: var(--t-4);
+}

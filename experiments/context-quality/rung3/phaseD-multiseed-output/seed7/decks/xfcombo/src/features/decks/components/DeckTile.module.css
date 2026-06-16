@@ -1,0 +1,66 @@
+.tile {
+  background: var(--color-surface, #1a1a2e);
+  border: 1px solid var(--color-border, #2a2a4e);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.2s;
+}
+
+.tile:hover {
+  border-color: var(--color-accent, #4a90d9);
+}
+
+.tileHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.deckName {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text, #e0e0e0);
+}
+
+.format {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tileBody {
+  display: flex;
+  gap: 24px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-positive, #2a9d8f);
+}
+
+.count {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text, #e0e0e0);
+}
+
+.topCards {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tileFooter {
+  border-top: 1px solid var(--color-border, #2a2a4e);
+  padding-top: 8px;
+}

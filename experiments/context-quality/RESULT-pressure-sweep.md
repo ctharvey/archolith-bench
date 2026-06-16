@@ -68,3 +68,28 @@ Per-file score (uniform regime): `cards.html` rel=0.21, `api.js` rel=0.07 (match
 - **For a live confirmation:** a file-heavy seeded session (20+ components) at a reduced
   `ASSEMBLER_TOKEN_BUDGET` (e.g. 2000) with briefings kept fresh (deterministic hot path) would show the
   FIFO-vs-scored recall gap end-to-end. Cheaper/clearer to keep finding boundaries offline first.
+
+---
+
+## Follow-up: 4-way strategy sweep (`assembly_strategy_sweep.py`)
+Same setup, comparing fill strategies head-to-head (convention files LAST, uniform importance 0.5):
+
+```
+budget |   fifo |  scored | propagated | topological (deterministic)
+  3000 |  3/4   |  3/4    |  3/4       |  4/4
+  2000 |  0/4   |  2/4    |  3/4       |  4/4
+  1500 |  0/4   |  2/4    |  3/4       |  4/4
+  1000 |  0/4   |  2/4    |  3/4       |  4/4
+   700 |  0/4   |  2/4    |  3/4       |  3/4
+```
+
+**Finding: the DETERMINISTIC topological order (sort by in-degree / who-is-depended-upon) wins** — it
+keeps the anchor (`mobile.css`) that keyword-scoring is blind to, and the most convention files, at every
+pressure level, with NO LLM and NO importance signal. A sort beat the Phase-4 scorer. One-hop dependency
+propagation (Axis A) also rescues the anchor (3/4) but topological is simpler and better.
+
+**This is a fill/eviction *policy* refinement, NOT a curator replacement.** The LLM curator/prepper is
+unchanged; topological is a deterministic option for how the assembler orders the briefing's files under
+budget. See `projects/archolith/.agent/plans/archolith-context-deterministic-layers-direction.md` for the
+combo architecture (curator + deterministic assembly + output contracts).
+Caveat: topological quality rests on mechanical dependency-edge extraction (corpus-specific).

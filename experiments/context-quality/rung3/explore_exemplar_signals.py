@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""EXPLORATION: what signal surfaces an "exemplar" across corpus types?
+
+The production miner (corpus_profile.py) uses ONE signal — recurring PascalCase
+trailing-word+ext across sibling dirs — which finds `Page.tsx` in a feature-folder
+React app but NOTHING in opencode (domain modules) or Python. This script tries
+THREE candidate signals per corpus to learn what it would take to determine
+exemplars more generally. Offline, no LLM. Not production code — a probe.
+
+  A  name-varying template : recurring `<Word><ext>` PascalCase suffix (current miner)
+  B  fixed-name convention : recurring EXACT basename across dirs (catches schema.ts,
+                             base.py, models.py) with boilerplate filtered out
+  C  recurring DIR SHAPE   : directories that share the same SET of file-roles -- the
+                             "template" generalized from one file to a co-located role set
+
+Usage: python rung3/explore_exemplar_signals.py <src-root> [lang]
+"""
+from __future__ import annotations
+
+import posixpath
+import re
+import sys
+from collections import Counter, defaultdict
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+from analyze_corpus import load_corpus, _EXTS  # noqa: E402
+
+_PASCAL = re.compile(r"[A-Z][a-z0-9]*")
+# boilerplate / structural files that are conventions but not "templates to imitate"
+_NOISE = {"__init__.py", "index.ts", "index.tsx", "index.js", "mod.ts", "__main__.py"}
+
+
+def _stem_ext(base: str) -> tuple[str, str]:
+    parts = base.split(".")
+    return (parts[0], "." + ".".join(parts[1:])) if len(parts) > 1 else (parts[0], "")
+
+
+def _pascal_suffix(base: str) -> str | None:
+    stem, ext = _stem_ext(base)
+    if not ext:
+        return None
+    words = _PASCAL.findall(stem)
+    return words[-1] + ext if words else None
+
+
+def _role(base: str) -> str:
+    """A file's role token: PascalCase suffix if present, else the exact basename."""
+    return _pascal_suffix(base) or base
+
+
+def explore(root: Path):
+    files, _ = load_corpus(root)
+    paths = [getattr(f, "path", "").replace("\\", "/") for f in files]
+    by_dir: dict[str, list[str]] = defaultdict(list)
+    for p in paths:
+        by_dir[posixpath.dirname(p)].append(posixpath.basename(p))
+
+    # Signal A — name-varying PascalCase template suffix, #distinct dirs
+    a = defaultdict(set)
+    for p in paths:
+        pat = _pascal_suffix(posixpath.basename(p))
+        if pat:
+            a[pat].add(posixpath.dirname(p))
+    sig_a = sorted(((k, len(v)) for k, v in a.items()), key=lambda kv: -kv[1])
+
+    # Signal B — fixed-name convention: exact basename across dirs, noise filtered
+    b = defaultdict(set)
+    for p in paths:
+        base = posixpath.basename(p)
+        if base in _NOISE:
+            continue
+        b[base].add(posixpath.dirname(p))
+    sig_b = sorted(((k, len(v)) for k, v in b.items() if len(v) >= 2), key=lambda kv: -kv[1])
+
+    # Signal C — recurring DIR SHAPE: the set of file-roles co-located in a dir
+    shape_dirs: dict[frozenset, list[str]] = defaultdict(list)
+    for d, bases in by_dir.items():
+        roles = frozenset(_role(b) for b in bases if b not in _NOISE)
+        if len(roles) >= 2:                      # ignore trivial 1-file dirs
+            shape_dirs[roles].append(d)
+    sig_c = sorted(
+        ((shape, dirs) for shape, dirs in shape_dirs.items() if len(dirs) >= 2),
+        key=lambda kv: (-len(kv[1]), -len(kv[0])),
+    )
+
+    print(f"\n===== {root}  ({len(files)} files) =====")
+    print("A name-varying template (PascalCase suffix x #dirs):",
+          sig_a[:6] or "(none)")
+    print("B fixed-name convention (exact basename x #dirs):",
+          sig_b[:8] or "(none)")
+    print("C recurring DIR SHAPE (top, #dirs x roles):")
+    if not sig_c:
+        print("    (no dir shape recurs)")
+    for shape, dirs in sig_c[:4]:
+        print(f"    {len(dirs):2d} dirs  roles={sorted(shape)}")
+        print(f"            e.g. {dirs[:3]}")
+
+
+def main(argv):
+    if not argv:
+        print("usage: explore_exemplar_signals.py <src-root>")
+        return 2
+    explore(Path(argv[0]))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

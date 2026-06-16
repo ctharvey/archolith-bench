@@ -59,6 +59,24 @@ Signal A is reported as **#dirs / #files** (both matter — see Java).
    namespace export"). Deterministic A+B+C+noise-filter cover MOST corpora; the LLM is the fallback for
    judgment and no-recurrence cases — sharpening the design note's phase-3 scope.
 
+## Signal E (built + validated): stem-family generalizes dir-shape
+Signal E groups files by name-STEM and finds entities carrying >=2 roles from the derived role
+vocabulary (the top Signal-A suffix words); the role set is the feature template, the fullest entity
+is the canonical exemplar. Restricting to the role vocabulary drops coincidental stem-sharing
+(`Delta`/`Api`/`App`).
+- **Java (yawn.rip):** 22 features; `Card -> {Controller, Dto, Repository, Service}` (the canonical
+  Spring vertical slice), `Set -> {Controller, Dto, Service}`, `VsCardList -> {Controller, Repository,
+  Service}`.
+- **React (yawn.frontend):** ALSO fires — `CardIndex -> {Data, Page}` (i.e. `CardIndexPage.tsx` +
+  `useCardIndexData.ts` share stem `CardIndex`), `MarketReport -> {Data, Island, Page}`.
+
+**Unification:** a feature template is a recurring ROLE SET, bound by some key. Signal C uses the
+DIRECTORY as the key (feature-folders); Signal E uses the name-STEM. **E generalizes C** — it catches
+React (stem `CardIndex`) AND Java (stem `Card`), where C only catches feature-folders. The general
+deterministic recipe is: **A (derive role vocabulary by file+dir count, acronym-safe) -> E (group by
+stem, role set = template, fullest = exemplar) -> B (fixed-name fallback for domain-module corpora) ->
+in-degree foundations (universal).**
+
 ## Concrete recommendation
 Extend the deterministic miner from 1 signal to a small ensemble, with two metric/parse refinements the
 Java corpus forced out:

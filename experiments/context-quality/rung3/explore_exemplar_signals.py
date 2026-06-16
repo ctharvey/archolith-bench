@@ -91,6 +91,25 @@ def explore(root: Path):
         key=lambda kv: (-len(kv[1]), -len(kv[0])),
     )
 
+    # Signal E — cross-layer STEM FAMILY (the layer-package analog of C): group files
+    # by entity stem; the recurring set of ROLE suffixes a stem carries is the feature
+    # template. Restrict roles to the derived role vocabulary (top sig_a words) so
+    # coincidental stem-sharing (Delta/Api/App) drops out.
+    role_vocab = {_stem_ext(k)[0].lstrip(".") or k.split(".")[0]: None for k, _d, _n in sig_a[:8]}
+    role_words = set()
+    for k, _d, _n in sig_a[:8]:
+        words = _PASCAL.findall(_stem_ext(k)[0]) or [_stem_ext(k)[0]]
+        if words:
+            role_words.add(words[-1])
+    ent_roles: dict[str, set] = defaultdict(set)
+    for p in paths:
+        stem = _stem_ext(posixpath.basename(p))[0]
+        words = _PASCAL.findall(stem)
+        if len(words) >= 2 and words[-1] in role_words:
+            ent_roles["".join(words[:-1])].add(words[-1])
+    multi = {e: rs for e, rs in ent_roles.items() if len(rs) >= 2}
+    sig_e = sorted(multi.items(), key=lambda kv: -len(kv[1]))
+
     print(f"\n===== {root}  ({len(files)} files) =====")
     print("A name-varying template (suffix: #dirs, #files):",
           [(k, f"{d}d/{n}f") for k, d, n in sig_a[:6]] or "(none)")
@@ -102,6 +121,13 @@ def explore(root: Path):
     for shape, dirs in sig_c[:4]:
         print(f"    {len(dirs):2d} dirs  roles={sorted(shape)}")
         print(f"            e.g. {dirs[:3]}")
+    print("E cross-layer STEM FAMILY (role vocab:", sorted(role_words), "):")
+    if not sig_e:
+        print("    (no stem spans >=2 roles)")
+    else:
+        print(f"    {len(sig_e)} entities span >=2 roles; fullest exemplars:")
+        for ent, roles in sig_e[:5]:
+            print(f"      {ent:22s} {sorted(roles)}")
 
 
 def main(argv):

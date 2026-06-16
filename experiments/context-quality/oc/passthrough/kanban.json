@@ -1,0 +1,26 @@
+{
+  "work": {
+    "todo": [],
+    "doing": [
+      {
+        "id": 2,
+        "title": "Add unit tests",
+        "description": "Cover the auth module",
+        "priority": "med"
+      }
+    ],
+    "done": []
+  },
+  "personal": {
+    "todo": [
+      {
+        "id": 1,
+        "title": "Groceries",
+        "description": "",
+        "priority": "low"
+      }
+    ],
+    "doing": [],
+    "done": []
+  }
+}

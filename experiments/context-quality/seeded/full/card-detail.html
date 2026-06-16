@@ -1,0 +1,23 @@
+<!-- card-detail.html — single card detail -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Card · Yawn</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<!-- canonical detail back-header pattern -->
+<header class="detail-header">
+  <a class="back-btn" href="cards.html">‹</a><span class="detail-title">Card</span>
+</header>
+<section class="card detail-hero">
+  <div class="hero-img"></div>
+  <h1 class="hero-name" id="name">—</h1>
+  <div class="row-sub" id="set">—</div>
+  <div class="hero-price" style="color:var(--accent)" id="price">—</div>
+</section>
+<section class="card"><div class="chart-placeholder">price history</div></section>
+<section class="card"><a class="button" id="buy" href="#">Buy</a></section>
+<script type="module">
+import { cardDetail } from './api.js';
+const id = new URLSearchParams(location.search).get('id');
+cardDetail({ id }).then(c => { name.textContent=c.name; set.textContent=c.set; price.textContent='$'+c.price; });
+</script>
+</body></html>

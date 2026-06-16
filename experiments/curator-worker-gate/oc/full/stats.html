@@ -1,0 +1,31 @@
+<!-- stats.html — Collection stats -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stats · Yawn</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<div class="card" style="margin:8px;text-align:center;padding:16px">
+  <div style="font-size:1.5rem;font-weight:700;color:var(--accent)" id="total-cards">—</div>
+  <div style="font-size:.8rem;color:var(--muted)">Total Cards</div>
+  <div style="font-size:1.2rem;font-weight:700;color:var(--accent)" id="total-value">—</div>
+  <div style="font-size:.8rem;color:var(--muted)">Total Value</div>
+</div>
+<div id="stats-list">
+  <a class="list-row" href="set-detail.html">
+    <div class="row-thumb"></div>
+    <div class="row-body"><div class="row-name">Base Set</div><div class="row-sub">82/102</div></div>
+    <div class="row-meta">80%</div>
+  </a>
+</div>
+<nav class="bottom-nav">
+  <a href="home.html">Pulse</a><a href="cards.html">Cards</a>
+  <a href="sealed.html">Sealed</a><a href="sets.html">Sets</a><a href="decks.html">Decks</a><a href="series.html">Series</a><a class="active" href="stats.html">Stats</a><a href="portfolio.html">Portfolio</a><a href="trades.html">Trades</a><a href="vs.html">VS</a>
+</nav>
+<script type="module">
+import { stats } from './api.js';
+const list = document.getElementById('stats-list');
+async function load(){ const s = await stats(); document.getElementById('total-cards').textContent = s.total_cards; document.getElementById('total-value').textContent = '$' + s.total_value; list.innerHTML = s.sets.map(st =>
+  `<a class="list-row" href="set-detail.html?id=${st.id}"><div class="row-thumb"></div>`+
+  `<div class="row-body"><div class="row-name">${st.name}</div><div class="row-sub">${st.owned}/${st.total}</div></div>`+
+  `<div class="row-meta">${st.pct}%</div></a>`).join(''); }
+</script>
+</body></html>

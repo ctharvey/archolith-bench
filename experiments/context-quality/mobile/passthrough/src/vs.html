@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — VS</title>
+  <link rel="stylesheet" href="mobile.css">
+  <script type="module" src="api.js"></script>
+</head>
+<body>
+  <main id="app" class="page">
+    <header class="page-header"><h1>VS Compare</h1></header>
+    <section class="page-body">
+      <div class="flex gap-2" id="vs-pickers">
+        <div style="flex:1" id="slot-a">
+          <input type="search" data-slot="a" class="button" placeholder="Card A..." style="background:var(--bg-deep);color:var(--text-primary);border:1px solid var(--border);border-radius:9999px;padding:10px 16px;font-size:1rem;width:100%">
+          <div data-results="a" class="flex-col"></div>
+        </div>
+        <div style="flex:1" id="slot-b">
+          <input type="search" data-slot="b" class="button" placeholder="Card B..." style="background:var(--bg-deep);color:var(--text-primary);border:1px solid var(--border);border-radius:9999px;padding:10px 16px;font-size:1rem;width:100%">
+          <div data-results="b" class="flex-col"></div>
+        </div>
+      </div>
+      <div id="comparison-panel" class="card" style="display:none;margin-top:12px"></div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Main tabs">
+    <button class="nav-btn" data-tab="pulse"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h3l2-5 4 10 2-5h5"/></svg> Pulse</button>
+    <button class="nav-btn" data-tab="cards"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M8 2v2M16 2v2"/></svg> Cards</button>
+    <button class="nav-btn" data-tab="sealed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> Sealed</button>
+    <button class="nav-btn" data-tab="sets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> Sets</button>
+    <button class="nav-btn active" data-tab="vs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg> VS</button>
+  </nav>
+
+  <script type="module">
+    import { cardSearch, vsCompare } from "api.js";
+
+    let selected = {};
+
+    document.querySelectorAll("[data-slot]").forEach(input => {
+      let debounce;
+      input.addEventListener("input", () => {
+        clearTimeout(debounce);
+        debounce = setTimeout(async () => {
+          const slot = input.dataset.slot;
+          const q = input.value.trim();
+          if (!q) return;
+          const results = await cardSearch(q);
+          const div = document.querySelector(`[data-results="${slot}"]`);
+          div.innerHTML = (results.cards ?? results ?? []).slice(0,5).map(c => `
+            <div class="list-row" style="cursor:pointer" data-id="${c.id}">
+              <img src="${c.image ?? ""}" alt="${c.name}" style="width:32px;height:44px;object-fit:cover;border-radius:4px">
+              <span style="flex:1">${c.name}</span>
+              <span>$${(c.price ?? 0).toFixed(2)}</span>
+            </div>
+          `).join("");
+          div.querySelectorAll("[data-id]").forEach(el => {
+            el.addEventListener("click", () => {
+              selected[slot] = el.dataset.id;
+              input.value = el.querySelector("span:first-of-type")?.textContent ?? "";
+              div.innerHTML = "";
+              if (selected.a && selected.b) compare();
+            });
+          });
+        }, 300);
+      });
+    });
+
+    async function compare() {
+      const data = await vsCompare(selected.a, selected.b);
+      const panel = document.getElementById("comparison-panel");
+      panel.style.display = "";
+      const left = data.left ?? {}, right = data.right ?? {};
+      panel.innerHTML = `
+        <div class="flex gap-4">
+          <div class="flex-col" style="flex:1">
+            <span class="font-bold">${left.name}</span>
+            <span class="text-sm text-muted">${left.set ?? ""}</span>
+            <span class="font-bold" style="color:var(--accent-green)">$${(left.price ?? 0).toFixed(2)}</span>
+          </div>
+          <div class="flex-col" style="flex:1;text-align:right">
+            <span class="font-bold">${right.name}</span>
+            <span class="text-sm text-muted">${right.set ?? ""}</span>
+            <span class="font-bold" style="color:var(--accent-green)">$${(right.price ?? 0).toFixed(2)}</span>
+          </div>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+<!-- notifications.html — Notifications feed -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Notifications · Yawn</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<div class="search-sticky"><input class="search-input" type="search" placeholder="Filter notifications…"></div>
+<div id="notif-list">
+  <a class="list-row" href="notif-detail.html">
+    <div class="row-thumb"></div>
+    <div class="row-body"><div class="row-name">Card added to watchlist</div><div class="row-sub">Charizard · $420</div></div>
+    <div class="row-meta">5m ago</div>
+  </a>
+</div>
+<nav class="bottom-nav">
+  <a href="home.html">Pulse</a><a href="cards.html">Cards</a>
+  <a href="sealed.html">Sealed</a><a href="sets.html">Sets</a><a href="decks.html">Decks</a><a href="series.html">Series</a><a href="stats.html">Stats</a><a class="active" href="notifications.html">Notif</a><a href="activity.html">Activity</a><a href="wishlist.html">Wish</a><a href="portfolio.html">Portfolio</a><a href="trades.html">Trades</a><a href="vs.html">VS</a>
+</nav>
+<script type="module">
+import { notifications } from './api.js';
+const list = document.getElementById('notif-list');
+async function load(q){ const items = await notifications({ q }); list.innerHTML = items.map(n =>
+  `<a class="list-row" href="notif-detail.html?id=${n.id}"><div class="row-thumb"></div>`+
+  `<div class="row-body"><div class="row-name">${n.message}</div><div class="row-sub">${n.detail}</div></div>`+
+  `<div class="row-meta">${n.time_ago}</div></a>`).join(''); }
+document.querySelector('.search-input').addEventListener('input', e => load(e.target.value));
+</script>
+</body></html>

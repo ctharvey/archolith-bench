@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Sealed — Yawn</title>
+  <link rel="stylesheet" href="mobile.css">
+</head>
+<body>
+  <!-- ── search bar (sticky) ── -->
+  <div class="search-sticky">
+    <input type="search" class="search-input" id="sealed-search" placeholder="Search sealed products…" autocomplete="off">
+  </div>
+
+  <!-- ── results list ── -->
+  <main class="container" id="results">
+    <!-- canonical sealed-row pattern -->
+    <div class="sealed-row" data-sealed-id="">
+      <img class="sealed-thumb" src="" alt="" loading="lazy" width="44" height="44">
+      <div class="sealed-row-body">
+        <div class="sealed-row-name"></div>
+        <div class="sealed-row-sub text-muted"></div>
+      </div>
+      <div class="sealed-row-ev"></div>
+    </div>
+  </main>
+
+  <nav class="bottom-nav">
+    <a class="nav-item" data-tab="pulse">
+      <span class="nav-icon">⚡</span>
+      <span>Pulse</span>
+    </a>
+    <a class="nav-item" data-tab="cards">
+      <span class="nav-icon">🃏</span>
+      <span>Cards</span>
+    </a>
+    <a class="nav-item active" data-tab="sealed">
+      <span class="nav-icon">📦</span>
+      <span>Sealed</span>
+    </a>
+    <a class="nav-item" data-tab="sets">
+      <span class="nav-icon">📚</span>
+      <span>Sets</span>
+    </a>
+    <a class="nav-item" data-tab="vs">
+      <span class="nav-icon">⚖️</span>
+      <span>VS</span>
+    </a>
+  </nav>
+
+  <script type="module">
+    import { sealedList } from './api.js';
+
+    const input = document.getElementById('sealed-search');
+    const results = document.getElementById('results');
+
+    let debounce;
+    input.addEventListener('input', () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(async () => {
+        const q = input.value.trim();
+        try {
+          const data = await sealedList(q);
+          renderResults(data);
+        } catch (e) {
+          results.innerHTML = `<p class="text-muted">${e.message}</p>`;
+        }
+      }, 300);
+    });
+
+    function renderResults(items) {
+      results.innerHTML = '';
+      for (const item of items) {
+        const row = document.createElement('div');
+        row.className = 'sealed-row';
+        const ev = item.expected_value;
+        row.innerHTML = `
+          <img class="sealed-thumb" src="${item.image || ''}" alt="${item.name}" loading="lazy" width="44" height="44">
+          <div class="sealed-row-body">
+            <div class="sealed-row-name">${item.name}</div>
+            <div class="sealed-row-sub text-muted">${item.type || ''}</div>
+          </div>
+          <div class="sealed-row-ev">${ev != null ? '$' + ev.toFixed(2) : '—'}</div>
+        `;
+        results.appendChild(row);
+      }
+    }
+  </script>
+</body>
+</html>

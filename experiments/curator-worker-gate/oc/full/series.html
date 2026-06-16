@@ -1,0 +1,27 @@
+<!-- series.html — Series browse/search -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Series · Yawn</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<div class="search-sticky"><input class="search-input" type="search" placeholder="Search series…"></div>
+<div id="series-list">
+  <a class="list-row" href="series-detail.html">
+    <div class="row-thumb"></div>
+    <div class="row-body"><div class="row-name">Base Set</div><div class="row-sub">3 sets</div></div>
+    <div class="row-meta">102</div>
+  </a>
+</div>
+<nav class="bottom-nav">
+  <a href="home.html">Pulse</a><a href="cards.html">Cards</a>
+  <a href="sealed.html">Sealed</a><a href="sets.html">Sets</a><a href="decks.html">Decks</a><a class="active" href="series.html">Series</a><a href="vs.html">VS</a>
+</nav>
+<script type="module">
+import { seriesList } from './api.js';
+const list = document.getElementById('series-list');
+async function load(q){ const rows = await seriesList({ q }); list.innerHTML = rows.map(r =>
+  `<a class="list-row" href="series-detail.html?id=${r.id}"><div class="row-thumb"></div>`+
+  `<div class="row-body"><div class="row-name">${r.name}</div><div class="row-sub">${r.set_count} sets</div></div>`+
+  `<div class="row-meta">${r.total_cards}</div></a>`).join(''); }
+document.querySelector('.search-input').addEventListener('input', e => load(e.target.value));
+</script>
+</body></html>

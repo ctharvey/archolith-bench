@@ -1,0 +1,16 @@
+Low stock items in Warehouse 1 (threshold 40):
+
+Warehouse 1 JSON dump:
+{"name": "Warehouse 1", "items": [{"id": "4e718e59-0f34-45dd-aa9c-ed21d90badf5", "sku": "WIDGET", "name": "Widget", "quantity": 100, "unit_price": 2500, "reserved": 20, "available": 80}, {"id": "289c9009-954d-410f-b660-a1be58b82596", "sku": "GADGET", "name": "Gadget", "quantity": 50, "unit_price": 1500, "reserved": 10, "available": 40}]}
+
+Transaction Log Entries:
+  [2026-06-14 13:19:16] add_item: Added to warehouse 'Warehouse 1'
+  [2026-06-14 13:19:16] add_item: Added to warehouse 'Warehouse 1'
+  [2026-06-14 13:19:16] add_item: Added to warehouse 'Warehouse 1'
+  [2026-06-14 13:19:16] reserve: Reserved 20 units in warehouse 'Warehouse 1'
+  [2026-06-14 13:19:16] reserve: Reserved 10 units in warehouse 'Warehouse 1'
+  [2026-06-14 13:19:16] remove_item: Removed from warehouse 'Warehouse 1'
+  [2026-06-14 13:19:16] add_item: Added to warehouse 'Warehouse 2'
+  [2026-06-14 13:19:16] transfer: Transferred from 'Warehouse 1' to 'Warehouse 2'
+  [2026-06-14 13:19:16] add_item: Added to warehouse 'Warehouse 1'
+  [2026-06-14 13:19:16] add_item: Added to warehouse 'Warehouse 1'

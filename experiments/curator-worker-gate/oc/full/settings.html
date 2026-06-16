@@ -1,0 +1,25 @@
+<!-- settings.html — App settings -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Settings · Yawn</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<div id="settings-list">
+  <a class="list-row" href="#">
+    <div class="row-thumb"></div>
+    <div class="row-body"><div class="row-name">Dark Mode</div><div class="row-sub">Toggle theme</div></div>
+    <div class="row-meta"><label class="switch"><input type="checkbox" checked></label></div>
+  </a>
+</div>
+<nav class="bottom-nav">
+  <a href="home.html">Pulse</a><a href="cards.html">Cards</a>
+  <a href="sealed.html">Sealed</a><a href="sets.html">Sets</a><a href="decks.html">Decks</a><a href="series.html">Series</a><a href="stats.html">Stats</a><a class="active" href="settings.html">Settings</a><a href="notifications.html">Notif</a><a href="activity.html">Activity</a><a href="wishlist.html">Wish</a><a href="portfolio.html">Portfolio</a><a href="trades.html">Trades</a><a href="vs.html">VS</a>
+</nav>
+<script type="module">
+import { settings } from './api.js';
+const list = document.getElementById('settings-list');
+settings().then(s => list.innerHTML = s.map(st =>
+  `<a class="list-row" href="#"><div class="row-thumb"></div>`+
+  `<div class="row-body"><div class="row-name">${st.label}</div><div class="row-sub">${st.desc}</div></div>`+
+  `<div class="row-meta">${st.value}</div></a>`).join(''); }
+</script>
+</body></html>

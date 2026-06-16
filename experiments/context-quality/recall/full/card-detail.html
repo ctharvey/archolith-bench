@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Card — Yawn</title>
+  <link rel="stylesheet" href="mobile.css">
+</head>
+<body>
+  <!-- ── back-header (canonical detail header) ── -->
+  <header class="back-header">
+    <button class="back-btn" onclick="history.back()">&#8592;</button>
+    <h1 class="back-title" id="card-title">Card Detail</h1>
+  </header>
+
+  <!-- ── hero ── -->
+  <section class="hero">
+    <img id="card-image" src="" alt="" class="hero-img" loading="lazy">
+    <h2 id="card-name" class="hero-name"></h2>
+    <p id="card-set" class="hero-set text-muted"></p>
+  </section>
+
+  <!-- ── current price (--accent) ── -->
+  <p class="current-price" id="current-price">&mdash;</p>
+
+  <!-- ── price-history placeholder chart ── -->
+  <div class="chart-placeholder" id="price-chart">
+    <p class="text-muted">Price history loading&hellip;</p>
+  </div>
+
+  <!-- ── buy buttons ── -->
+  <div class="buy-row">
+    <a class="button tcgplayer" id="tcg-link" target="_blank" rel="noopener">TCGPlayer</a>
+    <a class="button ebay" id="ebay-link" target="_blank" rel="noopener">eBay</a>
+  </div>
+
+  <script type="module">
+    import { cardDetail } from './api.js';
+
+    const id = new URLSearchParams(location.search).get('id');
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!id) return;
+      try {
+        const card = await cardDetail(id);
+        document.title = card.name + ' — Yawn';
+        document.getElementById('card-title').textContent = card.name;
+        document.getElementById('card-image').src = card.image || '';
+        document.getElementById('card-name').textContent = card.name;
+        document.getElementById('card-set').textContent = card.set_name || '';
+        const price = document.getElementById('current-price');
+        price.textContent = card.price != null ? '$' + card.price.toFixed(2) : '—';
+      } catch (e) {
+        document.getElementById('card-name').textContent = 'Error loading card';
+      }
+    });
+  </script>
+</body>
+</html>

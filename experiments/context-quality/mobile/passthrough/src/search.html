@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — Search</title>
+  <link rel="stylesheet" href="mobile.css">
+  <script type="module" src="api.js"></script>
+</head>
+<body>
+  <main id="app" class="page">
+    <header class="page-header">
+      <h1>Search</h1>
+      <input type="search" id="global-search" class="button" placeholder="Cards, sealed..." style="background:var(--bg-deep);color:var(--text-primary);border:1px solid var(--border);border-radius:9999px;padding:10px 16px;font-size:1rem;width:100%;margin-top:8px">
+    </header>
+    <section class="page-body">
+      <h2 class="text-sm text-muted mb-2">Cards</h2>
+      <div id="cards-results" class="flex-col"></div>
+      <h2 class="text-sm text-muted mb-2 mt-2">Sealed</h2>
+      <div id="sealed-results" class="flex-col"></div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Main tabs">
+    <button class="nav-btn" data-tab="pulse"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h3l2-5 4 10 2-5h5"/></svg> Pulse</button>
+    <button class="nav-btn active" data-tab="cards"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M8 2v2M16 2v2"/></svg> Cards</button>
+    <button class="nav-btn" data-tab="sealed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> Sealed</button>
+    <button class="nav-btn" data-tab="sets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> Sets</button>
+    <button class="nav-btn" data-tab="vs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg> VS</button>
+  </nav>
+
+  <script type="module">
+    import { cardSearch, sealedList } from "api.js";
+
+    const input = document.getElementById("global-search");
+    const cardsEl = document.getElementById("cards-results");
+    const sealedEl = document.getElementById("sealed-results");
+
+    let debounce;
+    input.addEventListener("input", () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(async () => {
+        const q = input.value.trim();
+        if (!q) { cardsEl.innerHTML = '<p class="text-muted">Start typing</p>'; sealedEl.innerHTML = ""; return; }
+
+        const [cards, sealed] = await Promise.all([
+          cardSearch(q),
+          sealedList({ q })
+        ]);
+
+        cardsEl.innerHTML = (cards.cards ?? cards ?? []).length
+          ? (cards.cards ?? cards ?? []).map(c => `<div class="list-row"><img src="${c.image ?? ""}" alt="" style="width:44px;height:64px;object-fit:cover;border-radius:4px;background:var(--bg-mid)"><div class="flex-col" style="flex:1"><span class="font-bold">${c.name}</span><span class="text-sm text-muted">${c.set ?? ""}</span></div><span>$${(c.price ?? 0).toFixed(2)}</span></div>`).join("")
+          : '<p class="text-muted">No card results</p>';
+
+        sealedEl.innerHTML = (sealed.sealed ?? sealed ?? []).length
+          ? (sealed.sealed ?? sealed ?? []).map(s => `<div class="list-row"><img src="${s.image ?? ""}" alt="" style="width:44px;height:64px;object-fit:cover;border-radius:4px;background:var(--bg-mid)"><div class="flex-col" style="flex:1"><span class="font-bold">${s.name}</span><span class="text-sm text-muted">${s.set ?? ""}</span></div><span class="text-sm" style="color:var(--accent-green)">EV ${(s.ev??0).toFixed(1)}%</span><span>$${(s.price??0).toFixed(2)}</span></div>`).join("")
+          : '<p class="text-muted">No sealed results</p>';
+      }, 300);
+    });
+  </script>
+</body>
+</html>

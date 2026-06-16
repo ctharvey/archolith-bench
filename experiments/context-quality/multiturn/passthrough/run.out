@@ -1,0 +1,19 @@
+Low stock items (threshold 80):
+  SKU002: 45 available
+
+Warehouse 1 JSON:
+{"name": "Main Warehouse", "items": [{"id": "0b374d81-f8c4-458a-a958-aa2ba95ebbcd", "sku": "SKU001", "name": "Widget A", "quantity": 100, "unit_price": 500, "reserved": 10, "available": 90}, {"id": "e5229181-2a42-44b2-9146-c68df66ff1b0", "sku": "SKU002", "name": "Widget B", "quantity": 50, "unit_price": 750, "reserved": 5, "available": 45}]}
+
+Reloaded warehouse: Main Warehouse
+  SKU001: 100 units @ 500 cents
+  SKU002: 50 units @ 750 cents
+
+Transaction log:
+  add_item: 0b374d81-f8c4-458a-a958-aa2ba95ebbcd at 1781461156.79 - Added item SKU001
+  add_item: e5229181-2a42-44b2-9146-c68df66ff1b0 at 1781461156.79 - Added item SKU002
+  add_item: 01093d50-9baf-4e7a-b431-72c8fc6ceb3b at 1781461156.79 - Added item SKU003
+  reserve: 0b374d81-f8c4-458a-a958-aa2ba95ebbcd at 1781461156.79 - Reserved 10 units
+  reserve: e5229181-2a42-44b2-9146-c68df66ff1b0 at 1781461156.79 - Reserved 5 units
+  remove_item: 01093d50-9baf-4e7a-b431-72c8fc6ceb3b at 1781461156.79 - Removed item
+  add_item: 01093d50-9baf-4e7a-b431-72c8fc6ceb3b at 1781461156.79 - Added item SKU003
+  transfer: 01093d50-9baf-4e7a-b431-72c8fc6ceb3b at 1781461156.79 - Transferred from Main Warehouse to Secondary Warehouse

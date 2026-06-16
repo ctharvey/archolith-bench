@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+  <link rel="stylesheet" href="mobile.css">
+  <title>Yawn — Sealed</title>
+</head>
+<body>
+  <main id="app" class="full" style="padding-bottom:64px;">
+    <!-- Sticky search -->
+    <div class="sticky-search" style="position:sticky;top:0;z-index:10;background:var(--bg-deep);padding:12px var(--gap);">
+      <input
+        type="search"
+        id="q"
+        placeholder="Search sealed products…"
+        style="width:100%;min-height:44px;padding:8px 12px;background:var(--bg-surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font:16px system-ui,sans-serif;"
+      >
+    </div>
+
+    <!-- Scrollable sealed list -->
+    <section id="results" class="scroll-y" style="height:calc(100vh - 120px);">
+      <template id="sealed-row">
+        <div class="list-row" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--border);">
+          <img class="thumb" loading="lazy" style="width:48px;height:48px;border-radius:4px;object-fit:cover;background:var(--bg-mid);">
+          <div class="info" style="flex:1;min-width:0;">
+            <div class="name" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">name</div>
+            <div class="meta" style="font-size:12px;color:var(--muted);">Set</div>
+          </div>
+          <div class="price" style="font-weight:600;color:var(--accent-bright);white-space:nowrap;">$0.00</div>
+          <div class="ev" style="font-size:12px;color:var(--muted);text-align:right;white-space:nowrap;">EV $0.00</div>
+        </div>
+      </template>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" id="nav">
+    <a href="#pulse" data-tab="pulse">Pulse</a>
+    <a href="#cards" data-tab="cards">Cards</a>
+    <a href="#sealed" class="active" data-tab="sealed">Sealed</a>
+    <a href="#sets" data-tab="sets">Sets</a>
+    <a href="#vs" data-tab="vs">VS</a>
+  </nav>
+
+  <script type="module" src="api.js"></script>
+</body>
+</html>

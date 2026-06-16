@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — Cards</title>
+  <link rel="stylesheet" href="mobile.css">
+  <script type="module" src="api.js"></script>
+</head>
+<body>
+  <main id="app" class="page">
+    <header class="page-header">
+      <h1>Cards</h1>
+      <input type="search" id="card-search" class="button" placeholder="Search cards..." style="margin-top:8px;background:var(--bg-deep);color:var(--text-primary);border:1px solid var(--border);border-radius:9999px;padding:10px 16px;font-size:1rem">
+    </header>
+    <section class="page-body">
+      <div id="card-list" class="flex-col"></div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Main tabs">
+    <button class="nav-btn" data-tab="pulse">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h3l2-5 4 10 2-5h5"/></svg>
+      Pulse
+    </button>
+    <button class="nav-btn active" data-tab="cards">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M8 2v2M16 2v2"/></svg>
+      Cards
+    </button>
+    <button class="nav-btn" data-tab="sealed">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+      Sealed
+    </button>
+    <button class="nav-btn" data-tab="sets">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Sets
+    </button>
+    <button class="nav-btn" data-tab="vs">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
+      VS
+    </button>
+  </nav>
+
+  <script type="module">
+    import { cardSearch } from "api.js";
+
+    const input = document.getElementById("card-search");
+    const list = document.getElementById("card-list");
+
+    /** Reusable card-row markup — re-used by Sealed, Set detail, etc. */
+    function cardRowHtml(card) {
+      const price = card.price ?? card.marketPrice ?? 0;
+      return `
+        <div class="list-row" data-id="${card.id}">
+          <img src="${card.image ?? card.thumbnail ?? ""}" alt="${card.name}" loading="lazy" style="width:44px;height:64px;object-fit:cover;border-radius:4px;background:var(--bg-mid)">
+          <div class="flex-col" style="flex:1">
+            <span class="font-bold">${card.name}</span>
+            <span class="text-sm text-muted">${card.set ?? ""}${card.number ? " #" + card.number : ""}</span>
+          </div>
+          <span class="text-sm font-bold">$${price.toFixed(2)}</span>
+        </div>
+      `;
+    }
+
+    function render(cards) {
+      list.innerHTML = cards?.length
+        ? cards.map(cardRowHtml).join("")
+        : '<p class="text-muted">No results</p>';
+    }
+
+    let debounce;
+    input.addEventListener("input", () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(async () => {
+        const q = input.value.trim();
+        if (!q) { list.innerHTML = '<p class="text-muted">Start typing to search</p>'; return; }
+        const results = await cardSearch(q);
+        render(results.cards ?? results);
+      }, 300);
+    });
+  </script>
+</body>
+</html>

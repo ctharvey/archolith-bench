@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — Pokemon TCG Market Data</title>
+  <link rel="stylesheet" href="mobile.css">
+  <script type="module" src="api.js"></script>
+</head>
+<body>
+  <!-- Page container — content loaded per tab -->
+  <main id="app" class="page"></main>
+
+  <!-- Bottom navigation -->
+  <nav class="bottom-nav" aria-label="Main tabs">
+    <button class="nav-btn active" data-tab="pulse">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h3l2-5 4 10 2-5h5"/></svg>
+      Pulse
+    </button>
+    <button class="nav-btn" data-tab="cards">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M8 2v2M16 2v2"/></svg>
+      Cards
+    </button>
+    <button class="nav-btn" data-tab="sealed">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+      Sealed
+    </button>
+    <button class="nav-btn" data-tab="sets">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Sets
+    </button>
+    <button class="nav-btn" data-tab="vs">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
+      VS
+    </button>
+  </nav>
+
+  <script>
+    // Tab switching placeholder — actual routing built per-screen
+    document.querySelectorAll(".nav-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+      });
+    });
+  </script>
+</body>
+</html>

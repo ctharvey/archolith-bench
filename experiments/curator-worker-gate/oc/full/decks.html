@@ -1,0 +1,27 @@
+<!-- decks.html — Decks browse/search -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Decks · Yawn</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<div class="search-sticky"><input class="search-input" type="search" placeholder="Search decks…"></div>
+<div id="deck-list">
+  <a class="list-row" href="deck-detail.html">
+    <div class="row-thumb"></div>
+    <div class="row-body"><div class="row-name">Pikachu &amp; Friends</div><div class="row-sub">Standard</div></div>
+    <div class="row-meta">60</div>
+  </a>
+</div>
+<nav class="bottom-nav">
+  <a href="home.html">Pulse</a><a href="cards.html">Cards</a>
+  <a href="sealed.html">Sealed</a><a href="sets.html">Sets</a><a class="active" href="decks.html">Decks</a><a href="vs.html">VS</a>
+</nav>
+<script type="module">
+import { decksList } from './api.js';
+const list = document.getElementById('deck-list');
+async function load(q){ const decks = await decksList({ q }); list.innerHTML = decks.map(d =>
+  `<a class="list-row" href="deck-detail.html?id=${d.id}"><div class="row-thumb"></div>`+
+  `<div class="row-body"><div class="row-name">${d.name}</div><div class="row-sub">${d.format}</div></div>`+
+  `<div class="row-meta">${d.card_count}</div></a>`).join(''); }
+document.querySelector('.search-input').addEventListener('input', e => load(e.target.value));
+</script>
+</body></html>

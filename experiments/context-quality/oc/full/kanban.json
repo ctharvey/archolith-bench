@@ -1,0 +1,12 @@
+{
+  "myboard": {
+    "cards": [
+      {
+        "title": "Fix login bug",
+        "description": "Handle null session gracefully",
+        "priority": "high",
+        "column": "doing"
+      }
+    ]
+  }
+}

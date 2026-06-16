@@ -1,0 +1,26 @@
+<!-- help.html — Help/FAQ -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Help · Yawn</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<div class="search-sticky"><input class="search-input" type="search" placeholder="Search FAQ…"></div>
+<div id="faq-list">
+  <a class="list-row" href="help-detail.html">
+    <div class="row-thumb"></div>
+    <div class="row-body"><div class="row-name">How to add cards?</div><div class="row-sub">Go to Cards → Search</div></div>
+    <div class="row-meta">▸</div>
+  </a>
+</div>
+<nav class="bottom-nav">
+  <a href="home.html">Pulse</a><a href="cards.html">Cards</a>
+  <a href="sealed.html">Sealed</a><a href="sets.html">Sets</a><a href="decks.html">Decks</a><a href="series.html">Series</a><a href="stats.html">Stats</a><a class="active" href="help.html">Help</a><a href="settings.html">Settings</a><a href="notifications.html">Notif</a><a href="activity.html">Activity</a><a href="wishlist.html">Wish</a><a href="portfolio.html">Portfolio</a><a href="trades.html">Trades</a><a href="vs.html">VS</a>
+</nav>
+<script type="module">
+import { help } from './api.js';
+const list = document.getElementById('faq-list');
+help().then(f => list.innerHTML = f.map(q =>
+  `<a class="list-row" href="help-detail.html?id=${q.id}"><div class="row-thumb"></div>`+
+  `<div class="row-body"><div class="row-name">${q.question}</div><div class="row-sub">${q.answer}</div></div>`+
+  `<div class="row-meta">▸</div></a>`).join(''); }
+</script>
+</body></html>

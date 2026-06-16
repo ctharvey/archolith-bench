@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — EV Explorer</title>
+  <link rel="stylesheet" href="mobile.css">
+  <script type="module" src="api.js"></script>
+</head>
+<body>
+  <main id="app" class="page">
+    <header class="page-header">
+      <h1>EV Explorer</h1>
+      <div class="flex-col gap-2 mt-2" style="padding:8px 0" id="filter-panel">
+        <label class="flex items-center justify-between" style="min-height:44px">
+          <span class="text-sm">Min EV</span>
+          <input type="range" id="ev-slider" min="0" max="200" value="100" step="1" style="flex:1;margin:0 12px;accent-color:var(--accent-green)">
+          <span id="ev-label" class="text-sm font-bold" style="color:var(--accent-green)">100%</span>
+        </label>
+        <div class="flex gap-2">
+          <select id="set-filter" class="button" style="flex:1;background:var(--bg-deep);color:var(--text-primary);border:1px solid var(--border);border-radius:9999px;padding:10px 16px;appearance:none">
+            <option value="">All sets</option>
+          </select>
+          <select id="type-filter" class="button" style="flex:1;background:var(--bg-deep);color:var(--text-primary);border:1px solid var(--border);border-radius:9999px;padding:10px 16px;appearance:none">
+            <option value="">All types</option>
+            <option>Booster</option><option>Collection</option><option>Premium</option>
+          </select>
+        </div>
+        <button id="apply-filters" class="button" style="width:auto;padding:10px 24px;border-radius:9999px">Apply</button>
+      </div>
+    </header>
+    <section class="page-body">
+      <div id="ev-results" class="flex-col"></div>
+    </section>
+  </nav>
+
+  <nav class="bottom-nav" aria-label="Main tabs">
+    <button class="nav-btn" data-tab="pulse">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h3l2-5 4 10 2-5h5"/></svg>
+      Pulse
+    </button>
+    <button class="nav-btn" data-tab="cards">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M8 2v2M16 2v2"/></svg>
+      Cards
+    </button>
+    <button class="nav-btn active" data-tab="sealed">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+      Sealed
+    </button>
+    <button class="nav-btn" data-tab="sets">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Sets
+    </button>
+    <button class="nav-btn" data-tab="vs">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
+      VS
+    </button>
+  </nav>
+
+  <script type="module">
+    import { sealedList } from "api.js";
+
+    const slider = document.getElementById("ev-slider");
+    const label = document.getElementById("ev-label");
+    const results = document.getElementById("ev-results");
+    let allItems = [];
+
+    slider.addEventListener("input", () => { label.textContent = `${slider.value}%`; });
+
+    document.getElementById("apply-filters").addEventListener("click", async () => {
+      if (!allItems.length) allItems = (await sealedList()).sealed ?? [];
+      const min = +slider.value / 100;
+      const filtered = allItems.filter(i => (i.ev ?? 0) / 100 >= min);
+      results.innerHTML = filtered.length
+        ? filtered.map(i => `
+          <div class="list-row">
+            <img src="${i.image ?? ""}" alt="${i.name}" loading="lazy" style="width:44px;height:64px;object-fit:cover;border-radius:4px;background:var(--bg-mid)">
+            <div class="flex-col" style="flex:1">
+              <span class="font-bold">${i.name}</span>
+              <span class="text-sm text-muted">${i.set ?? ""}</span>
+            </div>
+            <span class="text-sm" style="color:var(--accent-green)">EV ${(i.ev ?? 0).toFixed(1)}%</span>
+          </div>
+        `).join("")
+        : '<p class="text-muted">No products match</p>';
+    });
+  </script>
+</body>
+</html>

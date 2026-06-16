@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Yawn — Sealed Detail</title>
+  <link rel="stylesheet" href="mobile.css">
+  <script type="module" src="api.js"></script>
+</head>
+<body>
+  <main id="app" class="page">
+    <header class="page-header">
+      <div class="flex items-center gap-2">
+        <a href="#" onclick="history.back()" class="button" style="width:auto;min-width:44px;padding:8px;background:none;border:none;color:var(--text-primary)" aria-label="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </a>
+        <h1 id="detail-title" style="font-size:1.25rem;font-weight:600">Loading...</h1>
+      </div>
+    </header>
+    <section class="page-body">
+      <div id="hero" class="flex flex-col items-center gap-4" style="padding:24px 0">
+        <img id="detail-image" alt="" style="width:180px;height:252px;object-fit:contain;border-radius:var(--radius);background:var(--bg-mid)">
+        <span id="detail-name" class="font-bold"></span>
+        <span id="detail-price" class="font-bold" style="font-size:1.5rem;color:var(--accent-green);margin-top:4px"></span>
+      </div>
+      <div class="card">
+        <h3 class="font-bold mb-2">EV Breakdown</h3>
+        <div id="ev-list" class="flex-col"></div>
+        <div id="ev-total" class="flex items-center justify-between mt-2" style="padding-top:8px;border-top:1px solid var(--border)"></div>
+      </div>
+      <div class="flex gap-2 mt-2">
+        <a class="button" id="buy-tcgplayer" href="#" target="_blank" rel="noopener">Buy on TCGPlayer</a>
+        <a class="button button-outline" id="buy-ebay" href="#" target="_blank" rel="noopener">Buy on eBay</a>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { sealedDetail } from "api.js";
+    const id = new URLSearchParams(location.search).get("id");
+    if (id) {
+      sealedDetail(id).then(product => {
+        document.title = `Yawn — ${product.name}`;
+        document.getElementById("detail-title").textContent = product.name;
+        document.getElementById("detail-image").src = product.image ?? "";
+        document.getElementById("detail-name").textContent = product.name;
+        document.getElementById("detail-price").textContent = `$${(product.price ?? 0).toFixed(2)}`;
+        document.getElementById("buy-tcgplayer").href = product.tcgplayerUrl ?? "#";
+        document.getElementById("buy-ebay").href = product.ebayUrl ?? "#";
+
+        const evList = document.getElementById("ev-list");
+        const evTotal = document.getElementById("ev-total");
+        if (product.contents?.length) {
+          evList.innerHTML = product.contents.map(c => `
+            <div class="list-row">
+              <span style="flex:1">${c.name}</span>
+              <span style="color:var(--accent-green)">$${(c.value ?? 0).toFixed(2)}</span>
+            </div>
+          `).join("");
+          const total = product.contents.reduce((s, c) => s + (c.value ?? 0), 0);
+          evTotal.innerHTML = `<span class="font-bold">Total</span><span class="font-bold" style="color:var(--accent-green)">$${total.toFixed(2)}</span>`;
+        }
+      });
+    }
+  </script>
+</body>
+</html>

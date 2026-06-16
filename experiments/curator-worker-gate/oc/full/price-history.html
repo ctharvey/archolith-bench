@@ -1,0 +1,29 @@
+<!-- price-history.html — Card price history -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initialitial-scale=1">
+<title>Price History · Yawn</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<header class="detail-header">
+  <a class="back-btn" href="cards.html">‹</a><span class="detail-title">Price History</span>
+</header>
+<section class="card detail-hero">
+  <div class="hero-img"></div>
+  <h1 class="hero-name" id="card-name">—</h1>
+</section>
+<div id="history-list">
+  <a class="list-row" href="card-detail.html">
+    <div class="row-thumb"></div>
+    <div class="row-body"><div class="row-name">Jun 15</div><div class="row-sub">$420</div></div>
+    <div class="row-meta">+12</div>
+  </a>
+</div>
+<nav class="bottom-nav">
+  <a href="home.html">Pulse</a><a href="cards.html">Cards</a>
+  <a href="sealed.html">Sealed</a><a href="sets.html">Sets</a><a href="decks.html">Decks</a><a href="series.html">Series</a><a class="active" href="price-history.html">History</a><a href="portfolio.html">Portfolio</a><a href="trades.html">Trades</a><a href="vs.html">VS</a>
+</nav>
+<script type="module">
+import { history } from './api.js';
+const id = new URLSearchParams(location.search).get('id');
+history({ id }).then(h => { document.getElementById('card-name').textContent = h.name; });
+</script>
+</body></html>

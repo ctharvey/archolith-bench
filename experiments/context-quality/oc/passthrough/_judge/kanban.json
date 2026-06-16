@@ -1,0 +1,14 @@
+{
+  "work": {
+    "todo": [],
+    "doing": [
+      {
+        "id": 1,
+        "title": "Write tests",
+        "description": "unit",
+        "priority": "high"
+      }
+    ],
+    "done": []
+  }
+}

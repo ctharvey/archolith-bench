@@ -1,0 +1,23 @@
+<!-- signup.html — Create account -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Signup · Yawn</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<div class="card" style="margin:48px 8px 8px;padding:20px">
+  <div style="font-size:1.5rem;font-weight:700;text-align:center;margin-bottom:20px;color:var(--accent)">Create Account</div>
+  <input id="name" type="text" placeholder="Name" style="display:block;width:100%;margin-bottom:12px;padding:12px;border-radius:var(--radius);border:1px solid var(--bg-3);background:var(--bg);color:var(--text);font-size:1rem">
+  <input id="email" type="email" placeholder="Email" style="display:block;width:100%;margin-bottom:12px;padding:12px;border-radius:var(--radius);border:1px solid var(--bg-3);background:var(--bg);color:var(--text);font-size:1rem">
+  <input id="password" type="password" placeholder="Password" style="display:block;width:100%;margin-bottom:20px;padding:12px;border-radius:var(--radius);border:1px solid var(--bg-3);background:var(--bg);color:var(--text);font-size:1rem">
+  <button class="button" id="signup-btn" style="width:100%">Create Account</button>
+</div>
+<nav class="bottom-nav">
+  <a href="home.html">Pulse</a><a href="cards.html">Cards</a>
+  <a href="sealed.html">Sealed</a><a href="sets.html">Sets</a><a href="decks.html">Decks</a><a href="series.html">Series</a><a href="stats.html">Stats</a><a href="help.html">Help</a><a href="settings.html">Settings</a><a href="notifications.html">Notif</a><a href="activity.html">Activity</a><a href="wishlist.html">Wish</a><a href="portfolio.html">Portfolio</a><a href="trades.html">Trades</a><a class="active" href="signup.html">Signup</a><a href="login.html">Login</a><a href="vs.html">VS</a>
+</nav>
+<script type="module">
+import { signup } from './api.js';
+document.getElementById('signup-btn').addEventListener('click', async () => {
+  await signup({ name: document.getElementById('name').value, email: document.getElementById('email').value, password: document.getElementById('password').value });
+});
+</script>
+</body></html>

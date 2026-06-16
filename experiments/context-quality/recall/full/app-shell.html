@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Yawn</title>
+  <link rel="stylesheet" href="mobile.css">
+</head>
+<body>
+  <main id="app" class="container">
+    <p class="text-center text-muted">Loading…</p>
+  </main>
+
+  <nav class="bottom-nav" id="bottom-nav">
+    <a class="nav-item active" data-tab="pulse">
+      <span class="nav-icon">⚡</span>
+      <span>Pulse</span>
+    </a>
+    <a class="nav-item" data-tab="cards">
+      <span class="nav-icon">🃏</span>
+      <span>Cards</span>
+    </a>
+    <a class="nav-item" data-tab="sealed">
+      <span class="nav-icon">📦</span>
+      <span>Sealed</span>
+    </a>
+    <a class="nav-item" data-tab="sets">
+      <span class="nav-icon">📚</span>
+      <span>Sets</span>
+    </a>
+    <a class="nav-item" data-tab="vs">
+      <span class="nav-icon">⚖️</span>
+      <span>VS</span>
+    </a>
+  </nav>
+
+  <script type="module" src="api.js"></script>
+</body>
+</html>

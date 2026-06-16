@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Cards — Yawn</title>
+  <link rel="stylesheet" href="mobile.css">
+</head>
+<body>
+  <!-- ── search bar (sticky) ── -->
+  <div class="search-sticky">
+    <input type="search" class="search-input" id="card-search" placeholder="Search cards…" autocomplete="off">
+  </div>
+
+  <!-- ── results list ── -->
+  <main class="container" id="results">
+    <!-- canonical card-row pattern — reusable across the app -->
+    <div class="card-row" data-card-id="">
+      <img class="card-thumb" src="" alt="" loading="lazy" width="44" height="44">
+      <div class="card-row-body">
+        <div class="card-row-name"></div>
+        <div class="card-row-set text-muted"></div>
+      </div>
+      <div class="card-row-price"></div>
+    </div>
+  </main>
+
+  <!-- ── bottom nav ── -->
+  <nav class="bottom-nav">
+    <a class="nav-item" data-tab="pulse">
+      <span class="nav-icon">⚡</span>
+      <span>Pulse</span>
+    </a>
+    <a class="nav-item active" data-tab="cards">
+      <span class="nav-icon">🃏</span>
+      <span>Cards</span>
+    </a>
+    <a class="nav-item" data-tab="sealed">
+      <span class="nav-icon">📦</span>
+      <span>Sealed</span>
+    </a>
+    <a class="nav-item" data-tab="sets">
+      <span class="nav-icon">📚</span>
+      <span>Sets</span>
+    </a>
+    <a class="nav-item" data-tab="vs">
+      <span class="nav-icon">⚖️</span>
+      <span>VS</span>
+    </a>
+  </nav>
+
+  <script type="module">
+    import { cardSearch } from './api.js';
+
+    const input = document.getElementById('card-search');
+    const results = document.getElementById('results');
+
+    let debounce;
+    input.addEventListener('input', () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(async () => {
+        const q = input.value.trim();
+        if (!q) return;
+        try {
+          const data = await cardSearch(q);
+          renderResults(data);
+        } catch (e) {
+          results.innerHTML = `<p class="text-muted">${e.message}</p>`;
+        }
+      }, 300);
+    });
+
+    function renderResults(cards) {
+      results.innerHTML = '';
+      for (const c of cards) {
+        const row = document.createElement('div');
+        row.className = 'card-row';
+        row.innerHTML = `
+          <img class="card-thumb" src="${c.image || ''}" alt="${c.name}" loading="lazy" width="44" height="44">
+          <div class="card-row-body">
+            <div class="card-row-name">${c.name}</div>
+            <div class="card-row-set text-muted">${c.set_name || ''}</div>
+          </div>
+          <div class="card-row-price">${c.price != null ? '$' + c.price.toFixed(2) : '—'}</div>
+        `;
+        results.appendChild(row);
+      }
+    }
+  </script>
+</body>
+</html>

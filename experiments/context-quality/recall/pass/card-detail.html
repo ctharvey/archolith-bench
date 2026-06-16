@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+  <link rel="stylesheet" href="mobile.css">
+  <title>Yawn — Card Detail</title>
+</head>
+<body>
+  <main id="app" class="full">
+    <!-- Back-header — canonical detail-screen header -->
+    <header style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg-mid);border-bottom:1px solid var(--border);min-height:44px;">
+      <a href="javascript:history.back()" style="color:var(--text);text-decoration:none;font-size:24px;line-height:1;">←</a>
+      <h1 id="title" style="font-size:18px;font-weight:600;margin:0;color:var(--text);">Card Title</h1>
+    </header>
+
+    <!-- Hero -->
+    <section id="hero" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;text-align:center;">
+      <img id="img" style="width:180px;height:180px;border-radius:8px;object-fit:cover;background:var(--bg-surface);">
+      <h2 id="name" style="font-size:20px;font-weight:700;margin:0;">Card Name</h2>
+      <p id="set" style="font-size:14px;color:var(--muted);margin:0;">Set Name</p>
+    </section>
+
+    <!-- Current price -->
+    <div id="price" style="font-size:36px;font-weight:700;color:var(--accent);text-align:center;padding:8px 0;">$0.00</div>
+
+    <!-- Price history placeholder -->
+    <div id="chart" style="height:140px;margin:12px;border-radius:var(--radius);background:var(--bg-surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;">Chart placeholder</div>
+
+    <!-- Buy buttons -->
+    <div style="display:flex;gap:12px;padding:12px;">
+      <button class="button" style="flex:1;">Buy Now</button>
+      <button class="button" style="flex:1;background:var(--bg-surface);border:1px solid var(--accent);color:var(--accent);">Watch</button>
+    </div>
+  </main>
+
+  <script type="module" src="api.js"></script>
+</body>
+</html>

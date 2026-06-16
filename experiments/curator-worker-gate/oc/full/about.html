@@ -1,0 +1,28 @@
+<!-- about.html — About Yawn -->
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>About · Yawn</title><link rel="stylesheet" href="mobile.css"></head>
+<body>
+<div class="card" style="margin:8px;text-align:center;padding:16px">
+  <div style="font-size:1.2rem;font-weight:700">Yawn v1.0</div>
+  <div style="font-size:.8rem;color:var(--muted)">Card tracker &amp; collector</div>
+</div>
+<div id="about-list">
+  <a class="list-row" href="#">
+    <div class="row-thumb"></div>
+    <div class="row-body"><div class="row-name">GitHub</div><div class="row-sub">github.com/yawn</div></div>
+    <div class="row-meta">↗</div>
+  </a>
+</div>
+<nav class="bottom-nav">
+  <a href="home.html">Pulse</a><a href="cards.html">Cards</a>
+  <a href="sealed.html">Sealed</a><a href="sets.html">Sets</a><a href="decks.html">Decks</a><a href="series.html">Series</a><a href="stats.html">Stats</a><a class="active" href="about.html">About</a><a href="help.html">Help</a><a href="settings.html">Settings</a><a href="notifications.html">Notif</a><a href="activity.html">Activity</a><a href="wishlist.html">Wish</a><a href="portfolio.html">Portfolio</a><a href="trades.html">Trades</a><a href="vs.html">VS</a>
+</nav>
+<script type="module">
+import { about } from './api.js';
+about().then(d => { document.getElementById('about-list').innerHTML = d.links.map(l =>
+  `<a class="list-row" href="${l.url}"><div class="row-thumb"></div>`+
+  `<div class="row-body"><div class="row-name">${l.label}</div><div class="row-sub">${l.desc}</div></div>`+
+  `<div class="row-meta">↗</div></a>`).join(''); });
+</script>
+</body></html>

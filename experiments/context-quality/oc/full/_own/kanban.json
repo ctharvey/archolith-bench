@@ -1,0 +1,18 @@
+{
+  "work": {
+    "cards": [
+      {
+        "title": "Write tests",
+        "description": "unit tests",
+        "priority": "high",
+        "column": "doing"
+      },
+      {
+        "title": "Fix bug",
+        "description": "the bug",
+        "priority": "med",
+        "column": "todo"
+      }
+    ]
+  }
+}

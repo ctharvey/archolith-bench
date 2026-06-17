@@ -32,7 +32,13 @@ vs budgets {6000…1500}. Tracked foundations = `lib/api-client.ts`, `lib/react-
 topological ≥ FIFO at every budget, strictly > at all 5 → **VERDICT PASS** (same as yawn:
 foundations-first is the only fill that protects load-bearing files under truncation).
 
-## Phase D — frozen-briefing recall (METERED) — DOES NOT replicate the xfcombo win
+> **READ THIS FIRST — the single-seed read below was CORRECTED by the multi-seed firm-up.**
+> The N=1 (seed=7) table first read as "xfcombo did not generalize; topological won outright."
+> The N=9 multi-seed run (`bpr_phase_d_multiseed.py`, see the **Multi-seed firm-up** section)
+> shows that was an **N=1 artifact**: xfcombo and topological are **co-leaders** on bpr. The
+> retained-as-history single-seed analysis follows; the corrected conclusion is the multi-seed one.
+
+## Phase D — frozen-briefing recall (METERED) — single-seed (N=1), SUPERSEDED
 5 strategies × 3 new list-features (notifications / projects / tags), budget=3000,
 deepseek-chat, temp=0.2, seed=7 (N=1/cell). Re-reading denied. `*` = core PASS.
 
@@ -50,49 +56,60 @@ deepseek-chat, temp=0.2, seed=7 (N=1/cell). Re-reading denied. `*` = core PASS.
 | scored | 4.00/6 | 0/3 |
 | combo (naive) | 3.67/6 | 0/3 |
 
-## The finding (the gate result)
-1. **The xfcombo recall win does NOT generalize.** On bulletproof-react **topological wins**
-   outright (5.00/6, the ONLY arm core-OK on all 3 tasks); xfcombo is 2nd (4.67/6, 2/3).
-   On yawn, xfcombo was THE winner and topological a strong-but-losing arm — the ranking
-   FLIPS across corpora. naive combo is worst on both (3.67/6 here), consistent with yawn.
-2. **Mechanism (traced per-anchor, not just aggregate).** Where xfcombo loses to topological
-   it fails exactly **C1 — the query-template anchor** (the `useQuery`+`queryOptions`+`use<X>`
-   hook), the very thing a good exemplar should prime. Two reinforcing causes:
-   - On bpr the recall-critical convention (React Query + the api-client) is carried by the
-     **FOUNDATIONS** (`lib/api-client`, `lib/react-query`, `types/api`), so foundations-first
-     topological surfaces it directly. On yawn the convention lived in the **EXEMPLAR page**
-     (a leaf), so the exemplar guarantee mattered and foundations didn't carry it.
-   - xfcombo's deterministically-picked exemplar was `get-comments.ts` — bpr's **infinite-query
-     variant** (`useInfiniteQuery`/`infiniteQueryOptions`). Guaranteeing it primed the WRONG
-     query sub-pattern. **A wrong exemplar actively hurts** — the recall-axis echo of B2's
-     "a misleading map is worse than none."
-3. **Meta-vindication — this is what the gate was FOR.** The single-corpus xfcombo win was
-   corpus-specific. The headline rung-3 lesson **"foundation ≠ recall-critical" is itself
-   yawn-specific**: on bpr, foundation IS recall-critical. No single fill strategy wins both
-   corpora; the locus of the recall-critical convention (foundation vs exemplar) is a
-   corpus property.
+## Single-seed read (N=1) — RETAINED AS HISTORY, corrected below
+At seed=7 the table read as: topological wins outright (5.00/6, 3/3 core), xfcombo 2nd
+(4.67/6, 2/3), and xfcombo failed exactly the **C1 query-template anchor** on the cell it
+lost — its guaranteed exemplar was `get-comments.ts`, bpr's **infinite-query variant**, which
+appeared to prime the wrong query sub-pattern. That looked like "the win does not generalize;
+foundation IS recall-critical here." **The multi-seed firm-up shows this was an N=1 draw, not
+a real flip** (DeepSeek's `seed` is best-effort, not deterministic — re-running "seed 7" in the
+multi-seed pass did not even reproduce that miss). Read the next section as the real result.
 
-## Robust takeaway for production
-- **topological is the more robust default** across the two corpora (strong on yawn, winner
-  on bpr). The **exemplar guarantee is high-variance and exemplar-SELECTION-sensitive** —
-  worth it only where a single clean exemplar exists AND is correctly identified; a wrong
-  pick (infinite vs plain query) regresses the exact anchor it targets.
-- Implication for the corpus-profile design: the profiler must pick the RIGHT exemplar
-  (e.g. exclude infinite-query/edge variants), or the guarantee backfires. Where it can't,
-  fall back to topological, not naive combo.
+## Multi-seed firm-up (N=9) — the CORRECTED conclusion (`bpr_phase_d_multiseed.py`)
+3 seeds {7,8,9} × 3 tasks × 5 strategies = 45 calls, n=9/strategy. Graded score in [0,6].
+
+| strategy | graded mean | floor (min) | stdev | binary mean | core-OK |
+|----------|-------------|-------------|-------|-------------|---------|
+| **xfcombo** | **4.94** | 4.5 | **0.16** | 4.89 | 8/9 |
+| **topological** | 4.89 | 4.0 | 0.31 | 4.89 | **9/9** |
+| fifo | 4.67 | 4.5 | 0.24 | 4.33 | 3/9 |
+| scored | 4.39 | 3.5 | 0.31 | 3.56 | 0/9 |
+| combo (naive) | 4.17 | 3.5 | 0.47 | 3.67 | 0/9 |
+
+1. **xfcombo did NOT fail to generalize — it is co-best with topological on bpr.** They tie on
+   binary recall (4.89); xfcombo edges the graded mean (4.94) with the tightest variance
+   (stdev 0.16, floor 4.5); topological edges core reliability (9/9 vs 8/9 — xfcombo broke core
+   on 1/9 cells: tags @ seed9, the C1 anchor). The single-seed "topological wins outright" was
+   the N=1 mirage the gate's own caveat predicted.
+2. **What DOES hold firmly across both corpora:** the two STRUCTURE-AWARE arms (xfcombo,
+   topological) are the reliable top tier; **scored / naive-combo / fifo are unreliable**
+   (core-OK 0/9, 0/9, 3/9 — they collapse on some cells). naive combo worst, as on yawn.
+3. **The exemplar-selection caveat survives, softened.** A wrong exemplar (the infinite-query
+   variant) can still cost a cell — it did, 1/9 — but it does NOT systematically break xfcombo.
+   "Pick the right exemplar" remains a real profiler concern, not a disqualifier.
+
+## Robust takeaway for production (multi-seed)
+- **Both xfcombo and topological are good cross-corpus defaults.** topological has the best core
+  RELIABILITY on bpr (9/9) and was strong on yawn; xfcombo has the best graded mean + tightest
+  variance on bpr AND was the decisive winner on yawn. The decisive-margin xfcombo win is
+  yawn-specific, but xfcombo's TOP-TIER standing generalizes. There is no flip — both
+  structure-aware arms travel.
+- The clear, generalizing negative: **do not ship scored / naive-combo / fifo** as the recall
+  fill — they're unreliable on both corpora.
+- corpus-profile implication (unchanged, softened): the profiler should pick the RIGHT exemplar
+  (exclude infinite/edge variants); where it can't, topological is the safe fallback — never
+  naive combo.
 
 ## Honest caveats / limits
-- **N=1 per cell (seed=7).** yawn's xfcombo win was confirmed at N=9; this is single-seed.
-  The DIRECTION (topological wins, xfcombo doesn't dominate, naive combo worst) is clear and
-  core-driven; exact means need a multiseed pass to firm up. A `seed∈{7,8,9}` rerun is the
-  obvious follow-up before treating the flip as quantitatively settled.
-- **Contracts differ by corpus** (they must — different conventions), so recall NUMBERS are
-  not cross-corpus comparable; only the WITHIN-corpus ranking is. Within bpr:
-  topological > xfcombo > fifo > scored > combo.
-- Scores cluster 4–5/6 (mild ceiling); **core-OK count is the sharper discriminator**
-  (topological 3/3 vs xfcombo 2/3 vs others 0–1/3).
-- One feature family (list/browse screens), one model (deepseek-chat). Generalization across
-  task families is still open (roadmap C1).
+- **Two corpora, one feature family (list/browse), one model (deepseek-chat).** Multi-seed (N=9)
+  now covers both corpora; task-family generalization is still open (roadmap C1).
+- **`seed` is best-effort on DeepSeek** — even fixed-seed runs vary, which is exactly why the
+  multi-seed pass (not a single fixed seed) is the trustworthy unit. The single-seed section is
+  kept only to document the correction.
+- **Contracts differ by corpus** (different conventions), so recall NUMBERS are not cross-corpus
+  comparable; only the WITHIN-corpus ranking + the qualitative tiering travel.
+- Scores cluster 4–5/6 (mild ceiling); **core-OK count is the sharper discriminator** (xfcombo
+  8/9, topological 9/9 vs scored/combo 0/9).
 
 ## Reproduce
 ```

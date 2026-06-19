@@ -8,7 +8,7 @@ that map to proxy /admin/config overrides.
 | direct             | off             | off                             | Baseline                  |
 | filter_only        | on              | off                             | Filter token savings      |
 | proxy_only         | off             | on (baseline compression)      | Context engine no filter  |
-| proxy_plus_filter  | on              | on (filter as engine)          | Full-stack headline       |
+| proxy_plus_filter  | on              | on (filter as engine)          | Full-stack experimental   |
 | proxy_typed_state  | on              | on + typed work state           | Typed state continuity    |
 | proxy_state_snippets| on             | on + exact snippet injection    | Snippet continuity        |
 """

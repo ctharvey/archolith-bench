@@ -22,12 +22,13 @@ classifiers = [
 dependencies = [
     "httpx>=0.27",
     "python-dotenv>=1.0",
-    "archolith-filter",
-    "archolith-audit",
 ]
 
 [project.optional-dependencies]
-dev = []
+filter = ["archolith-filter"]
+audit = ["archolith-audit"]
+all = ["archolith-filter", "archolith-audit"]
+dev = ["pytest>=8"]
 
 [project.urls]
 Homepage = "https://github.com/archolith/archolith-bench"
@@ -39,3 +40,7 @@ include = ["archolith_bench*"]
 
 [project.scripts]
 archolith-bench = "archolith_bench.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["experiments", "results", "logs", "build", "dist", "*.egg-info"]

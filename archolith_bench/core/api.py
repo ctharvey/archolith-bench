@@ -13,7 +13,7 @@ load_dotenv()
 
 _proxy_port = os.getenv("PROXY_PORT", "9800")
 PROXY_URL = os.getenv("PROXY_URL", f"http://localhost:{_proxy_port}/v1")
-DIRECT_URL = os.getenv("UPSTREAM_BASE_URL", "https://integrate.api.nvidia.com/v1")
+DIRECT_URL = os.getenv("UPSTREAM_BASE_URL", "https://api.openai.com/v1")
 API_KEY = os.getenv("UPSTREAM_API_KEY", "")
 MODEL = os.getenv("BENCHMARK_MODEL", "gpt-4o-mini")
 

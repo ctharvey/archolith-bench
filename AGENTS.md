@@ -19,8 +19,14 @@ These instructions apply to the entire repository.
 # Install with dev dependencies
 pip install -e ".[dev]"
 
+# Install optional benchmark-suite dependencies
+pip install -e ".[all]"
+
 # Run all tests
 pytest
+
+# Default pytest collection is limited to tests/; experiments/ are archival
+# benchmark inputs and are excluded from launch-readiness test runs.
 
 # Run single test file
 pytest tests/test_metrics.py
@@ -35,6 +41,7 @@ ruff check --fix .
 archolith-bench proxy --list
 archolith-bench filter
 archolith-bench audit --before fixtures/audit_before.json --after fixtures/audit_after.json
+archolith-bench industry --launch-only
 
 # Generate BENCHMARKS.md from results/
 archolith-bench report
@@ -56,6 +63,7 @@ See `.agent/workflows/code_conventions.md` for full rules. Key points:
 - Token counting uses tiktoken (cl100k_base) when available via archolith-mcp-audit; falls back to char ÷ 4 heuristic.
 - Scenario files in `scenarios/` define multi-turn conversations with optional fact probes. Keep scenarios deterministic and reproducible.
 - The ContinuityTracker in `suites/proxy.py` measures repeat file reads, diagnostics, decision retention, and verification continuity across turns.
+- The industry suite in `suites/industry.py` maps each product to trusted external benchmark families and launch gates; update it when benchmark standards or product scope change.
 - Experiment arms in `arms.py` map named configurations to proxy `/admin/config` overrides. Add new arms there, not inline.
 - Checkpoint files (`.checkpoint_*.json`) enable resumable benchmark runs. They live in the working directory.
 - Headline numbers must be sourced from `HEADLINE-NUMBERS.md` before appearing in any marketing copy or README.

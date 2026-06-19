@@ -160,6 +160,38 @@ Six arms defined:
 
 `PROXY_FAMILY_ARMS` is the subset of arms where `proxy_enabled=True`: `proxy_only`, `proxy_plus_filter`, `proxy_typed_state`, `proxy_state_snippets`.
 
+## Industry Benchmark Registry (`core/industry.py`)
+
+### IndustryBenchmark
+
+Executable launch coverage entry tying one Archolith product to a trusted
+external benchmark family.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `benchmark_id` | `str` | Stable local identifier such as `ruler` or `swe-bench-lite` |
+| `name` | `str` | Public benchmark name |
+| `product` | `str` | Archolith product the benchmark applies to |
+| `suite` | `str` | Local archolith-bench suite or future suite owner |
+| `authority` | `str` | Maintainer or institution behind the external benchmark |
+| `benchmark_type` | `str` | What capability the benchmark measures |
+| `status` | `str` | `implemented-local` or `candidate-before-launch` |
+| `source_url` | `str` | Canonical project/source URL |
+| `paper_url` | `str` | Paper or formal benchmark description URL |
+| `rationale` | `str` | Why the benchmark is relevant to the product |
+| `local_coverage` | `str` | What archolith-bench currently implements or lacks |
+| `launch_gate` | `str` | Exit criteria before using the benchmark in public claims |
+| `run_command` | `str` | Local command or TODO for executing the benchmark path |
+| `evidence_path` | `str` | Expected tracked artifact under `benchmarks/` |
+
+Registry output:
+
+| File | Purpose |
+|------|---------|
+| `results/industry_benchmarks.json` | Machine-readable registry output |
+| `results/industry_benchmarks.md` | Generated human-readable matrix |
+| `benchmarks/industry-trusted-benchmark-coverage.md` | Tracked launch artifact when generated with `--out` |
+
 ## Repository Reference
 
 | Data | Storage | Access |
@@ -168,6 +200,7 @@ Six arms defined:
 | Corpus samples | `corpora/*.txt` | `CorpusSample` loader |
 | Fixture audit reports | `fixtures/audit_*.json` | Loaded by audit suite |
 | Benchmark results | `results/*.json` | Read by report generator |
+| Industry benchmark registry | `archolith_bench/core/industry.py` | Read by industry suite and report generator |
 | Checkpoints | `.checkpoint_*.json` (cwd) | Resumable state |
 | Experiment metadata | `experiments/<name>/` | Experiment mode |
 

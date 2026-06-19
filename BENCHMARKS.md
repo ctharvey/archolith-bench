@@ -15,16 +15,23 @@ Token-savings compression ratio measured on real tool-output corpora.
 | **Total** | 12 | 17,710 | 8,939 | **49.5%** |
 
 ## Proxy Suite
-Multi-turn token savings and continuity metrics across proxy experiment arms.
-| Scenario | Arm | Budget | Direct In | Arm In | Savings | Recall Pres. |
-|----------|-----|--------|-----------|--------|---------|-------------|
-| code_review | proxy_only | 15000 | 108,516 | 80,520 | 58.6% | 57% |
-| code_review | proxy_only | 4000 | 108,516 | 91,701 | 58.6% | 91% |
-| code_review | proxy_plus_filter | 15000 | 108,376 | 111,021 | 58.7% | 60% |
-| code_review | proxy_plus_filter | 4000 | 108,516 | 105,139 | 58.6% | 54% |
+Multi-turn input reduction and continuity metrics across proxy experiment arms.
+
+TODO: refresh this suite before launch against the current proxy configuration.
+The public headline should use actual upstream input reduction, while internal
+context-curation savings remain a separate diagnostic metric.
+Tracked evidence summary: `benchmarks/proxy-code-review-2026-05-30.md`.
+
+| Scenario | Arm | Budget | Direct In | Arm In | Upstream Input Reduction | Internal Curation Savings | Recall Pres. |
+|----------|-----|--------|-----------|--------|--------------------------|---------------------------|-------------|
+| code_review | proxy_only | 15000 | 108,516 | 80,520 | 25.8% | 58.6% | 57% |
+| code_review | proxy_only | 4000 | 108,516 | 91,701 | 15.5% | 58.6% | 91% |
+| code_review | proxy_plus_filter | 15000 | 108,376 | 111,021 | -2.4% | 58.7% | 60% |
+| code_review | proxy_plus_filter | 4000 | 108,516 | 105,139 | 3.1% | 58.6% | 54% |
 
 ## Audit Suite (archolith-audit)
 > **Note:** sample/fixture data, not a live audit run. The numbers below reflect the bundled `fixtures/` inputs and demonstrate the report format only. Run `archolith-bench audit` against real before/after session logs to produce measured results.
+> Tracked evidence summary: `benchmarks/audit-fixture-2026-06-06.md`.
 
 MCP token-waste reduction before vs after.
 Source: `fixtures\audit_before.json` -> `fixtures\audit_after.json`
@@ -40,5 +47,25 @@ Source: `fixtures\audit_before.json` -> `fixtures\audit_after.json`
 
 **Token reduction:** 150,500 (43.9%). **Waste reduction:** 83,500 (71.5%).
 
+## Industry-Trusted Benchmark Coverage
+Coverage matrix for external benchmark families that are relevant enough to
+anchor launch claims. Candidate benchmarks are not completed results.
+
+Tracked evidence summary: `benchmarks/industry-trusted-benchmark-coverage.md`.
+
+| Product | Suite | Benchmark | Status | Evidence |
+|---------|-------|-----------|--------|----------|
+| archolith-context | proxy | RULER | implemented-local | `benchmarks/proxy-ruler-recall-YYYY-MM-DD.md` |
+| archolith-context | proxy | LongBench v2 | candidate-before-launch | `benchmarks/proxy-longbench-v2-YYYY-MM-DD.md` |
+| archolith-context | proxy | SWE-bench Lite / Verified | candidate-before-launch | `benchmarks/proxy-swe-bench-smoke-YYYY-MM-DD.md` |
+| archolith-context | proxy | BigCodeBench-Hard | candidate-before-launch | `benchmarks/proxy-bigcodebench-hard-YYYY-MM-DD.md` |
+| archolith-filter | filter | HELM efficiency metrics | implemented-local | `benchmarks/filter-YYYY-MM-DD.md` |
+| archolith-filter | filter | SWE-bench-style agent traces | candidate-before-launch | `benchmarks/filter-swe-style-traces-YYYY-MM-DD.md` |
+| archolith-audit | audit | HELM-style token/cost accounting | implemented-local | `benchmarks/audit-live-before-after-YYYY-MM-DD.md` |
+| menhir | memory | MTEB retrieval/reranking slices | candidate-before-launch | `benchmarks/menhir-retrieval-YYYY-MM-DD.md` |
+| archolith-security | security | CyberSecEval 4 | candidate-before-launch | `benchmarks/security-cyberseceval-YYYY-MM-DD.md` |
+| archolith-security | security | AgentDojo | candidate-before-launch | `benchmarks/security-agentdojo-YYYY-MM-DD.md` |
+| archolith-context | security | OWASP LLM Top 10 + ASVS | candidate-before-launch | `benchmarks/security-owasp-context-YYYY-MM-DD.md` |
+
 ## Stack Suite (Four-Way Comparison)
-*Pending live-proxy run. Run `archolith-bench stack --all` to generate.*
+*Experimental and pending refreshed live-proxy run. Run `archolith-bench stack --all` to generate; do not use stack results as launch headlines until tracked evidence is added under `benchmarks/`.*

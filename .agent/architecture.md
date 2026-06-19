@@ -13,7 +13,8 @@ The benchmark is a **CLI tool**, not a service. It runs offline, sending control
 | L0–L2 | archolith-filter | Compression ratios across 8 categories of tool output corpora |
 | L3 | archolith-audit | MCP token-waste reduction before/after server-side fixes |
 | L4 | archolith-context (proxy) | Multi-turn token savings, continuity, restart/orientation scores |
-| Stack | All layers | Four-way additive comparison: direct / filter-only / proxy-only / proxy+filter |
+| Stack | All layers | Experimental four-way additive comparison: direct / filter-only / proxy-only / proxy+filter |
+| Launch | All products | Industry benchmark coverage matrix and claim gates |
 
 ## Tech Stack
 
@@ -48,6 +49,7 @@ Scenario JSON (scenarios/*.json)
 │  suites/filter.py             │  Corpus scan → filter_output() per sample
 │  suites/audit.py              │  Load before/after JSON → compare_reports()
 │  suites/stack.py              │  Run proxy suite 4× for four-way comparison
+│  suites/industry.py           │  Product → external benchmark matrix
 └──────────┬───────────────────┘
            │
     ┌──────┴──────┐
@@ -107,7 +109,24 @@ Scenario JSON (scenarios/*.json)
 4. Format human-readable report via `format_delta_report()`
 5. Output: `results/audit_comparison.json` + optional markdown
 
+### Industry Suite Flow (`suites/industry.py`)
+
+1. Read the executable registry in `core/industry.py`
+2. Filter by product/suite when requested
+3. Write `results/industry_benchmarks.json` and `results/industry_benchmarks.md`
+4. Optionally write a tracked launch artifact, usually `benchmarks/industry-trusted-benchmark-coverage.md`
+5. Report generator includes the matrix when `results/industry_benchmarks.json` exists
+
+The industry suite records external benchmark families such as RULER,
+LongBench v2, SWE-bench, BigCodeBench, HELM, MTEB, CyberSecEval, AgentDojo,
+and OWASP LLM/application security checks. It does not claim those benchmarks
+are complete. `candidate-before-launch` entries are explicit gates until a
+tracked evidence file exists.
+
 ### Stack Suite Flow (`suites/stack.py`)
+
+Status: experimental pending refreshed live-proxy run. Do not use stack results
+as launch headline copy until tracked evidence is added under `benchmarks/`.
 
 Runs the same scenario through 4 fixed arms sequentially:
 1. `direct` — baseline (no filter, no proxy)
@@ -121,7 +140,7 @@ Produces a four-way comparison table showing additive contributions of each laye
 
 ### CLI (`cli.py`)
 
-Argparse-based entry point. Five subcommands: `proxy`, `filter`, `stack`, `audit`, `report`. Handles argument validation, proxy health checks, arm name resolution, and dispatches to suite runners.
+Argparse-based entry point. Six suite/reporting subcommands: `proxy`, `filter`, `stack`, `audit`, `industry`, `report`. Handles argument validation, proxy health checks, arm name resolution, benchmark coverage filtering, and dispatches to suite runners.
 
 ### Experiment Arms (`arms.py`)
 
@@ -154,6 +173,7 @@ Four arms are in the "proxy family" (`proxy_enabled=True`): `proxy_only`, `proxy
 | `QualityPerfMetrics` | Quality + performance: fact recall accuracy, response similarity, assembly latency, total latency |
 | `TurnResult` | Single turn: user message, direct/proxy responses, trace data, token + continuity metrics |
 | `ScenarioResult` | Full run: scenario metadata, arm/budget, aborted status, summary, continuity, all turn results, fact probes |
+| `IndustryBenchmark` | External benchmark mapping: product, suite, authority, status, launch gate, command, evidence path |
 
 ### Continuity Tracker (`suites/proxy.py`)
 
@@ -172,6 +192,7 @@ Also computes `turn_one_orientation_score` via restart/bootstrap: replays the sc
 - `print_four_way_table()` — stack suite four-arm comparison
 - `save_results()` — JSON output to `results/`
 - `write_benchmarks_md()` — generates `BENCHMARKS.md` from all results
+- Includes `results/industry_benchmarks.json` when present, so generated `BENCHMARKS.md` shows trusted benchmark coverage and evidence paths
 
 ## Configuration / Environment Variables
 
@@ -181,8 +202,8 @@ All configuration via `.env` file:
 |----------|---------|---------|
 | `UPSTREAM_API_KEY` | API key for direct upstream and proxy forwarding | (required) |
 | `PROXY_URL` | Proxy chat completions endpoint | `http://localhost:9800/v1` |
-| `UPSTREAM_BASE_URL` | Direct upstream API for baseline comparison | `https://api.deepseek.com/v1` |
-| `BENCHMARK_MODEL` | Model used for benchmark conversations | `deepseek-chat` |
+| `UPSTREAM_BASE_URL` | Direct upstream API for baseline comparison | `https://api.openai.com/v1` |
+| `BENCHMARK_MODEL` | Model used for benchmark conversations | `gpt-4o-mini` |
 | `PROXY_PORT` | Proxy port (used to build PROXY_URL fallback) | `9800` |
 
 ## External Dependencies
@@ -190,12 +211,12 @@ All configuration via `.env` file:
 | Dependency | Purpose | Required |
 |------------|---------|----------|
 | archolith-context (proxy) | Proxy endpoint for proxy/stack suites | For proxy/stack suites |
-| archolith-filter | Filter compression in filter suite + filter_only arm | Yes (pip) |
-| archolith-audit | Token counting + audit comparison | Yes (pip) |
+| archolith-filter | Filter compression in filter suite + filter_only arm | Optional extra: `filter` / `all` |
+| archolith-audit | Token counting + audit comparison | Optional extra: `audit` / `all` |
 | httpx | HTTP client for all API calls | Yes (pip) |
 | python-dotenv | `.env` file loading | Yes (pip) |
 | Upstream LLM API | Chat completions for benchmark conversations | Yes (API key) |
-| tiktoken | Accurate token counting (via archolith-audit) | Transitive |
+| tiktoken | Accurate token counting (via archolith-audit) | Transitive optional |
 
 ## Port Assignment
 
@@ -218,12 +239,14 @@ archolith-bench/
 │   ├── core/
 │   │   ├── api.py            # HTTP helpers
 │   │   ├── corpus.py         # Corpus loader for filter suite
+│   │   ├── industry.py       # Trusted benchmark registry
 │   │   ├── metrics.py        # Metric dataclasses
 │   │   ├── report.py         # Report generation
 │   │   └── scenario.py       # Scenario loading
 │   └── suites/
 │       ├── proxy.py          # Proxy benchmark runner
 │       ├── filter.py         # Filter compression benchmark
+│       ├── industry.py       # Industry benchmark coverage report
 │       ├── audit.py          # Audit before/after comparison
 │       └── stack.py          # Four-way stack comparison
 ├── scenarios/                # Multi-turn conversation JSON

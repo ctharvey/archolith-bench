@@ -206,9 +206,38 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
         lines.append("## Audit Suite (archolith-audit)\n")
         lines.append("*Pending before/after audit logs. Run `archolith-bench audit --before <log> --after <log>` to generate.*\n\n")
 
+    # ---- Industry benchmark coverage ----
+    industry_path = results_dir / "industry_benchmarks.json"
+    if industry_path.exists():
+        with open(industry_path, encoding="utf-8") as f:
+            industry_data = json.load(f)
+        lines.append("## Industry-Trusted Benchmark Coverage\n")
+        lines.append(
+            "Coverage matrix for external benchmark families that are relevant enough "
+            "to anchor launch claims. Candidate benchmarks are not completed results.\n\n"
+        )
+        lines.append("| Product | Suite | Benchmark | Status | Evidence |\n")
+        lines.append("|---------|-------|-----------|--------|----------|\n")
+        for entry in industry_data.get("benchmarks", []):
+            lines.append(
+                f"| {entry['product']} | {entry['suite']} | {entry['name']} | "
+                f"{entry['status']} | `{entry['evidence_path']}` |\n"
+            )
+        lines.append("\n")
+    else:
+        lines.append("## Industry-Trusted Benchmark Coverage\n")
+        lines.append(
+            "*Pending matrix. Run `archolith-bench industry --launch-only` to generate "
+            "the benchmark coverage registry before launch.*\n\n"
+        )
+
     # ---- Stack section ----
     lines.append("## Stack Suite (Four-Way Comparison)\n")
-    lines.append("*Pending live-proxy run. Run `archolith-bench stack --all` to generate.*\n")
+    lines.append(
+        "*Experimental and pending refreshed live-proxy run. Run `archolith-bench "
+        "stack --all` to generate; do not use stack results as launch headlines "
+        "until tracked evidence is added under `benchmarks/`.*\n"
+    )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:

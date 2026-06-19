@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-from .arms import ARMS, PROXY_FAMILY_ARMS
+from .arms import ARMS
 from .core.api import API_KEY, DIRECT_URL, MODEL, PROXY_URL, check_proxy_health
 from .core.display import print_cross_scenario_summary, print_four_way_table, print_summary
 from .core.metrics import PRICING_DEFAULTS, PricingModel
@@ -111,6 +111,24 @@ def main(argv: list[str] | None = None) -> None:
     audit_p.add_argument("--output-dir", type=Path, default=Path("results"),
                          help="Output directory for results")
 
+    # ---- industry subcommand ----
+    industry_p = subparsers.add_parser(
+        "industry",
+        help="Industry benchmark coverage matrix for launch-readiness claims",
+    )
+    industry_p.add_argument("--product", default=None,
+                            help="Filter by product, e.g. archolith-context")
+    industry_p.add_argument("--suite", dest="benchmark_suite", default=None,
+                            help="Filter by suite, e.g. proxy/filter/audit")
+    industry_p.add_argument("--launch-only", action="store_true",
+                            help="Only include launch-relevant implemented/candidate benchmarks")
+    industry_p.add_argument("--format", choices=["markdown", "json"], default="markdown",
+                            help="Output format (default: markdown)")
+    industry_p.add_argument("--output-dir", type=Path, default=Path("results"),
+                            help="Output directory for generated registry files")
+    industry_p.add_argument("--out", type=Path, default=None,
+                            help="Optional explicit output file")
+
     # ---- report subcommand ----
     report_p = subparsers.add_parser("report", help="Generate BENCHMARKS.md from results/")
     report_p.add_argument("--out", type=Path, default=Path("BENCHMARKS.md"),
@@ -134,6 +152,8 @@ def main(argv: list[str] | None = None) -> None:
         _run_stack(args)
     elif args.suite == "audit":
         _run_audit(args)
+    elif args.suite == "industry":
+        _run_industry(args)
     elif args.suite == "report":
         _run_report(args)
     else:
@@ -272,8 +292,8 @@ def _run_filter(args: argparse.Namespace) -> None:
         args.output_dir.mkdir(parents=True, exist_ok=True)
         with open(md_path, "w", encoding="utf-8") as f:
             f.write("# Filter Suite Results\n\n")
-            f.write(f"| Category | Samples | Raw Tokens | Filtered | Savings |\n")
-            f.write(f"|----------|---------|------------|----------|---------|\n")
+            f.write("| Category | Samples | Raw Tokens | Filtered | Savings |\n")
+            f.write("|----------|---------|------------|----------|---------|\n")
             for cat in data.get("per_category", []):
                 f.write(f"| {cat['category']} | {cat['samples']} | {cat['total_raw_tokens']:,} "
                         f"| {cat['total_filtered_tokens']:,} | {cat['savings_ratio']:.1%} |\n")
@@ -284,7 +304,6 @@ def _run_filter(args: argparse.Namespace) -> None:
 
 def _run_stack(args: argparse.Namespace) -> None:
     from .suites.stack import run_stack_suite
-    from .suites.proxy import run_benchmark
 
     if args.list:
         print("Available scenarios:")
@@ -351,7 +370,7 @@ def _run_audit(args: argparse.Namespace) -> None:
         print(f"ERROR: After report not found: {after_path}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Audit suite: comparing before vs after")
+    print("Audit suite: comparing before vs after")
     print(f"  Before: {before_path}")
     print(f"  After:  {after_path}")
 
@@ -365,8 +384,8 @@ def _run_audit(args: argparse.Namespace) -> None:
         args.output_dir.mkdir(parents=True, exist_ok=True)
         with open(md_path, "w", encoding="utf-8") as f:
             f.write("# Audit Comparison: Before vs After\n\n")
-            f.write(f"| Server | Before | After | Change | Pct | Status |\n")
-            f.write(f"|--------|--------|-------|--------|-----|--------|\n")
+            f.write("| Server | Before | After | Change | Pct | Status |\n")
+            f.write("|--------|--------|-------|--------|-----|--------|\n")
             for s in result.get("per_server", []):
                 f.write(f"| {s['server']} | {s['before_tokens']:,} | {s['after_tokens']:,} "
                         f"| {s['token_change']:+,} | {s['token_change_pct']:+.1f}% | {s['status']} |\n")
@@ -375,6 +394,34 @@ def _run_audit(args: argparse.Namespace) -> None:
             f.write(f"\n**Waste reduction:** {result['waste_reduction']:,} tokens "
                     f"({result['waste_reduction_pct']:.1f}%)\n")
         print(f"  Markdown report saved to {md_path}")
+
+
+def _run_industry(args: argparse.Namespace) -> None:
+    from .core.industry import write_industry_benchmarks
+    from .suites.industry import print_industry_summary, run_industry_suite
+
+    data = run_industry_suite(
+        output_dir=args.output_dir,
+        product=args.product,
+        suite=args.benchmark_suite,
+        launch_only=args.launch_only,
+    )
+    print_industry_summary(data)
+
+    if args.out:
+        write_industry_benchmarks(
+            args.out,
+            product=args.product,
+            suite=args.benchmark_suite,
+            launch_only=args.launch_only,
+            output_format=args.format,
+        )
+        print(f"  Written to {args.out}")
+        return
+
+    suffix = "json" if args.format == "json" else "md"
+    default_out = args.output_dir / f"industry_benchmarks.{suffix}"
+    print(f"  Written to {default_out}")
 
 
 def _run_report(args: argparse.Namespace) -> None:

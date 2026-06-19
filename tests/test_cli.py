@@ -26,3 +26,24 @@ def test_proxy_list() -> None:
     )
     assert result.returncode == 0, f"Expected exit code 0, got {result.returncode}"
     assert "Available scenarios" in result.stdout or "scenarios" in result.stdout.lower()
+
+
+def test_industry_cli_json(tmp_path) -> None:
+    """Test that industry coverage can be generated without API keys."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "archolith_bench",
+            "industry",
+            "--format",
+            "json",
+            "--output-dir",
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, f"Expected exit code 0, got {result.returncode}: {result.stderr}"
+    assert "INDUSTRY BENCHMARK COVERAGE" in result.stdout
+    assert (tmp_path / "industry_benchmarks.json").exists()

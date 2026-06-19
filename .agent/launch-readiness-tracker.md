@@ -4,6 +4,14 @@ Date: 2026-06-19
 Status: Imminent pre-launch, not launched
 Release posture: fix only Critical and High issues before public release; defer polish unless it blocks trust or installability.
 
+## Launch Sequencing (decided 2026-06-19)
+
+Run pre-launch work in this order so headline numbers reflect the final, post-remediation system:
+
+1. **Audits** — run code/security audits and remediate findings first.
+2. **Industry benchmarks** — square away the `archolith-bench industry` registry: complete or explicitly defer each candidate and security (CyberSecEval/AgentDojo/OWASP) gate.
+3. **Actual benchmark runs** — refresh proxy, audit before/after, and stack runs LAST, immediately before launch, against the final system. Do not spend a live proxy/API run before the system is frozen.
+
 ## Current Decision Log
 
 - Public benchmark copy uses actual upstream input reduction, not internal context-curation savings.

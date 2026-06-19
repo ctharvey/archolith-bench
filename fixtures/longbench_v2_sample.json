@@ -1,0 +1,54 @@
+[
+  {
+    "_id": "sample-001",
+    "domain": "single_document_qa",
+    "difficulty": "easy",
+    "length": "short",
+    "context": "The Meridian Protocol was ratified in 2019 by twelve member states. Its primary clause established a shared satellite uplink at 14.2 GHz operated from the Kiruna ground station.",
+    "question": "At what frequency does the shared satellite uplink operate?",
+    "choice_A": "14.2 GHz",
+    "choice_B": "12.0 GHz",
+    "choice_C": "2019 MHz",
+    "choice_D": "Kiruna band",
+    "answer": "A"
+  },
+  {
+    "_id": "sample-002",
+    "domain": "multi_document_qa",
+    "difficulty": "medium",
+    "length": "short",
+    "context": "Report A notes the reservoir held 4.1 million cubic metres. Report B, filed later, revised the figure to 3.8 million cubic metres after silt correction.",
+    "question": "What is the silt-corrected reservoir volume?",
+    "choice_A": "4.1 million cubic metres",
+    "choice_B": "3.8 million cubic metres",
+    "choice_C": "Unchanged",
+    "choice_D": "Not reported",
+    "answer": "B"
+  },
+  {
+    "_id": "sample-003",
+    "domain": "single_document_qa",
+    "difficulty": "easy",
+    "length": "short",
+    "context": "The compiler emits an error when the heap arena exceeds 256 MB. Operators raise the cap via the ARENA_MAX environment variable.",
+    "question": "Which environment variable raises the heap arena cap?",
+    "choice_A": "ARENA_MAX",
+    "choice_B": "HEAP_CAP",
+    "choice_C": "MAX_MB",
+    "choice_D": "ARENA_MIN",
+    "answer": "A"
+  },
+  {
+    "_id": "sample-004",
+    "domain": "long_dialogue",
+    "difficulty": "hard",
+    "length": "medium",
+    "context": "Across the meeting transcript, the team agreed the launch date would slip from Q2 to Q3 because the security review was incomplete.",
+    "question": "Why did the launch date slip?",
+    "choice_A": "Budget overrun",
+    "choice_B": "Staff shortage",
+    "choice_C": "Incomplete security review",
+    "choice_D": "Vendor delay",
+    "answer": "C"
+  }
+]

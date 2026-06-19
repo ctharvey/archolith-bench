@@ -27,6 +27,20 @@ and [`benchmarks/`](benchmarks/) for tracked evidence summaries.
 | `audit` | MCP token-waste reduction before/after comparison |
 | `stack` | Experimental four-way comparison; pending refreshed live run |
 | `industry` | Launch coverage matrix mapping products to trusted external benchmark families |
+| `harness` | Runs official external benchmarks (e.g. LongBench v2) as a direct-vs-proxy A/B |
+
+### Harness: official benchmarks as direct-vs-proxy A/B
+
+Archolith is middleware, not a model, so a harness adapter never claims a standalone
+benchmark score. It runs the official dataset + scorer twice (client pointed at the direct
+upstream, then at the proxy) and reports the **delta**: official score preserved while input
+tokens and cost drop. Local-analogue scenarios (RULER) are `-style` smoke tests only.
+
+```bash
+archolith-bench harness --list
+pip install -e ".[longbench]"          # official LongBench v2 needs `datasets`
+archolith-bench harness longbench-v2 --arms direct,proxy_only,proxy_plus_filter --subset single_document_qa --limit 50
+```
 
 ## Quick Start
 

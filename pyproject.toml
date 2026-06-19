@@ -27,7 +27,9 @@ dependencies = [
 [project.optional-dependencies]
 filter = ["archolith-filter"]
 audit = ["archolith-audit"]
-all = ["archolith-filter", "archolith-audit"]
+longbench = ["datasets>=2"]
+harness = ["datasets>=2"]
+all = ["archolith-filter", "archolith-audit", "datasets>=2"]
 dev = ["pytest>=8"]
 
 [project.urls]

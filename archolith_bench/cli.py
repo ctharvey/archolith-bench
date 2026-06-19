@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from .arms import ARMS
-from .core.api import API_KEY, DIRECT_URL, MODEL, PROXY_URL, check_proxy_health
+from .core.api import API_KEY, DIRECT_URL, MODEL, PROXY_URL, check_proxy_health, send_chat
 from .core.display import print_cross_scenario_summary, print_four_way_table, print_summary
 from .core.metrics import PRICING_DEFAULTS, PricingModel
 from .core.report import save_results
@@ -129,6 +129,29 @@ def main(argv: list[str] | None = None) -> None:
     industry_p.add_argument("--out", type=Path, default=None,
                             help="Optional explicit output file")
 
+    # ---- harness subcommand ----
+    harness_p = subparsers.add_parser(
+        "harness",
+        help="Run an official external benchmark as a direct-vs-proxy A/B",
+    )
+    harness_p.add_argument("benchmark_id", nargs="?", default=None,
+                           help="Benchmark id, e.g. longbench-v2 (omit with --list)")
+    harness_p.add_argument("--list", action="store_true", dest="list_adapters",
+                           help="List available harness adapters and exit")
+    harness_p.add_argument("--arms", default="direct,proxy_only,proxy_plus_filter",
+                           help="Comma-separated experiment arms")
+    harness_p.add_argument("--subset", default=None, help="Benchmark subset/domain filter")
+    harness_p.add_argument("--limit", type=int, default=None, help="Max tasks to run")
+    harness_p.add_argument("--model", default=MODEL, help="Model id for inference")
+    harness_p.add_argument("--offline-fixture", type=Path, default=None,
+                           help="Run offline against a bundled fixture JSON (no API calls)")
+    harness_p.add_argument("--format", choices=["markdown", "json"], default="markdown",
+                           help="Evidence output format (default: markdown)")
+    harness_p.add_argument("--output-dir", type=Path, default=Path("results"),
+                           help="Output directory for evidence files")
+    harness_p.add_argument("--out", type=Path, default=None,
+                           help="Optional explicit evidence output file")
+
     # ---- report subcommand ----
     report_p = subparsers.add_parser("report", help="Generate BENCHMARKS.md from results/")
     report_p.add_argument("--out", type=Path, default=Path("BENCHMARKS.md"),
@@ -154,6 +177,8 @@ def main(argv: list[str] | None = None) -> None:
         _run_audit(args)
     elif args.suite == "industry":
         _run_industry(args)
+    elif args.suite == "harness":
+        _run_harness(args)
     elif args.suite == "report":
         _run_report(args)
     else:
@@ -422,6 +447,69 @@ def _run_industry(args: argparse.Namespace) -> None:
     suffix = "json" if args.format == "json" else "md"
     default_out = args.output_dir / f"industry_benchmarks.{suffix}"
     print(f"  Written to {default_out}")
+
+
+def _run_harness(args: argparse.Namespace) -> None:
+    from .harness import ADAPTERS, get_adapter, run_ab, write_harness_evidence
+
+    if args.list_adapters:
+        print("Available harness adapters:")
+        for bid, adapter in sorted(ADAPTERS.items()):
+            print(f"  {bid}  ({adapter.name})")
+        return
+
+    if not args.benchmark_id:
+        print("ERROR: benchmark_id is required (or use --list)", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        adapter = get_adapter(args.benchmark_id)
+    except KeyError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    arms = [a.strip() for a in args.arms.split(",") if a.strip()]
+    offline = args.offline_fixture is not None
+    if offline:
+        print(f"Harness: {adapter.name} (OFFLINE fixture {args.offline_fixture})")
+    else:
+        print(f"Harness: {adapter.name} — running official A/B (arms: {', '.join(arms)})")
+
+    ab = run_ab(
+        adapter,
+        arms=arms,
+        subset=args.subset,
+        limit=args.limit,
+        model=args.model,
+        send_fn=_offline_send_fn if offline else send_chat,
+        configure_proxy=not offline,
+        fixture_path=args.offline_fixture,
+    )
+
+    print(f"\n{adapter.name} A/B ({ab.model}):")
+    for arm, r in ab.arms.items():
+        print(f"  {arm}: score={r.score:.3f} n={r.n} "
+              f"in={r.input_tokens:,} out={r.output_tokens:,} cost=${r.cost_usd:.6f}")
+    for arm, d in ab.deltas.items():
+        print(f"  delta {arm}: score {d['score_delta']:+.3f}, "
+              f"input -{d['input_token_reduction_pct']:.1f}%, cost -{d['cost_reduction_pct']:.1f}%")
+
+    suffix = "json" if args.format == "json" else "md"
+    out_path = args.out or (args.output_dir / f"harness_{adapter.benchmark_id}.{suffix}")
+    write_harness_evidence(ab, out_path, output_format=args.format)
+    print(f"  Evidence written to {out_path}")
+
+
+def _offline_send_fn(client, base_url, api_key, messages, model, **kwargs):  # noqa: ANN001
+    """Deterministic offline stub for --offline-fixture pipeline smoke tests.
+
+    Always answers "A" with an estimated token count, so the A/B plumbing (load ->
+    run -> score -> aggregate -> deltas -> evidence) runs without network access.
+    This is a smoke path, not real evidence; real runs use core.api.send_chat.
+    """
+    prompt_tokens = sum(len(str(m.get("content", ""))) for m in messages) // 4
+    usage = {"prompt_tokens": max(1, prompt_tokens), "completion_tokens": 1}
+    return "A", 0.0, usage
 
 
 def _run_report(args: argparse.Namespace) -> None:

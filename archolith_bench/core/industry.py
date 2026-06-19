@@ -49,8 +49,9 @@ INDUSTRY_BENCHMARKS: tuple[IndustryBenchmark, ...] = (
             "archolith-context continuity, recall preservation, and repeated-read reduction."
         ),
         local_coverage=(
-            "`scenarios/ruler_recall.json` implements a RULER-style seeded-fact recall workload with "
-            "late-turn probes. It is local and reproducible, but not a leaderboard-equivalent RULER run."
+            "`scenarios/ruler_recall.json` is a RULER-STYLE smoke test (seeded-fact recall with late-turn "
+            "probes): local, reproducible, useful for regression checks — but NOT an official RULER run and "
+            "must not be advertised as a RULER score. Real RULER would be wired as a harness adapter."
         ),
         launch_gate=(
             "Run direct, proxy_only, and proxy_plus_filter on `ruler_recall`; publish recall preservation, "
@@ -78,16 +79,17 @@ INDUSTRY_BENCHMARKS: tuple[IndustryBenchmark, ...] = (
             "state without replaying the whole transcript."
         ),
         local_coverage=(
-            "`scenarios/long_agent.json` is a local long-agent analogue. A real LongBench v2 adapter is "
-            "not implemented yet and should not be claimed as completed."
+            "Official adapter implemented (`harness/longbench_v2.py`) — runs the real THUDM/LongBench-v2 "
+            "multiple-choice set as a direct-vs-proxy A/B via `harness.run_ab`. Awaiting a tracked paid run; "
+            "the result is the delta (accuracy preserved + tokens/cost reduced), not a standalone score."
         ),
         launch_gate=(
-            "Before making any industry-backed context-quality claim, add a small adapter or documented "
-            "manual run for the code-repo and long-dialogue subsets, then compare direct vs proxy answers."
+            "Run `archolith-bench harness longbench-v2` direct vs proxy on a real subset and publish the "
+            "accuracy delta plus input-token and cost reduction as tracked evidence under benchmarks/."
         ),
         run_command=(
-            "TODO: add archolith-bench proxy-longbench --subset code_repo,long_dialogue "
-            "or a documented external LongBench v2 run artifact"
+            "archolith-bench harness longbench-v2 --arms direct,proxy_only,proxy_plus_filter "
+            "--subset single_document_qa --limit 50"
         ),
         evidence_path="benchmarks/proxy-longbench-v2-YYYY-MM-DD.md",
     ),

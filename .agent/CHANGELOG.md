@@ -1,5 +1,17 @@
 # archolith-bench Changelog
 
+## 2026-06-19 — External Benchmark Harness (real-harness A/B)
+
+**feat(harness):** New `archolith_bench/harness/` package houses official external benchmarks under one roof behind `ExternalBenchmarkAdapter`. `run_ab()` runs an adapter across arms (direct vs proxy family), reusing `core.api.send_chat`, `apply_arm_config`, and the cost model, and reports the proxy-vs-direct delta (official score preserved + tokens/cost reduced) — the only honest, advertisable Archolith claim, since Archolith is middleware, not a model.
+
+**feat(harness):** First concrete adapter — `LongBenchV2Adapter` runs the official `THUDM/LongBench-v2` multiple-choice set (accuracy). Online via the `longbench` extra (`datasets`); offline via a bundled fixture.
+
+**feat(cli):** `archolith-bench harness <id>` with `--list`, `--arms`, `--subset`, `--limit`, `--offline-fixture`, markdown/JSON evidence.
+
+**docs:** Registry updated — LongBench v2 now points at the real adapter; RULER relabeled as a `-style` smoke test (not advertisable). Real paid runs deferred to launch step 3.
+
+**tests:** Offline harness coverage (load/score/A-B/deltas/evidence + CLI smoke), no network or API spend.
+
 ## 2026-06-19 — Industry Benchmark Coverage Matrix
 
 **feat(industry):** Added executable industry benchmark registry mapping Archolith products to trusted benchmark families: RULER, LongBench v2, SWE-bench, BigCodeBench, HELM, MTEB, CyberSecEval, AgentDojo, and OWASP LLM/application security checks.

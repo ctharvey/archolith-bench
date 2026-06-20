@@ -225,27 +225,35 @@ class AgentDojoAdapter(ExternalCliAdapter):
 
 
 class MtebAdapter(ExternalCliAdapter):
-    """MTEB retrieval/reranking, direct-vs-proxy A/B over an EMBEDDINGS endpoint.
+    """MTEB retrieval/reranking as a single-arm EMBEDDINGS-model baseline.
 
-    CAVEAT: MTEB measures embedding quality. The Archolith chat proxy is not in the
-    embeddings path, so today the proxy arm is effectively a no-op delta. This
-    adapter exists so MTEB lives under one roof; a meaningful A/B requires an
-    embeddings proxy/caching layer (or menhir owning retrieval eval). Default to
-    the direct arm until that exists.
+    Runs the official mteb against an OpenAI-compatible embeddings endpoint. The
+    embedding model is a menhir / fact-retrieval dependency, NOT the chat proxy's
+    path, so there is no meaningful direct-vs-proxy A/B today: the adapter ignores
+    the chat arm's base_url and always targets `embeddings_base_url`. A real A/B
+    would need an embeddings proxy/caching layer.
+
+    Defaults target a local LM Studio embeddings server, so this benchmark runs
+    for free (no API spend) once the `mteb` extra is installed.
     """
 
     benchmark_id = "mteb-retrieval"
     name = "MTEB retrieval/reranking"
     extra = "mteb"
 
+    # Local LM Studio embeddings server by default; override via env.
+    embeddings_base_url = os.getenv("EMBEDDINGS_BASE_URL", "http://localhost:1234/v1")
+    embeddings_model = os.getenv("EMBEDDINGS_MODEL", "text-embedding-nomic-embed-text-v1.5")
+
     def build_command(self, *, arm, base_url, api_key, model, subset, limit, workdir):  # noqa: ANN001
+        # MTEB measures the embedding model; the chat arm base_url is irrelevant.
         argv = [
             "mteb", "run",
-            "-m", model,
+            "-m", self.embeddings_model,
             "-t", subset or "SciFact",
             "--output_folder", str(workdir),
         ]
-        return argv, _openai_env(base_url, api_key)
+        return argv, _openai_env(self.embeddings_base_url, api_key or "lm-studio")
 
     def results_path(self, workdir: Path) -> Path:
         return workdir / "results.json"

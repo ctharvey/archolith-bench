@@ -246,14 +246,17 @@ INDUSTRY_BENCHMARKS: tuple[IndustryBenchmark, ...] = (
             "evaluation: can stored facts be recalled when queried later?"
         ),
         local_coverage=(
-            "Official adapter scaffolded (`harness/external.py` MtebAdapter) for an embeddings A/B. "
-            "CAVEAT: MTEB measures embedding quality and the chat proxy is NOT in the embeddings path, so "
-            "the proxy arm is a no-op delta today. A meaningful A/B needs an embeddings proxy/caching layer "
-            "or menhir owning retrieval eval. Lives under one roof; defaults to the direct arm."
+            "Official adapter (`harness/external.py` MtebAdapter) runs mteb against an OpenAI-compatible "
+            "embeddings endpoint, defaulting to a local LM Studio server (text-embedding-nomic-embed-text-v1.5) "
+            "— so it runs for FREE, no API spend, once the `mteb` extra is installed. SINGLE-ARM BASELINE: the "
+            "embedding model is a menhir / fact-retrieval dependency, not the chat proxy path, so there is no "
+            "direct-vs-proxy A/B (a real A/B needs an embeddings proxy/caching layer). Measures the embedding "
+            "model menhir depends on, not the proxy."
         ),
         launch_gate=(
-            "Do not make durable-memory retrieval claims until either an embeddings A/B layer exists or a "
-            "menhir-owned MTEB run is tracked. The bench adapter exists for parity, not a launch claim."
+            "Run `archolith-bench harness mteb-retrieval` against the embeddings model and publish the MTEB "
+            "score as a menhir/embedding-model baseline (not a proxy claim). A proxy A/B requires an "
+            "embeddings layer that does not exist yet."
         ),
         run_command="archolith-bench harness mteb-retrieval --subset SciFact --arms direct",
         evidence_path="benchmarks/menhir-retrieval-YYYY-MM-DD.md",

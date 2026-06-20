@@ -11,7 +11,7 @@ This matrix maps each Archolith product to external benchmark families that are 
 | archolith-filter | filter | HELM efficiency metrics | implemented-local | Run the filter suite on the launch corpus and publish per-category savings, total savings, sample count, corpus source, and known no-op categories. |
 | archolith-filter | filter | SWE-bench-style agent traces | candidate-before-launch | Add at least one tracked corpus summary showing sample provenance and category balance, then rerun `archolith-bench filter`. |
 | archolith-audit | audit | HELM-style token/cost accounting | implemented-local | Use real before/after session logs, not fixtures. Publish server-level deltas and note any new waste type regressions. |
-| menhir | memory | MTEB retrieval/reranking slices | candidate-before-launch | Do not make durable-memory retrieval claims until either an embeddings A/B layer exists or a menhir-owned MTEB run is tracked. The bench adapter exists for parity, not a launch claim. |
+| menhir | memory | MTEB retrieval/reranking slices | candidate-before-launch | Run `archolith-bench harness mteb-retrieval` against the embeddings model and publish the MTEB score as a menhir/embedding-model baseline (not a proxy claim). A proxy A/B requires an embeddings layer that does not exist yet. |
 | archolith-security | security | CyberSecEval 4 | candidate-before-launch | Run `archolith-bench harness cyberseceval-4` on a scoped subset, direct vs proxy, and publish pass/fail, refusal, and false-refusal caveats before any security benchmark claim. |
 | archolith-security | security | AgentDojo | candidate-before-launch | Run `archolith-bench harness agentdojo` direct vs proxy and publish utility delta + attack-success-rate before claiming hardening against malicious tool output. |
 | archolith-context | security | OWASP LLM Top 10 + ASVS | candidate-before-launch | Complete a scoped OWASP LLM Top 10 + ASVS checklist for public proxy surfaces and track the findings/remediations before presenting the proxy as launch-safe. |
@@ -133,8 +133,8 @@ This matrix maps each Archolith product to external benchmark families that are 
 - Source: https://github.com/embeddings-benchmark/mteb
 - Paper: https://arxiv.org/abs/2210.07316
 - Why relevant: Menhir is the durable memory direction. Its closest trusted benchmark family is retrieval evaluation: can stored facts be recalled when queried later?
-- Local coverage: Official adapter scaffolded (`harness/external.py` MtebAdapter) for an embeddings A/B. CAVEAT: MTEB measures embedding quality and the chat proxy is NOT in the embeddings path, so the proxy arm is a no-op delta today. A meaningful A/B needs an embeddings proxy/caching layer or menhir owning retrieval eval. Lives under one roof; defaults to the direct arm.
-- Launch gate: Do not make durable-memory retrieval claims until either an embeddings A/B layer exists or a menhir-owned MTEB run is tracked. The bench adapter exists for parity, not a launch claim.
+- Local coverage: Official adapter (`harness/external.py` MtebAdapter) runs mteb against an OpenAI-compatible embeddings endpoint, defaulting to a local LM Studio server (text-embedding-nomic-embed-text-v1.5) — so it runs for FREE, no API spend, once the `mteb` extra is installed. SINGLE-ARM BASELINE: the embedding model is a menhir / fact-retrieval dependency, not the chat proxy path, so there is no direct-vs-proxy A/B (a real A/B needs an embeddings proxy/caching layer). Measures the embedding model menhir depends on, not the proxy.
+- Launch gate: Run `archolith-bench harness mteb-retrieval` against the embeddings model and publish the MTEB score as a menhir/embedding-model baseline (not a proxy claim). A proxy A/B requires an embeddings layer that does not exist yet.
 - Command: `archolith-bench harness mteb-retrieval --subset SciFact --arms direct`
 - Evidence path: `benchmarks/menhir-retrieval-YYYY-MM-DD.md`
 

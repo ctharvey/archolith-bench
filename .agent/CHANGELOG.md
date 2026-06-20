@@ -1,5 +1,13 @@
 # archolith-bench Changelog
 
+## 2026-06-19 — LongMemEval Mode B: persistent-memory (ingest-then-recall) driver
+
+**feat(harness):** Added a third adapter shape for memory benchmarks. `harness/memory_ab.py` `run_memory_ab` drives ingest -> recall -> answer per item: for memory arms it isolates a `group_id`, ingests the haystack sessions, recalls against the question, and answers from recalled memory (not the raw history); the `no_memory` arm is the floor. Reports the memory-QA accuracy lift. `assert_not_production` refuses prod-looking targets before any write.
+
+**feat(harness):** `LongMemEvalMemoryAdapter` (`longmemeval-menhir`) implements the memory-QA contract, reusing the shared LongMemEval loader + scorer. `harness/menhir_client.py` provides `StubMenhirClient` (deterministic in-memory, offline) and `HttpMenhirClient` (configurable, for a throwaway menhir). CLI dispatches in-process / external-cli / memory; `--menhir-url` for real runs.
+
+**note:** Mode A (`longmemeval`, in-context) tests the proxy; Mode B (`longmemeval-menhir`) tests menhir's persistent graph memory and is what the registry maps to menhir. Real Mode-B run (throwaway menhir+Neo4j) deferred; offline-runnable now with the stub.
+
 ## 2026-06-19 — Memory benchmark: LongMemEval for menhir (MTEB reclassified)
 
 **feat(harness):** Added `LongMemEvalAdapter` (in-process) — the official LongMemEval long-term memory QA benchmark, run as a direct(no memory)-vs-proxy A/B. This is menhir's CAPABILITY benchmark: menhir is built on Graphiti (the temporal-KG engine Zep reports on LongMemEval/DMR), so it's the apples-to-apples industry standard for a memory system. Deterministic normalized-containment scorer offline; official GPT-4 judge can be added behind a flag.

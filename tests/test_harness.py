@@ -133,14 +133,77 @@ def test_harness_cli_offline(tmp_path):
     assert (tmp_path / "harness_longbench-v2.json").exists()
 
 
+def test_stub_menhir_client_roundtrip():
+    from archolith_bench.harness import StubMenhirClient
+    c = StubMenhirClient()
+    g = c.new_group()
+    c.ingest(g, "user", "My dog is named Biscuit")
+    c.ingest(g, "assistant", "Nice name!")
+    out = c.recall(g, "what is my dog named", limit=10)
+    assert any("Biscuit" in s for s in out)
+    c.reset(g)
+    assert c.recall(g, "dog", limit=10) == []
+
+
+def test_assert_not_production_guards():
+    from archolith_bench.harness import assert_not_production
+    assert_not_production("http://localhost:7999")  # ok
+    for bad in ("https://menhir.example.com", "http://prod-neo4j:7687", "http://localhost:9800/v1"):
+        try:
+            assert_not_production(bad)
+        except SystemExit:
+            continue
+        raise AssertionError(f"expected refusal for {bad}")
+
+
+def test_run_memory_ab_lift_offline():
+    from archolith_bench.harness import StubMenhirClient, run_memory_ab
+    from archolith_bench.harness.longmemeval import LongMemEvalMemoryAdapter
+
+    def send_fn(client, base_url, api_key, messages, model, **kwargs):
+        # Answer only if the fact is present in the (recalled) memory context.
+        user = messages[-1]["content"]
+        text = "I don't know"
+        if "Biscuit" in user:
+            text = "Biscuit"
+        elif "Denver" in user:
+            text = "Denver"
+        return text, 1.0, {"prompt_tokens": max(1, len(user) // 4), "completion_tokens": 2}
+
+    ab = run_memory_ab(
+        LongMemEvalMemoryAdapter(),
+        arms=("no_memory", "menhir_recall"),
+        fixture_path=LME_FIXTURE,
+        client=StubMenhirClient(),
+        send_fn=send_fn,
+    )
+    # no_memory: only the abstention item is right (1/3). menhir_recall: all 3.
+    assert ab.arms["no_memory"].score < ab.arms["menhir_recall"].score
+    assert ab.arms["menhir_recall"].score == 1.0
+    assert ab.deltas["menhir_recall"]["score_delta"] > 0
+
+
+def test_harness_cli_memory_offline(tmp_path):
+    result = subprocess.run(
+        [
+            sys.executable, "-m", "archolith_bench", "harness", "longmemeval-menhir",
+            "--offline-fixture", str(LME_FIXTURE),
+            "--format", "json", "--output-dir", str(tmp_path),
+        ],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert (tmp_path / "harness_longmemeval-menhir.json").exists()
+
+
 def test_harness_cli_list():
     result = subprocess.run(
         [sys.executable, "-m", "archolith_bench", "harness", "--list"],
         capture_output=True, text=True,
     )
     assert result.returncode == 0
-    for bid in ("longbench-v2", "bigcodebench-hard", "swe-bench", "cyberseceval-4",
-                "agentdojo", "mteb-retrieval"):
+    for bid in ("longbench-v2", "bigcodebench-hard", "longmemeval", "longmemeval-menhir",
+                "swe-bench", "cyberseceval-4", "agentdojo", "mteb-retrieval"):
         assert bid in result.stdout
 
 

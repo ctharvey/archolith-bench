@@ -53,6 +53,37 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text.lower().translate(_PUNCT)).strip()
 
 
+def _load_lme_items(subset: str | None, fixture_path: str | Path | None) -> list[dict]:
+    """Load raw LongMemEval items (shared by the in-context and memory adapters)."""
+    if fixture_path is not None:
+        with open(fixture_path, encoding="utf-8") as f:
+            items = json.load(f)
+    else:
+        try:
+            from datasets import load_dataset
+        except ImportError as e:  # pragma: no cover - online only
+            raise RuntimeError(
+                "LongMemEval requires the 'datasets' package. "
+                "Install with: pip install '.[longmemeval]', or pass fixture_path for offline use."
+            ) from e
+        ds = load_dataset("xiaowu0162/longmemeval", split="train")  # pragma: no cover - network
+        items = [dict(row) for row in ds]
+    if subset:
+        items = [it for it in items if it.get("question_type") == subset]
+    return items
+
+
+def _score_answer(answer: str, question_type: str | None, response_text: str) -> bool:
+    """Normalized-containment scorer with abstention handling (shared by both modes)."""
+    gold = _normalize(answer)
+    resp = _normalize(response_text)
+    if not resp:
+        return False
+    if question_type == "abstention" or gold in {"", "no answer", "unknown"}:
+        return any(p in resp for p in ("dont know", "not sure", "no information", "cannot", "unable"))
+    return bool(gold) and gold in resp
+
+
 class LongMemEvalAdapter:
     """Official LongMemEval memory-QA accuracy, run as a direct-vs-proxy A/B."""
 
@@ -65,7 +96,7 @@ class LongMemEvalAdapter:
         limit: int | None = None,
         fixture_path: str | Path | None = None,
     ) -> list[Task]:
-        items = self._load_items(subset=subset, fixture_path=fixture_path)
+        items = _load_lme_items(subset, fixture_path)
         if limit is not None:
             items = items[:limit]
         tasks: list[Task] = []
@@ -81,36 +112,50 @@ class LongMemEvalAdapter:
             )
         return tasks
 
-    def _load_items(self, subset: str | None, fixture_path: str | Path | None) -> list[dict]:
-        if fixture_path is not None:
-            with open(fixture_path, encoding="utf-8") as f:
-                items = json.load(f)
-            if subset:
-                items = [it for it in items if it.get("question_type") == subset]
-            return items
-        try:
-            from datasets import load_dataset
-        except ImportError as e:  # pragma: no cover - online only
-            raise RuntimeError(
-                "LongMemEval requires the 'datasets' package. "
-                "Install with: pip install '.[longmemeval]', or pass fixture_path for offline use."
-            ) from e
-        ds = load_dataset("xiaowu0162/longmemeval", split="train")  # pragma: no cover - network
-        items = [dict(row) for row in ds]
-        if subset:
-            items = [it for it in items if it.get("question_type") == subset]
+    def score(self, task: Task, response_text: str) -> bool:
+        return _score_answer(task.answer, task.meta.get("question_type"), response_text)
+
+
+_MEMORY_SYSTEM_PROMPT = (
+    "You are a helpful assistant. Use ONLY the retrieved memory below to answer the question "
+    "accurately and concisely. If the memory does not contain the answer, say you don't know."
+)
+
+
+class LongMemEvalMemoryAdapter:
+    """Mode B: LongMemEval via persistent ingest-then-recall (menhir memory).
+
+    Per item: ingest the haystack sessions into the memory store, recall against
+    the question, and answer from the recalled memory (not the raw history).
+    Implements the `memory_ab.MemoryQAAdapter` shape; driven by `run_memory_ab`.
+    """
+
+    benchmark_id = "longmemeval-menhir"
+    name = "LongMemEval (menhir memory)"
+
+    def load_items(
+        self,
+        subset: str | None = None,
+        limit: int | None = None,
+        fixture_path: str | Path | None = None,
+    ) -> list[dict]:
+        items = _load_lme_items(subset, fixture_path)
+        if limit is not None:
+            items = items[:limit]
         return items
 
-    def score(self, task: Task, response_text: str) -> bool:
-        """Normalized-containment scorer.
+    def sessions(self, item: dict) -> list[list[dict]]:
+        return item.get("haystack_sessions") or item.get("sessions") or []
 
-        Abstention questions (gold answer signals 'no answer') pass if the model
-        declines; otherwise the gold answer must appear in the response.
-        """
-        gold = _normalize(task.answer)
-        resp = _normalize(response_text)
-        if not resp:
-            return False
-        if task.meta.get("question_type") == "abstention" or gold in {"", "no answer", "unknown"}:
-            return any(p in resp for p in ("dont know", "not sure", "no information", "cannot", "unable"))
-        return bool(gold) and gold in resp
+    def question(self, item: dict) -> str:
+        return item.get("question", "")
+
+    def build_messages(self, memory_context: str, question: str) -> list[dict]:
+        mem = memory_context.strip() or "(no relevant memory found)"
+        return [
+            {"role": "system", "content": _MEMORY_SYSTEM_PROMPT},
+            {"role": "user", "content": f"Retrieved memory:\n{mem}\n\nQuestion: {question}"},
+        ]
+
+    def score(self, item: dict, response_text: str) -> bool:
+        return _score_answer(str(item.get("answer", "")), item.get("question_type"), response_text)

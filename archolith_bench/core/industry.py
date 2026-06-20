@@ -277,9 +277,11 @@ INDUSTRY_BENCHMARKS: tuple[IndustryBenchmark, ...] = (
             "graph store, so it needs an isolated (throwaway) Neo4j and per-question `group_id` isolation."
         ),
         local_coverage=(
-            "Not yet wired. Needs a Mode-B driver that ingests + recalls against a throwaway menhir/Neo4j with "
-            "per-item group_id isolation. menhir backend anchors: `recall(query, *, preset, limit, ...)` and "
-            "`ingest_document(...)` with group_id (core/backend_impl.py). Plan: "
+            "Adapter WIRED: `harness/longmemeval.py` LongMemEvalMemoryAdapter + `harness/memory_ab.py` "
+            "run_memory_ab driver (ingest -> recall -> answer) + `harness/menhir_client.py` (Stub for offline, "
+            "Http for real). Offline-runnable now with StubMenhirClient (no Neo4j). A real run needs a throwaway "
+            "menhir (`--menhir-url`, prod-guarded) + Neo4j and per-item group_id isolation (menhir backend: "
+            "`recall(...)` / `ingest_document(...)` with group_id). Awaiting tracked run. Plan: "
             "`archolith-bench-longmemeval-menhir-mode-b-plan.md`."
         ),
         launch_gate=(

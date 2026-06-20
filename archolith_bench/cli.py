@@ -145,6 +145,8 @@ def main(argv: list[str] | None = None) -> None:
     harness_p.add_argument("--model", default=MODEL, help="Model id for inference")
     harness_p.add_argument("--offline-fixture", type=Path, default=None,
                            help="Run offline against a bundled fixture JSON (no API calls)")
+    harness_p.add_argument("--menhir-url", default=None,
+                           help="Memory benchmarks: throwaway menhir base URL (refuses prod-looking targets)")
     harness_p.add_argument("--format", choices=["markdown", "json"], default="markdown",
                            help="Evidence output format (default: markdown)")
     harness_p.add_argument("--output-dir", type=Path, default=Path("results"),
@@ -452,17 +454,23 @@ def _run_industry(args: argparse.Namespace) -> None:
 def _run_harness(args: argparse.Namespace) -> None:
     from .harness import (
         ADAPTERS,
+        DEFAULT_MEMORY_ARMS,
+        HttpMenhirClient,
+        StubMenhirClient,
+        assert_not_production,
         get_adapter,
         is_external,
+        is_memory,
         run_ab,
         run_external_ab,
+        run_memory_ab,
         write_harness_evidence,
     )
 
     if args.list_adapters:
         print("Available harness adapters:")
         for bid, adapter in sorted(ADAPTERS.items()):
-            kind = "external-cli" if is_external(adapter) else "in-process"
+            kind = "memory" if is_memory(adapter) else ("external-cli" if is_external(adapter) else "in-process")
             print(f"  {bid}  ({adapter.name}) [{kind}]")
         return
 
@@ -483,7 +491,30 @@ def _run_harness(args: argparse.Namespace) -> None:
     else:
         print(f"Harness: {adapter.name} — running official A/B (arms: {', '.join(arms)})")
 
-    if is_external(adapter):
+    if is_memory(adapter):
+        mem_arms = list(DEFAULT_MEMORY_ARMS) if args.arms == "direct,proxy_only,proxy_plus_filter" else arms
+        if offline:
+            client = StubMenhirClient()
+            send_fn = _offline_send_fn
+        else:
+            if not args.menhir_url:
+                print("ERROR: memory benchmarks need --menhir-url (a throwaway menhir instance)",
+                      file=sys.stderr)
+                sys.exit(1)
+            assert_not_production(args.menhir_url)
+            client = HttpMenhirClient(args.menhir_url, api_key=API_KEY)
+            send_fn = send_chat
+        ab = run_memory_ab(
+            adapter,
+            arms=mem_arms,
+            subset=args.subset,
+            limit=args.limit,
+            model=args.model,
+            client=client,
+            send_fn=send_fn,
+            fixture_path=args.offline_fixture,
+        )
+    elif is_external(adapter):
         results_fixtures = (
             {arm: args.offline_fixture for arm in arms} if offline else None
         )
@@ -514,7 +545,8 @@ def _run_harness(args: argparse.Namespace) -> None:
               f"in={r.input_tokens:,} out={r.output_tokens:,} cost=${r.cost_usd:.6f}")
     for arm, d in ab.deltas.items():
         print(f"  delta {arm}: score {d['score_delta']:+.3f}, "
-              f"input -{d['input_token_reduction_pct']:.1f}%, cost -{d['cost_reduction_pct']:.1f}%")
+              f"input reduction {d['input_token_reduction_pct']:+.1f}%, "
+              f"cost reduction {d['cost_reduction_pct']:+.1f}%")
 
     suffix = "json" if args.format == "json" else "md"
     out_path = args.out or (args.output_dir / f"harness_{adapter.benchmark_id}.{suffix}")

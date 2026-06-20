@@ -32,16 +32,26 @@ from .external import (
     SweBenchAdapter,
 )
 from .longbench_v2 import LongBenchV2Adapter
-from .longmemeval import LongMemEvalAdapter
+from .longmemeval import LongMemEvalAdapter, LongMemEvalMemoryAdapter
+from .memory_ab import (
+    DEFAULT_MEMORY_ARMS,
+    NO_MEMORY,
+    MemoryQAAdapter,
+    MenhirClient,
+    assert_not_production,
+    run_memory_ab,
+)
+from .menhir_client import HttpMenhirClient, StubMenhirClient
 
 # Registry of available real-harness adapters, keyed by benchmark_id (the one roof).
-# In-process adapters run via run_ab; ExternalCliAdapter subclasses run via run_external_ab.
+# In-process: run_ab. ExternalCliAdapter: run_external_ab. MemoryQAAdapter: run_memory_ab.
 ADAPTERS: dict[str, object] = {
     a.benchmark_id: a
     for a in (
         LongBenchV2Adapter(),
         BigCodeBenchHardAdapter(),
         LongMemEvalAdapter(),
+        LongMemEvalMemoryAdapter(),
         SweBenchAdapter(),
         CyberSecEvalAdapter(),
         AgentDojoAdapter(),
@@ -65,6 +75,11 @@ def is_external(adapter: object) -> bool:
     return isinstance(adapter, ExternalCliAdapter)
 
 
+def is_memory(adapter: object) -> bool:
+    """True if the adapter is an ingest-then-recall memory benchmark (run via run_memory_ab)."""
+    return hasattr(adapter, "sessions") and hasattr(adapter, "load_items")
+
+
 __all__ = [
     "ABResult",
     "ADAPTERS",
@@ -72,20 +87,30 @@ __all__ = [
     "ArmResult",
     "BigCodeBenchHardAdapter",
     "CyberSecEvalAdapter",
+    "DEFAULT_MEMORY_ARMS",
     "ExternalBenchmarkAdapter",
     "ExternalCliAdapter",
     "HarnessBenchmarkAdapter",
+    "HttpMenhirClient",
     "LongBenchV2Adapter",
     "LongMemEvalAdapter",
+    "LongMemEvalMemoryAdapter",
+    "MemoryQAAdapter",
+    "MenhirClient",
     "MtebAdapter",
+    "NO_MEMORY",
+    "StubMenhirClient",
     "SweBenchAdapter",
     "Task",
     "TaskResult",
     "ab_result_to_dict",
     "arm_result_from_summary",
+    "assert_not_production",
     "get_adapter",
     "is_external",
+    "is_memory",
     "run_ab",
     "run_external_ab",
+    "run_memory_ab",
     "write_harness_evidence",
 ]

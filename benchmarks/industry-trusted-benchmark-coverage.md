@@ -5,15 +5,15 @@ This matrix maps each Archolith product to external benchmark families that are 
 | Product | Suite | Benchmark | Status | Launch gate |
 |---------|-------|-----------|--------|-------------|
 | archolith-context | proxy | RULER | implemented-local | Run direct, proxy_only, and proxy_plus_filter on `ruler_recall`; publish recall preservation, upstream input reduction, and any quality regressions together. |
-| archolith-context | proxy | LongBench v2 | candidate-before-launch | Before making any industry-backed context-quality claim, add a small adapter or documented manual run for the code-repo and long-dialogue subsets, then compare direct vs proxy answers. |
-| archolith-context | proxy | SWE-bench Lite / Verified | candidate-before-launch | Run at least a smoke subset through the same model direct vs proxy and report pass/fail, token/cost, and any patch-quality regression. Do not claim SWE-bench performance until this exists. |
-| archolith-context | proxy | BigCodeBench-Hard | candidate-before-launch | Optional before launch; useful for a cheap proxy-overhead sanity check. Report it separately from multi-turn context claims. |
+| archolith-context | proxy | LongBench v2 | candidate-before-launch | Run `archolith-bench harness longbench-v2` direct vs proxy on a real subset and publish the accuracy delta plus input-token and cost reduction as tracked evidence under benchmarks/. |
+| archolith-context | proxy | SWE-bench Lite / Verified | candidate-before-launch | Run `archolith-bench harness swe-bench` on a Lite/Verified smoke subset, direct vs proxy, and report the resolution-rate delta + token/cost. Do not claim SWE-bench performance until this exists. |
+| archolith-context | proxy | BigCodeBench-Hard | candidate-before-launch | Run `archolith-bench harness bigcodebench-hard` direct vs proxy and report the pass@1 delta plus token/cost reduction. Cheap proxy-overhead sanity check; report separately from multi-turn context claims. |
 | archolith-filter | filter | HELM efficiency metrics | implemented-local | Run the filter suite on the launch corpus and publish per-category savings, total savings, sample count, corpus source, and known no-op categories. |
 | archolith-filter | filter | SWE-bench-style agent traces | candidate-before-launch | Add at least one tracked corpus summary showing sample provenance and category balance, then rerun `archolith-bench filter`. |
 | archolith-audit | audit | HELM-style token/cost accounting | implemented-local | Use real before/after session logs, not fixtures. Publish server-level deltas and note any new waste type regressions. |
-| menhir | memory | MTEB retrieval/reranking slices | candidate-before-launch | Do not make durable-memory retrieval claims from archolith-bench until a Menhir-owned MTEB-style or project-memory retrieval evaluation exists. |
-| archolith-security | security | CyberSecEval 4 | candidate-before-launch | Before making security benchmark claims, run a scoped CyberSecEval subset relevant to the released products and publish pass/fail, refusal, and false-refusal caveats. |
-| archolith-security | security | AgentDojo | candidate-before-launch | Run or explicitly defer an AgentDojo-style prompt-injection evaluation for proxy/tool workflows before claiming security hardening against malicious tool output. |
+| menhir | memory | MTEB retrieval/reranking slices | candidate-before-launch | Do not make durable-memory retrieval claims until either an embeddings A/B layer exists or a menhir-owned MTEB run is tracked. The bench adapter exists for parity, not a launch claim. |
+| archolith-security | security | CyberSecEval 4 | candidate-before-launch | Run `archolith-bench harness cyberseceval-4` on a scoped subset, direct vs proxy, and publish pass/fail, refusal, and false-refusal caveats before any security benchmark claim. |
+| archolith-security | security | AgentDojo | candidate-before-launch | Run `archolith-bench harness agentdojo` direct vs proxy and publish utility delta + attack-success-rate before claiming hardening against malicious tool output. |
 | archolith-context | security | OWASP LLM Top 10 + ASVS | candidate-before-launch | Complete a scoped OWASP LLM Top 10 + ASVS checklist for public proxy surfaces and track the findings/remediations before presenting the proxy as launch-safe. |
 
 ## Details
@@ -28,7 +28,7 @@ This matrix maps each Archolith product to external benchmark families that are 
 - Source: https://github.com/NVIDIA/RULER
 - Paper: https://arxiv.org/abs/2404.06654
 - Why relevant: RULER is the closest external methodology for testing whether long-context systems can retrieve and aggregate facts across very long distractor contexts. That maps directly to archolith-context continuity, recall preservation, and repeated-read reduction.
-- Local coverage: `scenarios/ruler_recall.json` implements a RULER-style seeded-fact recall workload with late-turn probes. It is local and reproducible, but not a leaderboard-equivalent RULER run.
+- Local coverage: `scenarios/ruler_recall.json` is a RULER-STYLE smoke test (seeded-fact recall with late-turn probes): local, reproducible, useful for regression checks — but NOT an official RULER run and must not be advertised as a RULER score. Real RULER would be wired as a harness adapter.
 - Launch gate: Run direct, proxy_only, and proxy_plus_filter on `ruler_recall`; publish recall preservation, upstream input reduction, and any quality regressions together.
 - Command: `archolith-bench proxy --scenario scenarios/ruler_recall.json --arms direct,proxy_only,proxy_plus_filter --budgets 15000`
 - Evidence path: `benchmarks/proxy-ruler-recall-YYYY-MM-DD.md`
@@ -43,12 +43,12 @@ This matrix maps each Archolith product to external benchmark families that are 
 - Source: https://github.com/THUDM/LongBench
 - Paper: https://arxiv.org/abs/2412.15204
 - Why relevant: LongBench v2 includes long-document, long-dialogue, structured-data, and code-repository understanding. It is relevant to the proxy's claim that curated context can preserve useful state without replaying the whole transcript.
-- Local coverage: `scenarios/long_agent.json` is a local long-agent analogue. A real LongBench v2 adapter is not implemented yet and should not be claimed as completed.
-- Launch gate: Before making any industry-backed context-quality claim, add a small adapter or documented manual run for the code-repo and long-dialogue subsets, then compare direct vs proxy answers.
-- Command: `TODO: add archolith-bench proxy-longbench --subset code_repo,long_dialogue or a documented external LongBench v2 run artifact`
+- Local coverage: Official adapter implemented (`harness/longbench_v2.py`) — runs the real THUDM/LongBench-v2 multiple-choice set as a direct-vs-proxy A/B via `harness.run_ab`. Awaiting a tracked paid run; the result is the delta (accuracy preserved + tokens/cost reduced), not a standalone score.
+- Launch gate: Run `archolith-bench harness longbench-v2` direct vs proxy on a real subset and publish the accuracy delta plus input-token and cost reduction as tracked evidence under benchmarks/.
+- Command: `archolith-bench harness longbench-v2 --arms direct,proxy_only,proxy_plus_filter --subset single_document_qa --limit 50`
 - Evidence path: `benchmarks/proxy-longbench-v2-YYYY-MM-DD.md`
 
-### SWE-bench Lite / Verified (swe-bench-lite)
+### SWE-bench Lite / Verified (swe-bench)
 
 - Product: `archolith-context`
 - Suite: `proxy`
@@ -58,9 +58,9 @@ This matrix maps each Archolith product to external benchmark families that are 
 - Source: https://github.com/SWE-bench/SWE-bench
 - Paper: https://arxiv.org/abs/2310.06770
 - Why relevant: SWE-bench is the trusted coding-agent benchmark for real issue resolution. It is relevant because archolith-context targets agent sessions that must retain repo state, decisions, and test feedback across multiple turns.
-- Local coverage: `scenarios/code_review.json`, `scenarios/debugging.json`, and `scenarios/long_agent.json` cover local SWE-bench-like behaviors but are not SWE-bench results.
-- Launch gate: Run at least a smoke subset through the same model direct vs proxy and report pass/fail, token/cost, and any patch-quality regression. Do not claim SWE-bench performance until this exists.
-- Command: `TODO: wrap SWE-bench inference/evaluation with direct vs proxy base URLs, then run a small Lite/Verified smoke subset before broad OSS promotion`
+- Local coverage: Official adapter scaffolded (`harness/external.py` SweBenchAdapter) — wraps the SWE-bench evaluation harness per arm (client base_url = direct vs proxy) and parses its report into the A/B result. Real run needs an agent scaffold (e.g. SWE-agent) + Docker eval; deferred to step 3. `scenarios/{code_review,debugging,long_agent}.json` remain -style smoke tests, not SWE-bench scores.
+- Launch gate: Run `archolith-bench harness swe-bench` on a Lite/Verified smoke subset, direct vs proxy, and report the resolution-rate delta + token/cost. Do not claim SWE-bench performance until this exists.
+- Command: `archolith-bench harness swe-bench --subset princeton-nlp/SWE-bench_Lite --arms direct,proxy_only`
 - Evidence path: `benchmarks/proxy-swe-bench-smoke-YYYY-MM-DD.md`
 
 ### BigCodeBench-Hard (bigcodebench-hard)
@@ -73,9 +73,9 @@ This matrix maps each Archolith product to external benchmark families that are 
 - Source: https://github.com/bigcode-project/bigcodebench
 - Paper: https://arxiv.org/abs/2406.15877
 - Why relevant: BigCodeBench-Hard is relevant as a compact, reproducible coding workload when full SWE-bench runs are too expensive. It is less agentic than SWE-bench, so it should be a secondary signal for proxy overhead and answer preservation.
-- Local coverage: No direct local BigCodeBench adapter exists. Existing coding scenarios are multi-turn agent workloads rather than function-level benchmark tasks.
-- Launch gate: Optional before launch; useful for a cheap proxy-overhead sanity check. Report it separately from multi-turn context claims.
-- Command: `TODO: add direct/proxy OpenAI-compatible backend configuration for BigCodeBench-Hard or keep this as a later benchmark`
+- Local coverage: Official adapter implemented (`harness/bigcodebench.py`) — runs the real bigcode/bigcodebench-hard pass@1 (generated code executed in a sandboxed subprocess) as a direct-vs-proxy A/B via `harness.run_ab`. Awaiting a tracked paid run.
+- Launch gate: Run `archolith-bench harness bigcodebench-hard` direct vs proxy and report the pass@1 delta plus token/cost reduction. Cheap proxy-overhead sanity check; report separately from multi-turn context claims.
+- Command: `archolith-bench harness bigcodebench-hard --arms direct,proxy_only,proxy_plus_filter --limit 50`
 - Evidence path: `benchmarks/proxy-bigcodebench-hard-YYYY-MM-DD.md`
 
 ### HELM efficiency metrics (helm-efficiency)
@@ -133,9 +133,9 @@ This matrix maps each Archolith product to external benchmark families that are 
 - Source: https://github.com/embeddings-benchmark/mteb
 - Paper: https://arxiv.org/abs/2210.07316
 - Why relevant: Menhir is the durable memory direction. Its closest trusted benchmark family is retrieval evaluation: can stored facts be recalled when queried later?
-- Local coverage: archolith-bench does not currently run Menhir retrieval benchmarks. Proxy fact probes are only an indirect signal.
-- Launch gate: Do not make durable-memory retrieval claims from archolith-bench until a Menhir-owned MTEB-style or project-memory retrieval evaluation exists.
-- Command: `TODO: implement in menhir or a future archolith-bench memory suite`
+- Local coverage: Official adapter scaffolded (`harness/external.py` MtebAdapter) for an embeddings A/B. CAVEAT: MTEB measures embedding quality and the chat proxy is NOT in the embeddings path, so the proxy arm is a no-op delta today. A meaningful A/B needs an embeddings proxy/caching layer or menhir owning retrieval eval. Lives under one roof; defaults to the direct arm.
+- Launch gate: Do not make durable-memory retrieval claims until either an embeddings A/B layer exists or a menhir-owned MTEB run is tracked. The bench adapter exists for parity, not a launch claim.
+- Command: `archolith-bench harness mteb-retrieval --subset SciFact --arms direct`
 - Evidence path: `benchmarks/menhir-retrieval-YYYY-MM-DD.md`
 
 ### CyberSecEval 4 (cyberseceval-4)
@@ -148,9 +148,9 @@ This matrix maps each Archolith product to external benchmark families that are 
 - Source: https://github.com/meta-llama/PurpleLlama/tree/main/CybersecurityBenchmarks
 - Paper: https://arxiv.org/abs/2408.01605
 - Why relevant: CyberSecEval is the closest external benchmark family for archolith-security's LLM security posture: prompt injection, insecure code generation, code interpreter risk, vulnerability exploitation, autonomous offensive operations, and defensive SOC/autopatch tasks.
-- Local coverage: No archolith-bench CyberSecEval adapter exists. Current coverage is only documentation-level mapping, so no CyberSecEval score can be claimed.
-- Launch gate: Before making security benchmark claims, run a scoped CyberSecEval subset relevant to the released products and publish pass/fail, refusal, and false-refusal caveats.
-- Command: `TODO: add archolith-bench security-cyberseceval or document an external CyberSecEval run against the launch model/proxy configuration`
+- Local coverage: Official adapter scaffolded (`harness/external.py` CyberSecEvalAdapter) — wraps Meta PurpleLlama CybersecurityBenchmarks per arm and parses its stat file into the A/B result. Real run pending (archolith-security-owned, step 3); no score may be claimed yet.
+- Launch gate: Run `archolith-bench harness cyberseceval-4` on a scoped subset, direct vs proxy, and publish pass/fail, refusal, and false-refusal caveats before any security benchmark claim.
+- Command: `archolith-bench harness cyberseceval-4 --subset mitre --arms direct,proxy_only`
 - Evidence path: `benchmarks/security-cyberseceval-YYYY-MM-DD.md`
 
 ### AgentDojo (agentdojo)
@@ -163,9 +163,9 @@ This matrix maps each Archolith product to external benchmark families that are 
 - Source: https://github.com/ethz-spylab/agentdojo
 - Paper: https://arxiv.org/abs/2406.13352
 - Why relevant: AgentDojo directly matches Archolith's agent/tool threat model: untrusted tool results, indirect prompt injection, data exfiltration attempts, and over-defense that breaks useful work.
-- Local coverage: No local AgentDojo adapter exists. Proxy and filter tests are not a substitute for an adversarial tool-agent security benchmark.
-- Launch gate: Run or explicitly defer an AgentDojo-style prompt-injection evaluation for proxy/tool workflows before claiming security hardening against malicious tool output.
-- Command: `TODO: add archolith-bench security-agentdojo or document an external AgentDojo run for the launch proxy/tool configuration`
+- Local coverage: Official adapter scaffolded (`harness/external.py` AgentDojoAdapter) — wraps the AgentDojo runner per arm and parses utility-under-attack into the A/B result; attack-success-rate is reported alongside as the security signal. Real run pending (step 3).
+- Launch gate: Run `archolith-bench harness agentdojo` direct vs proxy and publish utility delta + attack-success-rate before claiming hardening against malicious tool output.
+- Command: `archolith-bench harness agentdojo --subset workspace --arms direct,proxy_only`
 - Evidence path: `benchmarks/security-agentdojo-YYYY-MM-DD.md`
 
 ### OWASP LLM Top 10 + ASVS (owasp-llm-asvs)

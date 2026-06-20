@@ -94,7 +94,7 @@ INDUSTRY_BENCHMARKS: tuple[IndustryBenchmark, ...] = (
         evidence_path="benchmarks/proxy-longbench-v2-YYYY-MM-DD.md",
     ),
     IndustryBenchmark(
-        benchmark_id="swe-bench-lite",
+        benchmark_id="swe-bench",
         name="SWE-bench Lite / Verified",
         product="archolith-context",
         suite="proxy",

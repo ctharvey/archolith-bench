@@ -169,7 +169,7 @@ external benchmark family.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `benchmark_id` | `str` | Stable local identifier such as `ruler` or `swe-bench-lite` |
+| `benchmark_id` | `str` | Stable local identifier such as `ruler` or `swe-bench` |
 | `name` | `str` | Public benchmark name |
 | `product` | `str` | Archolith product the benchmark applies to |
 | `suite` | `str` | Local archolith-bench suite or future suite owner |

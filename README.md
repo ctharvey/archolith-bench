@@ -36,11 +36,28 @@ benchmark score. It runs the official dataset + scorer twice (client pointed at 
 upstream, then at the proxy) and reports the **delta**: official score preserved while input
 tokens and cost drop. Local-analogue scenarios (RULER) are `-style` smoke tests only.
 
+Adapters (all under one roof):
+
+| Benchmark id | Kind | Extra |
+|--------------|------|-------|
+| `longbench-v2` | in-process | `longbench` |
+| `bigcodebench-hard` | in-process (sandboxed exec) | `bigcodebench` |
+| `swe-bench` | external-cli wrapper | `swebench` |
+| `cyberseceval-4` | external-cli wrapper | `cyberseceval` |
+| `agentdojo` | external-cli wrapper | `agentdojo` |
+| `mteb-retrieval` | external-cli wrapper (embeddings; see caveat) | `mteb` |
+
 ```bash
 archolith-bench harness --list
 pip install -e ".[longbench]"          # official LongBench v2 needs `datasets`
 archolith-bench harness longbench-v2 --arms direct,proxy_only,proxy_plus_filter --subset single_document_qa --limit 50
 ```
+
+In-process adapters drive each task via the chat client; external-cli adapters invoke the
+official tool (per arm, direct vs proxy base URL) and parse its results. SWE-bench/CyberSecEval/
+AgentDojo/MTEB are scaffolded — real runs (datasets, agent scaffolds, API budget) land at launch
+step 3. **MTEB caveat:** it measures embeddings, which the chat proxy doesn't sit in front of, so
+its proxy-arm delta is a no-op until an embeddings layer exists.
 
 ## Quick Start
 

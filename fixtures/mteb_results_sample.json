@@ -1,0 +1,6 @@
+{
+  "results": [
+    {"task": "SciFact", "main_score": 0.71},
+    {"task": "NFCorpus", "main_score": 0.68}
+  ]
+}

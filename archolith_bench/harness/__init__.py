@@ -14,22 +14,41 @@ from .base import (
     ABResult,
     ArmResult,
     ExternalBenchmarkAdapter,
+    HarnessBenchmarkAdapter,
     Task,
     TaskResult,
     ab_result_to_dict,
+    arm_result_from_summary,
     run_ab,
+    run_external_ab,
     write_harness_evidence,
+)
+from .bigcodebench import BigCodeBenchHardAdapter
+from .external import (
+    AgentDojoAdapter,
+    CyberSecEvalAdapter,
+    ExternalCliAdapter,
+    MtebAdapter,
+    SweBenchAdapter,
 )
 from .longbench_v2 import LongBenchV2Adapter
 
 # Registry of available real-harness adapters, keyed by benchmark_id (the one roof).
-# New official-benchmark adapters register here once implemented.
-ADAPTERS: dict[str, ExternalBenchmarkAdapter] = {
-    LongBenchV2Adapter.benchmark_id: LongBenchV2Adapter(),
+# In-process adapters run via run_ab; ExternalCliAdapter subclasses run via run_external_ab.
+ADAPTERS: dict[str, object] = {
+    a.benchmark_id: a
+    for a in (
+        LongBenchV2Adapter(),
+        BigCodeBenchHardAdapter(),
+        SweBenchAdapter(),
+        CyberSecEvalAdapter(),
+        AgentDojoAdapter(),
+        MtebAdapter(),
+    )
 }
 
 
-def get_adapter(benchmark_id: str) -> ExternalBenchmarkAdapter:
+def get_adapter(benchmark_id: str):
     """Return a registered adapter by benchmark_id, or raise with the known set."""
     try:
         return ADAPTERS[benchmark_id]
@@ -39,16 +58,31 @@ def get_adapter(benchmark_id: str) -> ExternalBenchmarkAdapter:
         ) from e
 
 
+def is_external(adapter: object) -> bool:
+    """True if the adapter wraps an external CLI (run via run_external_ab)."""
+    return isinstance(adapter, ExternalCliAdapter)
+
+
 __all__ = [
     "ABResult",
     "ADAPTERS",
+    "AgentDojoAdapter",
     "ArmResult",
+    "BigCodeBenchHardAdapter",
+    "CyberSecEvalAdapter",
     "ExternalBenchmarkAdapter",
+    "ExternalCliAdapter",
+    "HarnessBenchmarkAdapter",
     "LongBenchV2Adapter",
+    "MtebAdapter",
+    "SweBenchAdapter",
     "Task",
     "TaskResult",
     "ab_result_to_dict",
+    "arm_result_from_summary",
     "get_adapter",
+    "is_external",
     "run_ab",
+    "run_external_ab",
     "write_harness_evidence",
 ]

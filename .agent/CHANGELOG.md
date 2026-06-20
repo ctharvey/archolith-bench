@@ -4,13 +4,18 @@
 
 **feat(harness):** New `archolith_bench/harness/` package houses official external benchmarks under one roof behind `ExternalBenchmarkAdapter`. `run_ab()` runs an adapter across arms (direct vs proxy family), reusing `core.api.send_chat`, `apply_arm_config`, and the cost model, and reports the proxy-vs-direct delta (official score preserved + tokens/cost reduced) — the only honest, advertisable Archolith claim, since Archolith is middleware, not a model.
 
-**feat(harness):** First concrete adapter — `LongBenchV2Adapter` runs the official `THUDM/LongBench-v2` multiple-choice set (accuracy). Online via the `longbench` extra (`datasets`); offline via a bundled fixture.
+**feat(harness):** Two adapter shapes under one roof — in-process (`ExternalBenchmarkAdapter`, driven by `run_ab`) and external-CLI wrappers (`HarnessBenchmarkAdapter` + `ExternalCliAdapter`, driven by `run_external_ab`, which invoke the official tool per arm and parse its results file).
 
-**feat(cli):** `archolith-bench harness <id>` with `--list`, `--arms`, `--subset`, `--limit`, `--offline-fixture`, markdown/JSON evidence.
+**feat(harness):** All candidate benchmarks wired:
+- `longbench-v2` (in-process) — official THUDM/LongBench-v2 multiple-choice accuracy.
+- `bigcodebench-hard` (in-process) — official bigcode/bigcodebench-hard pass@1; generated code executed in a sandboxed subprocess with a timeout.
+- `swe-bench`, `cyberseceval-4`, `agentdojo`, `mteb-retrieval` (external-CLI wrappers) — scaffolded: documented official command + env injection (direct/proxy base URL) + results parser, tested offline against sample results fixtures. Real runs deferred to step 3 (need the tools, datasets, agent scaffolds, API budget).
 
-**docs:** Registry updated — LongBench v2 now points at the real adapter; RULER relabeled as a `-style` smoke test (not advertisable). Real paid runs deferred to launch step 3.
+**feat(cli):** `archolith-bench harness <id>` with `--list` (shows in-process vs external-cli), `--arms`, `--subset`, `--limit`, `--offline-fixture`, markdown/JSON evidence.
 
-**tests:** Offline harness coverage (load/score/A-B/deltas/evidence + CLI smoke), no network or API spend.
+**docs:** Registry updated — every candidate points at its real adapter; RULER relabeled a `-style` smoke test. MTEB caveat recorded: chat proxy is not in the embeddings path, so its proxy-arm delta is a no-op until an embeddings layer exists.
+
+**tests:** Offline harness coverage for all six adapters (load/score/exec/parse/A-B/deltas/evidence + CLI smoke), no network or API spend.
 
 ## 2026-06-19 — Industry Benchmark Coverage Matrix
 

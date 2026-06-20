@@ -109,16 +109,17 @@ INDUSTRY_BENCHMARKS: tuple[IndustryBenchmark, ...] = (
             "and test feedback across multiple turns."
         ),
         local_coverage=(
-            "`scenarios/code_review.json`, `scenarios/debugging.json`, and `scenarios/long_agent.json` "
-            "cover local SWE-bench-like behaviors but are not SWE-bench results."
+            "Official adapter scaffolded (`harness/external.py` SweBenchAdapter) — wraps the SWE-bench "
+            "evaluation harness per arm (client base_url = direct vs proxy) and parses its report into the "
+            "A/B result. Real run needs an agent scaffold (e.g. SWE-agent) + Docker eval; deferred to step 3. "
+            "`scenarios/{code_review,debugging,long_agent}.json` remain -style smoke tests, not SWE-bench scores."
         ),
         launch_gate=(
-            "Run at least a smoke subset through the same model direct vs proxy and report pass/fail, "
-            "token/cost, and any patch-quality regression. Do not claim SWE-bench performance until this exists."
+            "Run `archolith-bench harness swe-bench` on a Lite/Verified smoke subset, direct vs proxy, and "
+            "report the resolution-rate delta + token/cost. Do not claim SWE-bench performance until this exists."
         ),
         run_command=(
-            "TODO: wrap SWE-bench inference/evaluation with direct vs proxy base URLs, then run a small "
-            "Lite/Verified smoke subset before broad OSS promotion"
+            "archolith-bench harness swe-bench --subset princeton-nlp/SWE-bench_Lite --arms direct,proxy_only"
         ),
         evidence_path="benchmarks/proxy-swe-bench-smoke-YYYY-MM-DD.md",
     ),
@@ -138,16 +139,17 @@ INDUSTRY_BENCHMARKS: tuple[IndustryBenchmark, ...] = (
             "secondary signal for proxy overhead and answer preservation."
         ),
         local_coverage=(
-            "No direct local BigCodeBench adapter exists. Existing coding scenarios are multi-turn agent "
-            "workloads rather than function-level benchmark tasks."
+            "Official adapter implemented (`harness/bigcodebench.py`) — runs the real "
+            "bigcode/bigcodebench-hard pass@1 (generated code executed in a sandboxed subprocess) as a "
+            "direct-vs-proxy A/B via `harness.run_ab`. Awaiting a tracked paid run."
         ),
         launch_gate=(
-            "Optional before launch; useful for a cheap proxy-overhead sanity check. Report it separately "
-            "from multi-turn context claims."
+            "Run `archolith-bench harness bigcodebench-hard` direct vs proxy and report the pass@1 delta "
+            "plus token/cost reduction. Cheap proxy-overhead sanity check; report separately from "
+            "multi-turn context claims."
         ),
         run_command=(
-            "TODO: add direct/proxy OpenAI-compatible backend configuration for BigCodeBench-Hard "
-            "or keep this as a later benchmark"
+            "archolith-bench harness bigcodebench-hard --arms direct,proxy_only,proxy_plus_filter --limit 50"
         ),
         evidence_path="benchmarks/proxy-bigcodebench-hard-YYYY-MM-DD.md",
     ),
@@ -244,14 +246,16 @@ INDUSTRY_BENCHMARKS: tuple[IndustryBenchmark, ...] = (
             "evaluation: can stored facts be recalled when queried later?"
         ),
         local_coverage=(
-            "archolith-bench does not currently run Menhir retrieval benchmarks. Proxy fact probes are "
-            "only an indirect signal."
+            "Official adapter scaffolded (`harness/external.py` MtebAdapter) for an embeddings A/B. "
+            "CAVEAT: MTEB measures embedding quality and the chat proxy is NOT in the embeddings path, so "
+            "the proxy arm is a no-op delta today. A meaningful A/B needs an embeddings proxy/caching layer "
+            "or menhir owning retrieval eval. Lives under one roof; defaults to the direct arm."
         ),
         launch_gate=(
-            "Do not make durable-memory retrieval claims from archolith-bench until a Menhir-owned MTEB-style "
-            "or project-memory retrieval evaluation exists."
+            "Do not make durable-memory retrieval claims until either an embeddings A/B layer exists or a "
+            "menhir-owned MTEB run is tracked. The bench adapter exists for parity, not a launch claim."
         ),
-        run_command="TODO: implement in menhir or a future archolith-bench memory suite",
+        run_command="archolith-bench harness mteb-retrieval --subset SciFact --arms direct",
         evidence_path="benchmarks/menhir-retrieval-YYYY-MM-DD.md",
     ),
     IndustryBenchmark(
@@ -270,16 +274,16 @@ INDUSTRY_BENCHMARKS: tuple[IndustryBenchmark, ...] = (
             "vulnerability exploitation, autonomous offensive operations, and defensive SOC/autopatch tasks."
         ),
         local_coverage=(
-            "No archolith-bench CyberSecEval adapter exists. Current coverage is only documentation-level "
-            "mapping, so no CyberSecEval score can be claimed."
+            "Official adapter scaffolded (`harness/external.py` CyberSecEvalAdapter) — wraps Meta "
+            "PurpleLlama CybersecurityBenchmarks per arm and parses its stat file into the A/B result. "
+            "Real run pending (archolith-security-owned, step 3); no score may be claimed yet."
         ),
         launch_gate=(
-            "Before making security benchmark claims, run a scoped CyberSecEval subset relevant to the "
-            "released products and publish pass/fail, refusal, and false-refusal caveats."
+            "Run `archolith-bench harness cyberseceval-4` on a scoped subset, direct vs proxy, and publish "
+            "pass/fail, refusal, and false-refusal caveats before any security benchmark claim."
         ),
         run_command=(
-            "TODO: add archolith-bench security-cyberseceval or document an external CyberSecEval run "
-            "against the launch model/proxy configuration"
+            "archolith-bench harness cyberseceval-4 --subset mitre --arms direct,proxy_only"
         ),
         evidence_path="benchmarks/security-cyberseceval-YYYY-MM-DD.md",
     ),
@@ -298,16 +302,16 @@ INDUSTRY_BENCHMARKS: tuple[IndustryBenchmark, ...] = (
             "indirect prompt injection, data exfiltration attempts, and over-defense that breaks useful work."
         ),
         local_coverage=(
-            "No local AgentDojo adapter exists. Proxy and filter tests are not a substitute for an adversarial "
-            "tool-agent security benchmark."
+            "Official adapter scaffolded (`harness/external.py` AgentDojoAdapter) — wraps the AgentDojo "
+            "runner per arm and parses utility-under-attack into the A/B result; attack-success-rate is "
+            "reported alongside as the security signal. Real run pending (step 3)."
         ),
         launch_gate=(
-            "Run or explicitly defer an AgentDojo-style prompt-injection evaluation for proxy/tool workflows "
-            "before claiming security hardening against malicious tool output."
+            "Run `archolith-bench harness agentdojo` direct vs proxy and publish utility delta + "
+            "attack-success-rate before claiming hardening against malicious tool output."
         ),
         run_command=(
-            "TODO: add archolith-bench security-agentdojo or document an external AgentDojo run "
-            "for the launch proxy/tool configuration"
+            "archolith-bench harness agentdojo --subset workspace --arms direct,proxy_only"
         ),
         evidence_path="benchmarks/security-agentdojo-YYYY-MM-DD.md",
     ),

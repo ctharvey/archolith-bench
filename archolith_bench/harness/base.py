@@ -75,7 +75,11 @@ class ABResult:
 
 @runtime_checkable
 class ExternalBenchmarkAdapter(Protocol):
-    """Contract every official-benchmark adapter implements (the one roof)."""
+    """In-process adapter: we drive each official task via send_chat (the one roof).
+
+    Suited to benchmarks whose items are single chat requests we score ourselves
+    (LongBench v2, BigCodeBench). Driven by `run_ab`.
+    """
 
     benchmark_id: str
     name: str
@@ -91,6 +95,35 @@ class ExternalBenchmarkAdapter(Protocol):
 
     def score(self, task: Task, response_text: str) -> bool:
         """Apply the official scoring rule to one response."""
+        ...
+
+
+@runtime_checkable
+class HarnessBenchmarkAdapter(Protocol):
+    """External-harness adapter: the official tool has its own runner.
+
+    We invoke the official harness once per arm with the inference client pointed
+    at the arm's base_url (direct vs proxy), then parse its results into an
+    ArmResult. Suited to SWE-bench, CyberSecEval, AgentDojo, MTEB. Driven by
+    `run_external_ab`. `results_fixture` lets tests parse a sample results file
+    offline without invoking the real tool.
+    """
+
+    benchmark_id: str
+    name: str
+
+    def run_arm(
+        self,
+        arm: str,
+        *,
+        base_url: str,
+        api_key: str,
+        model: str,
+        subset: str | None = None,
+        limit: int | None = None,
+        results_fixture: str | Path | None = None,
+    ) -> ArmResult:
+        """Run the official harness for one arm and parse it into an ArmResult."""
         ...
 
 
@@ -154,6 +187,35 @@ def _run_arm(
     )
 
 
+def arm_result_from_summary(
+    arm: str,
+    *,
+    n: int,
+    score: float,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    model: str = MODEL,
+    pricing: PricingModel | None = None,
+) -> ArmResult:
+    """Build an ArmResult (with cost) from an external harness's parsed summary.
+
+    External tools report a score and often token totals but not per-task detail;
+    this fills the same ArmResult shape so evidence/deltas are uniform. Cost is
+    computed from the token totals via the cache-aware pricing model.
+    """
+    pricing = _pick_pricing(model, pricing)
+    arm_cost = compute_arm_cost([{"input_tokens": input_tokens, "output_tokens": output_tokens}], pricing)
+    return ArmResult(
+        arm=arm,
+        n=n,
+        score=round(score, 4),
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost_usd=round(arm_cost.total_effective_cost_usd, 6),
+        results=[],
+    )
+
+
 def _pct_reduction(direct: float, arm: float) -> float:
     if direct <= 0:
         return 0.0
@@ -214,17 +276,81 @@ def run_ab(
         if own_client and client is not None:
             client.close()
 
+    return ABResult(
+        benchmark_id=adapter.benchmark_id,
+        name=adapter.name,
+        model=model,
+        subset=subset,
+        arms=arm_results,
+        deltas=_compute_deltas(arm_results),
+    )
+
+
+def _compute_deltas(arm_results: dict[str, ArmResult]) -> dict[str, dict]:
+    """Proxy-arm deltas vs the direct baseline (score, input-token, cost)."""
     deltas: dict[str, dict] = {}
     direct = arm_results.get("direct")
-    if direct is not None:
-        for arm, res in arm_results.items():
-            if arm == "direct":
-                continue
-            deltas[arm] = {
-                "score_delta": round(res.score - direct.score, 4),
-                "input_token_reduction_pct": _pct_reduction(direct.input_tokens, res.input_tokens),
-                "cost_reduction_pct": _pct_reduction(direct.cost_usd, res.cost_usd),
-            }
+    if direct is None:
+        return deltas
+    for arm, res in arm_results.items():
+        if arm == "direct":
+            continue
+        deltas[arm] = {
+            "score_delta": round(res.score - direct.score, 4),
+            "input_token_reduction_pct": _pct_reduction(direct.input_tokens, res.input_tokens),
+            "cost_reduction_pct": _pct_reduction(direct.cost_usd, res.cost_usd),
+        }
+    return deltas
+
+
+def run_external_ab(
+    adapter: HarnessBenchmarkAdapter,
+    *,
+    arms: Sequence[str] = ("direct", "proxy_only", "proxy_plus_filter"),
+    subset: str | None = None,
+    limit: int | None = None,
+    model: str = MODEL,
+    direct_url: str = DIRECT_URL,
+    proxy_url: str = PROXY_URL,
+    api_key: str = API_KEY,
+    configure_proxy: bool = True,
+    results_fixtures: dict[str, str | Path] | None = None,
+    client=None,
+) -> ABResult:
+    """Run an external-harness adapter across arms and compute proxy-vs-direct deltas.
+
+    The adapter shells out to the official tool per arm (base_url = direct, then
+    proxy). Offline: pass `results_fixtures={arm: path}` so each arm parses a
+    sample results file instead of invoking the real harness, and
+    `configure_proxy=False` to skip proxy admin calls.
+    """
+    results_fixtures = results_fixtures or {}
+    own_client = client is None
+    if own_client and configure_proxy:
+        import httpx
+
+        client = httpx.Client()
+
+    arm_results: dict[str, ArmResult] = {}
+    try:
+        for arm in arms:
+            if arm not in ARMS:
+                raise ValueError(f"unknown arm: {arm!r} (known: {sorted(ARMS)})")
+            base_url = direct_url if arm == "direct" else proxy_url
+            if configure_proxy and arm != "direct":
+                apply_arm_config(client, proxy_url, ARMS[arm].get("config_overrides", {}))
+            arm_results[arm] = adapter.run_arm(
+                arm,
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
+                subset=subset,
+                limit=limit,
+                results_fixture=results_fixtures.get(arm),
+            )
+    finally:
+        if own_client and client is not None:
+            client.close()
 
     return ABResult(
         benchmark_id=adapter.benchmark_id,
@@ -232,7 +358,7 @@ def run_ab(
         model=model,
         subset=subset,
         arms=arm_results,
-        deltas=deltas,
+        deltas=_compute_deltas(arm_results),
     )
 
 

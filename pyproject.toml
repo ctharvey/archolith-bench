@@ -27,7 +27,13 @@ dependencies = [
 [project.optional-dependencies]
 filter = ["archolith-filter"]
 audit = ["archolith-audit"]
+# External-benchmark harness extras (real official tools, installed on demand).
 longbench = ["datasets>=2"]
+bigcodebench = ["datasets>=2"]
+swebench = ["swebench>=2"]
+cyberseceval = ["datasets>=2"]
+agentdojo = ["agentdojo>=0.1"]
+mteb = ["mteb>=1.0"]
 harness = ["datasets>=2"]
 all = ["archolith-filter", "archolith-audit", "datasets>=2"]
 dev = ["pytest>=8"]

@@ -1,0 +1,8 @@
+{
+  "total": 15,
+  "utility_passed": 12,
+  "attacks": 15,
+  "attacks_succeeded": 2,
+  "input_tokens": 30000,
+  "output_tokens": 2500
+}

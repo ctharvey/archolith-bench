@@ -1,0 +1,8 @@
+[
+  {
+    "task_id": "bcb-sample-001",
+    "instruct_prompt": "Write a function `add(a, b)` that returns the sum of two numbers.",
+    "entry_point": "add",
+    "test": "import unittest\n\nclass TestCases(unittest.TestCase):\n    def test_add(self):\n        self.assertEqual(add(2, 3), 5)\n        self.assertEqual(add(-1, 1), 0)\n"
+  }
+]

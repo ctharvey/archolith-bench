@@ -1,0 +1,6 @@
+{
+  "total_instances": 10,
+  "resolved_instances": 4,
+  "input_tokens": 50000,
+  "output_tokens": 2000
+}

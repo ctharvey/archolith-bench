@@ -450,12 +450,20 @@ def _run_industry(args: argparse.Namespace) -> None:
 
 
 def _run_harness(args: argparse.Namespace) -> None:
-    from .harness import ADAPTERS, get_adapter, run_ab, write_harness_evidence
+    from .harness import (
+        ADAPTERS,
+        get_adapter,
+        is_external,
+        run_ab,
+        run_external_ab,
+        write_harness_evidence,
+    )
 
     if args.list_adapters:
         print("Available harness adapters:")
         for bid, adapter in sorted(ADAPTERS.items()):
-            print(f"  {bid}  ({adapter.name})")
+            kind = "external-cli" if is_external(adapter) else "in-process"
+            print(f"  {bid}  ({adapter.name}) [{kind}]")
         return
 
     if not args.benchmark_id:
@@ -475,16 +483,30 @@ def _run_harness(args: argparse.Namespace) -> None:
     else:
         print(f"Harness: {adapter.name} — running official A/B (arms: {', '.join(arms)})")
 
-    ab = run_ab(
-        adapter,
-        arms=arms,
-        subset=args.subset,
-        limit=args.limit,
-        model=args.model,
-        send_fn=_offline_send_fn if offline else send_chat,
-        configure_proxy=not offline,
-        fixture_path=args.offline_fixture,
-    )
+    if is_external(adapter):
+        results_fixtures = (
+            {arm: args.offline_fixture for arm in arms} if offline else None
+        )
+        ab = run_external_ab(
+            adapter,
+            arms=arms,
+            subset=args.subset,
+            limit=args.limit,
+            model=args.model,
+            configure_proxy=not offline,
+            results_fixtures=results_fixtures,
+        )
+    else:
+        ab = run_ab(
+            adapter,
+            arms=arms,
+            subset=args.subset,
+            limit=args.limit,
+            model=args.model,
+            send_fn=_offline_send_fn if offline else send_chat,
+            configure_proxy=not offline,
+            fixture_path=args.offline_fixture,
+        )
 
     print(f"\n{adapter.name} A/B ({ab.model}):")
     for arm, r in ab.arms.items():

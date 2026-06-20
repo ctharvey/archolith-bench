@@ -10,13 +10,21 @@ from pathlib import Path
 from archolith_bench.core.api import DIRECT_URL
 from archolith_bench.harness import (
     ABResult,
+    AgentDojoAdapter,
+    BigCodeBenchHardAdapter,
+    CyberSecEvalAdapter,
+    MtebAdapter,
+    SweBenchAdapter,
     get_adapter,
+    is_external,
     run_ab,
+    run_external_ab,
     write_harness_evidence,
 )
 from archolith_bench.harness.longbench_v2 import LongBenchV2Adapter, _extract_choice
 
-FIXTURE = Path(__file__).resolve().parent.parent / "fixtures" / "longbench_v2_sample.json"
+FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
+FIXTURE = FIXTURES / "longbench_v2_sample.json"
 
 
 def _make_send_fn(answer_by_task: dict[str, str], proxy_input_tokens: int | None = None):
@@ -131,4 +139,87 @@ def test_harness_cli_list():
         capture_output=True, text=True,
     )
     assert result.returncode == 0
-    assert "longbench-v2" in result.stdout
+    for bid in ("longbench-v2", "bigcodebench-hard", "swe-bench", "cyberseceval-4",
+                "agentdojo", "mteb-retrieval"):
+        assert bid in result.stdout
+
+
+# ---- BigCodeBench (in-process, real code execution) ----
+
+BCB_FIXTURE = FIXTURES / "bigcodebench_hard_sample.json"
+
+
+def test_bigcodebench_load_and_score():
+    adapter = BigCodeBenchHardAdapter()
+    tasks = adapter.load_tasks(fixture_path=BCB_FIXTURE)
+    assert len(tasks) == 1
+    good = "```python\ndef add(a, b):\n    return a + b\n```"
+    bad = "```python\ndef add(a, b):\n    return a - b\n```"
+    assert adapter.score(tasks[0], good) is True
+    assert adapter.score(tasks[0], bad) is False
+
+
+def test_bigcodebench_run_ab_executes(tmp_path):
+    adapter = BigCodeBenchHardAdapter()
+
+    def send_fn(client, base_url, api_key, messages, model, **kwargs):
+        return "```python\ndef add(a, b):\n    return a + b\n```", 1.0, {
+            "prompt_tokens": 100, "completion_tokens": 20,
+        }
+
+    ab = run_ab(adapter, arms=("direct",), fixture_path=BCB_FIXTURE,
+                send_fn=send_fn, configure_proxy=False)
+    assert ab.arms["direct"].score == 1.0
+
+
+# ---- External-harness wrappers (parser + A/B over fixtures) ----
+
+def test_external_adapters_are_external():
+    for a in (SweBenchAdapter(), CyberSecEvalAdapter(), AgentDojoAdapter(), MtebAdapter()):
+        assert is_external(a)
+
+
+def test_swebench_parse_summary():
+    adapter = SweBenchAdapter()
+    s = adapter.parse_summary({"total_instances": 10, "resolved_instances": 4})
+    assert s["n"] == 10 and s["score"] == 0.4
+
+
+def test_mteb_parse_summary_mean():
+    adapter = MtebAdapter()
+    s = adapter.parse_summary({"results": [{"main_score": 0.7}, {"main_score": 0.5}]})
+    assert s["n"] == 2 and abs(s["score"] - 0.6) < 1e-9
+
+
+def test_run_external_ab_with_per_arm_fixtures(tmp_path):
+    adapter = SweBenchAdapter()
+    # direct uses more input tokens than the proxy arm -> positive reduction delta.
+    direct_f = tmp_path / "direct.json"
+    proxy_f = tmp_path / "proxy.json"
+    direct_f.write_text(json.dumps(
+        {"total_instances": 10, "resolved_instances": 4, "input_tokens": 100000, "output_tokens": 2000}))
+    proxy_f.write_text(json.dumps(
+        {"total_instances": 10, "resolved_instances": 4, "input_tokens": 60000, "output_tokens": 2000}))
+    ab = run_external_ab(
+        adapter,
+        arms=("direct", "proxy_only"),
+        configure_proxy=False,
+        results_fixtures={"direct": direct_f, "proxy_only": proxy_f},
+    )
+    assert ab.arms["direct"].score == 0.4
+    assert ab.deltas["proxy_only"]["input_token_reduction_pct"] == 40.0
+    assert ab.deltas["proxy_only"]["score_delta"] == 0.0
+
+
+def test_harness_cli_external_offline(tmp_path):
+    result = subprocess.run(
+        [
+            sys.executable, "-m", "archolith_bench", "harness", "swe-bench",
+            "--arms", "direct,proxy_only",
+            "--offline-fixture", str(FIXTURES / "swebench_report_sample.json"),
+            "--format", "json", "--output-dir", str(tmp_path),
+        ],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert (tmp_path / "harness_swe-bench.json").exists()

@@ -233,32 +233,61 @@ INDUSTRY_BENCHMARKS: tuple[IndustryBenchmark, ...] = (
     ),
     IndustryBenchmark(
         benchmark_id="longmemeval",
-        name="LongMemEval",
-        product="menhir",
-        suite="memory",
+        name="LongMemEval (in-context / proxy)",
+        product="archolith-context",
+        suite="proxy",
         authority="Wu et al. (ICLR 2025)",
-        benchmark_type="long-term interactive memory QA (extraction, multi-session, temporal, updates, abstention)",
+        benchmark_type="long-term memory QA with the history IN-CONTEXT (Mode A: tests proxy curation)",
         status="candidate-before-launch",
         source_url="https://github.com/xiaowu0162/LongMemEval",
         paper_url="https://arxiv.org/abs/2410.10813",
         rationale=(
-            "This is menhir's CAPABILITY benchmark: can the memory system recall the right facts across a long, "
-            "multi-session history? menhir is built on Graphiti (the temporal knowledge-graph engine Zep reports "
-            "on LongMemEval/DMR), so this is the apples-to-apples industry standard for the product menhir is — "
-            "unlike MTEB, which only measures the embedding sub-component."
+            "MODE A — the LongMemEval history is placed in the prompt and the proxy curates/compresses it. This "
+            "tests archolith-context (context curation over a long memory-QA history), NOT menhir's persistent "
+            "graph memory. menhir's capability benchmark is the separate `longmemeval-menhir` (Mode B) entry."
         ),
         local_coverage=(
             "Official adapter implemented (`harness/longmemeval.py`, in-process) — runs LongMemEval QA as a "
-            "direct (no/curated memory) vs proxy A/B; the proxy assembles relevant memory from the history. "
-            "Deterministic normalized-containment scorer offline; the official GPT-4 judge can be added behind a "
-            "flag. Awaiting a tracked run. Runs locally with the gemma chat model + local embeddings (cheap)."
+            "direct (full history in context) vs proxy A/B. Deterministic normalized-containment scorer offline; "
+            "the official GPT-4 judge can be added behind a flag. Awaiting a tracked run."
         ),
         launch_gate=(
-            "Run `archolith-bench harness longmemeval` direct (no memory) vs proxy/menhir and publish the "
-            "memory-QA accuracy lift plus token/cost. This is menhir's primary, advertisable capability claim."
+            "Run `archolith-bench harness longmemeval` direct vs proxy and publish memory-QA accuracy preserved "
+            "while input tokens drop (the proxy curates the long history). A context-curation claim, not a "
+            "menhir memory claim."
         ),
         run_command="archolith-bench harness longmemeval --arms direct,proxy_only,proxy_plus_filter --limit 50",
-        evidence_path="benchmarks/longmemeval-YYYY-MM-DD.md",
+        evidence_path="benchmarks/longmemeval-proxy-YYYY-MM-DD.md",
+    ),
+    IndustryBenchmark(
+        benchmark_id="longmemeval-menhir",
+        name="LongMemEval (persistent menhir memory)",
+        product="menhir",
+        suite="memory",
+        authority="Wu et al. (ICLR 2025)",
+        benchmark_type="long-term interactive memory QA via ingest-then-recall (Mode B: tests menhir end-to-end)",
+        status="candidate-before-launch",
+        source_url="https://github.com/xiaowu0162/LongMemEval",
+        paper_url="https://arxiv.org/abs/2410.10813",
+        rationale=(
+            "MODE B — menhir's CAPABILITY benchmark. Per question: ingest the haystack sessions into menhir's "
+            "graph (extraction -> temporal KG), then query menhir's recall, feed the retrieved memory to the "
+            "model, answer. menhir is built on Graphiti (the engine Zep reports on LongMemEval/DMR), so this is "
+            "the apples-to-apples industry standard for what menhir is. Unlike Mode A it exercises the actual "
+            "graph store, so it needs an isolated (throwaway) Neo4j and per-question `group_id` isolation."
+        ),
+        local_coverage=(
+            "Not yet wired. Needs a Mode-B driver that ingests + recalls against a throwaway menhir/Neo4j with "
+            "per-item group_id isolation. menhir backend anchors: `recall(query, *, preset, limit, ...)` and "
+            "`ingest_document(...)` with group_id (core/backend_impl.py). Plan: "
+            "`archolith-bench-longmemeval-menhir-mode-b-plan.md`."
+        ),
+        launch_gate=(
+            "Stand up a throwaway menhir+Neo4j, run LongMemEval Mode B (no-memory baseline vs menhir-recall), and "
+            "publish the memory-QA accuracy lift. This is menhir's primary advertisable capability claim."
+        ),
+        run_command="archolith-bench harness longmemeval-menhir --limit 30   # (Mode-B driver pending)",
+        evidence_path="benchmarks/longmemeval-menhir-YYYY-MM-DD.md",
     ),
     IndustryBenchmark(
         benchmark_id="dmr",

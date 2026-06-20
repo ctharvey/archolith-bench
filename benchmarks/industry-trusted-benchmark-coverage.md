@@ -11,7 +11,8 @@ This matrix maps each Archolith product to external benchmark families that are 
 | archolith-filter | filter | HELM efficiency metrics | implemented-local | Run the filter suite on the launch corpus and publish per-category savings, total savings, sample count, corpus source, and known no-op categories. |
 | archolith-filter | filter | SWE-bench-style agent traces | candidate-before-launch | Add at least one tracked corpus summary showing sample provenance and category balance, then rerun `archolith-bench filter`. |
 | archolith-audit | audit | HELM-style token/cost accounting | implemented-local | Use real before/after session logs, not fixtures. Publish server-level deltas and note any new waste type regressions. |
-| menhir | memory | LongMemEval | candidate-before-launch | Run `archolith-bench harness longmemeval` direct (no memory) vs proxy/menhir and publish the memory-QA accuracy lift plus token/cost. This is menhir's primary, advertisable capability claim. |
+| archolith-context | proxy | LongMemEval (in-context / proxy) | candidate-before-launch | Run `archolith-bench harness longmemeval` direct vs proxy and publish memory-QA accuracy preserved while input tokens drop (the proxy curates the long history). A context-curation claim, not a menhir memory claim. |
+| menhir | memory | LongMemEval (persistent menhir memory) | candidate-before-launch | Stand up a throwaway menhir+Neo4j, run LongMemEval Mode B (no-memory baseline vs menhir-recall), and publish the memory-QA accuracy lift. This is menhir's primary advertisable capability claim. |
 | menhir | memory | Deep Memory Retrieval (DMR) | candidate-before-launch | Either wire a DMR adapter and report a direct-vs-proxy retrieval-accuracy delta, or keep DMR a documented future benchmark and lead menhir's memory claim with LongMemEval. |
 | menhir | memory | MTEB retrieval/reranking slices | candidate-before-launch | Run `archolith-bench harness mteb-retrieval` against the embeddings model and publish the MTEB score as a menhir/embedding-model baseline (not a proxy claim). A proxy A/B requires an embeddings layer that does not exist yet. |
 | archolith-security | security | CyberSecEval 4 | candidate-before-launch | Run `archolith-bench harness cyberseceval-4` on a scoped subset, direct vs proxy, and publish pass/fail, refusal, and false-refusal caveats before any security benchmark claim. |
@@ -125,20 +126,35 @@ This matrix maps each Archolith product to external benchmark families that are 
 - Command: `archolith-bench audit --before <real-before.json> --after <real-after.json> --format markdown`
 - Evidence path: `benchmarks/audit-live-before-after-YYYY-MM-DD.md`
 
-### LongMemEval (longmemeval)
+### LongMemEval (in-context / proxy) (longmemeval)
+
+- Product: `archolith-context`
+- Suite: `proxy`
+- Authority: Wu et al. (ICLR 2025)
+- Type: long-term memory QA with the history IN-CONTEXT (Mode A: tests proxy curation)
+- Status: `candidate-before-launch`
+- Source: https://github.com/xiaowu0162/LongMemEval
+- Paper: https://arxiv.org/abs/2410.10813
+- Why relevant: MODE A — the LongMemEval history is placed in the prompt and the proxy curates/compresses it. This tests archolith-context (context curation over a long memory-QA history), NOT menhir's persistent graph memory. menhir's capability benchmark is the separate `longmemeval-menhir` (Mode B) entry.
+- Local coverage: Official adapter implemented (`harness/longmemeval.py`, in-process) — runs LongMemEval QA as a direct (full history in context) vs proxy A/B. Deterministic normalized-containment scorer offline; the official GPT-4 judge can be added behind a flag. Awaiting a tracked run.
+- Launch gate: Run `archolith-bench harness longmemeval` direct vs proxy and publish memory-QA accuracy preserved while input tokens drop (the proxy curates the long history). A context-curation claim, not a menhir memory claim.
+- Command: `archolith-bench harness longmemeval --arms direct,proxy_only,proxy_plus_filter --limit 50`
+- Evidence path: `benchmarks/longmemeval-proxy-YYYY-MM-DD.md`
+
+### LongMemEval (persistent menhir memory) (longmemeval-menhir)
 
 - Product: `menhir`
 - Suite: `memory`
 - Authority: Wu et al. (ICLR 2025)
-- Type: long-term interactive memory QA (extraction, multi-session, temporal, updates, abstention)
+- Type: long-term interactive memory QA via ingest-then-recall (Mode B: tests menhir end-to-end)
 - Status: `candidate-before-launch`
 - Source: https://github.com/xiaowu0162/LongMemEval
 - Paper: https://arxiv.org/abs/2410.10813
-- Why relevant: This is menhir's CAPABILITY benchmark: can the memory system recall the right facts across a long, multi-session history? menhir is built on Graphiti (the temporal knowledge-graph engine Zep reports on LongMemEval/DMR), so this is the apples-to-apples industry standard for the product menhir is — unlike MTEB, which only measures the embedding sub-component.
-- Local coverage: Official adapter implemented (`harness/longmemeval.py`, in-process) — runs LongMemEval QA as a direct (no/curated memory) vs proxy A/B; the proxy assembles relevant memory from the history. Deterministic normalized-containment scorer offline; the official GPT-4 judge can be added behind a flag. Awaiting a tracked run. Runs locally with the gemma chat model + local embeddings (cheap).
-- Launch gate: Run `archolith-bench harness longmemeval` direct (no memory) vs proxy/menhir and publish the memory-QA accuracy lift plus token/cost. This is menhir's primary, advertisable capability claim.
-- Command: `archolith-bench harness longmemeval --arms direct,proxy_only,proxy_plus_filter --limit 50`
-- Evidence path: `benchmarks/longmemeval-YYYY-MM-DD.md`
+- Why relevant: MODE B — menhir's CAPABILITY benchmark. Per question: ingest the haystack sessions into menhir's graph (extraction -> temporal KG), then query menhir's recall, feed the retrieved memory to the model, answer. menhir is built on Graphiti (the engine Zep reports on LongMemEval/DMR), so this is the apples-to-apples industry standard for what menhir is. Unlike Mode A it exercises the actual graph store, so it needs an isolated (throwaway) Neo4j and per-question `group_id` isolation.
+- Local coverage: Not yet wired. Needs a Mode-B driver that ingests + recalls against a throwaway menhir/Neo4j with per-item group_id isolation. menhir backend anchors: `recall(query, *, preset, limit, ...)` and `ingest_document(...)` with group_id (core/backend_impl.py). Plan: `archolith-bench-longmemeval-menhir-mode-b-plan.md`.
+- Launch gate: Stand up a throwaway menhir+Neo4j, run LongMemEval Mode B (no-memory baseline vs menhir-recall), and publish the memory-QA accuracy lift. This is menhir's primary advertisable capability claim.
+- Command: `archolith-bench harness longmemeval-menhir --limit 30   # (Mode-B driver pending)`
+- Evidence path: `benchmarks/longmemeval-menhir-YYYY-MM-DD.md`
 
 ### Deep Memory Retrieval (DMR) (dmr)
 

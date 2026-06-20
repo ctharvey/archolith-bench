@@ -42,6 +42,7 @@ Adapters (all under one roof):
 |--------------|------|-------|
 | `longbench-v2` | in-process | `longbench` |
 | `bigcodebench-hard` | in-process (sandboxed exec) | `bigcodebench` |
+| `longmemeval` | in-process (menhir memory capability) | `longmemeval` |
 | `swe-bench` | external-cli wrapper | `swebench` |
 | `cyberseceval-4` | external-cli wrapper | `cyberseceval` |
 | `agentdojo` | external-cli wrapper | `agentdojo` |

@@ -1,5 +1,13 @@
 # archolith-bench Changelog
 
+## 2026-06-19 — Memory benchmark: LongMemEval for menhir (MTEB reclassified)
+
+**feat(harness):** Added `LongMemEvalAdapter` (in-process) — the official LongMemEval long-term memory QA benchmark, run as a direct(no memory)-vs-proxy A/B. This is menhir's CAPABILITY benchmark: menhir is built on Graphiti (the temporal-KG engine Zep reports on LongMemEval/DMR), so it's the apples-to-apples industry standard for a memory system. Deterministic normalized-containment scorer offline; official GPT-4 judge can be added behind a flag.
+
+**docs(registry):** Re-mapped menhir's memory benchmark from MTEB to **LongMemEval** (primary) + **DMR** (candidate). MTEB reclassified as an embedding-COMPONENT diagnostic (embedder-selection data), not the memory capability claim. Rationale: MTEB measures the embedding sub-component, not the memory system end-to-end.
+
+**evidence:** Earlier MTEB embedding head-to-head retained as a component diagnostic — local nomic 0.681 vs OpenAI text-embedding-3-small 0.730 on SciFact (`benchmarks/mteb-embedding-baseline-2026-06-19.md`).
+
 ## 2026-06-19 — External Benchmark Harness (real-harness A/B)
 
 **feat(harness):** New `archolith_bench/harness/` package houses official external benchmarks under one roof behind `ExternalBenchmarkAdapter`. `run_ab()` runs an adapter across arms (direct vs proxy family), reusing `core.api.send_chat`, `apply_arm_config`, and the cost model, and reports the proxy-vs-direct delta (official score preserved + tokens/cost reduced) — the only honest, advertisable Archolith claim, since Archolith is middleware, not a model.

@@ -232,18 +232,73 @@ INDUSTRY_BENCHMARKS: tuple[IndustryBenchmark, ...] = (
         evidence_path="benchmarks/audit-live-before-after-YYYY-MM-DD.md",
     ),
     IndustryBenchmark(
+        benchmark_id="longmemeval",
+        name="LongMemEval",
+        product="menhir",
+        suite="memory",
+        authority="Wu et al. (ICLR 2025)",
+        benchmark_type="long-term interactive memory QA (extraction, multi-session, temporal, updates, abstention)",
+        status="candidate-before-launch",
+        source_url="https://github.com/xiaowu0162/LongMemEval",
+        paper_url="https://arxiv.org/abs/2410.10813",
+        rationale=(
+            "This is menhir's CAPABILITY benchmark: can the memory system recall the right facts across a long, "
+            "multi-session history? menhir is built on Graphiti (the temporal knowledge-graph engine Zep reports "
+            "on LongMemEval/DMR), so this is the apples-to-apples industry standard for the product menhir is — "
+            "unlike MTEB, which only measures the embedding sub-component."
+        ),
+        local_coverage=(
+            "Official adapter implemented (`harness/longmemeval.py`, in-process) — runs LongMemEval QA as a "
+            "direct (no/curated memory) vs proxy A/B; the proxy assembles relevant memory from the history. "
+            "Deterministic normalized-containment scorer offline; the official GPT-4 judge can be added behind a "
+            "flag. Awaiting a tracked run. Runs locally with the gemma chat model + local embeddings (cheap)."
+        ),
+        launch_gate=(
+            "Run `archolith-bench harness longmemeval` direct (no memory) vs proxy/menhir and publish the "
+            "memory-QA accuracy lift plus token/cost. This is menhir's primary, advertisable capability claim."
+        ),
+        run_command="archolith-bench harness longmemeval --arms direct,proxy_only,proxy_plus_filter --limit 50",
+        evidence_path="benchmarks/longmemeval-YYYY-MM-DD.md",
+    ),
+    IndustryBenchmark(
+        benchmark_id="dmr",
+        name="Deep Memory Retrieval (DMR)",
+        product="menhir",
+        suite="memory",
+        authority="MemGPT / Letta; reported by Zep",
+        benchmark_type="memory retrieval accuracy over conversational history",
+        status="candidate-before-launch",
+        source_url="https://github.com/cpacker/MemGPT",
+        paper_url="https://arxiv.org/abs/2310.08560",
+        rationale=(
+            "The second memory benchmark Zep/Graphiti report on, complementing LongMemEval. Registered under one "
+            "roof; an adapter is not yet wired."
+        ),
+        local_coverage=(
+            "No adapter yet. Candidate — wire after LongMemEval lands, reusing the same in-process A/B pattern."
+        ),
+        launch_gate=(
+            "Either wire a DMR adapter and report a direct-vs-proxy retrieval-accuracy delta, or keep DMR a "
+            "documented future benchmark and lead menhir's memory claim with LongMemEval."
+        ),
+        run_command="TODO: add a DMR adapter under harness/ (in-process, same pattern as longmemeval)",
+        evidence_path="benchmarks/dmr-YYYY-MM-DD.md",
+    ),
+    IndustryBenchmark(
         benchmark_id="mteb-retrieval",
         name="MTEB retrieval/reranking slices",
         product="menhir",
         suite="memory",
         authority="Embeddings Benchmark / MTEB",
-        benchmark_type="retrieval and reranking evaluation",
+        benchmark_type="embedding retrieval/reranking (COMPONENT diagnostic, not the memory capability)",
         status="candidate-before-launch",
         source_url="https://github.com/embeddings-benchmark/mteb",
         paper_url="https://arxiv.org/abs/2210.07316",
         rationale=(
-            "Menhir is the durable memory direction. Its closest trusted benchmark family is retrieval "
-            "evaluation: can stored facts be recalled when queried later?"
+            "COMPONENT diagnostic only: MTEB measures the embedding model's retrieval quality, not the memory "
+            "system end-to-end. Useful for an embedder-selection decision (e.g. free local nomic vs OpenAI "
+            "text-embedding-3-small for menhir), NOT a memory capability claim. menhir's capability benchmark is "
+            "LongMemEval (and DMR)."
         ),
         local_coverage=(
             "Official adapter (`harness/external.py` MtebAdapter) runs mteb against an OpenAI-compatible "

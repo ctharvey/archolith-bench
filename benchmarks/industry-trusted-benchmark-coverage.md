@@ -11,6 +11,8 @@ This matrix maps each Archolith product to external benchmark families that are 
 | archolith-filter | filter | HELM efficiency metrics | implemented-local | Run the filter suite on the launch corpus and publish per-category savings, total savings, sample count, corpus source, and known no-op categories. |
 | archolith-filter | filter | SWE-bench-style agent traces | candidate-before-launch | Add at least one tracked corpus summary showing sample provenance and category balance, then rerun `archolith-bench filter`. |
 | archolith-audit | audit | HELM-style token/cost accounting | implemented-local | Use real before/after session logs, not fixtures. Publish server-level deltas and note any new waste type regressions. |
+| menhir | memory | LongMemEval | candidate-before-launch | Run `archolith-bench harness longmemeval` direct (no memory) vs proxy/menhir and publish the memory-QA accuracy lift plus token/cost. This is menhir's primary, advertisable capability claim. |
+| menhir | memory | Deep Memory Retrieval (DMR) | candidate-before-launch | Either wire a DMR adapter and report a direct-vs-proxy retrieval-accuracy delta, or keep DMR a documented future benchmark and lead menhir's memory claim with LongMemEval. |
 | menhir | memory | MTEB retrieval/reranking slices | candidate-before-launch | Run `archolith-bench harness mteb-retrieval` against the embeddings model and publish the MTEB score as a menhir/embedding-model baseline (not a proxy claim). A proxy A/B requires an embeddings layer that does not exist yet. |
 | archolith-security | security | CyberSecEval 4 | candidate-before-launch | Run `archolith-bench harness cyberseceval-4` on a scoped subset, direct vs proxy, and publish pass/fail, refusal, and false-refusal caveats before any security benchmark claim. |
 | archolith-security | security | AgentDojo | candidate-before-launch | Run `archolith-bench harness agentdojo` direct vs proxy and publish utility delta + attack-success-rate before claiming hardening against malicious tool output. |
@@ -123,16 +125,46 @@ This matrix maps each Archolith product to external benchmark families that are 
 - Command: `archolith-bench audit --before <real-before.json> --after <real-after.json> --format markdown`
 - Evidence path: `benchmarks/audit-live-before-after-YYYY-MM-DD.md`
 
+### LongMemEval (longmemeval)
+
+- Product: `menhir`
+- Suite: `memory`
+- Authority: Wu et al. (ICLR 2025)
+- Type: long-term interactive memory QA (extraction, multi-session, temporal, updates, abstention)
+- Status: `candidate-before-launch`
+- Source: https://github.com/xiaowu0162/LongMemEval
+- Paper: https://arxiv.org/abs/2410.10813
+- Why relevant: This is menhir's CAPABILITY benchmark: can the memory system recall the right facts across a long, multi-session history? menhir is built on Graphiti (the temporal knowledge-graph engine Zep reports on LongMemEval/DMR), so this is the apples-to-apples industry standard for the product menhir is — unlike MTEB, which only measures the embedding sub-component.
+- Local coverage: Official adapter implemented (`harness/longmemeval.py`, in-process) — runs LongMemEval QA as a direct (no/curated memory) vs proxy A/B; the proxy assembles relevant memory from the history. Deterministic normalized-containment scorer offline; the official GPT-4 judge can be added behind a flag. Awaiting a tracked run. Runs locally with the gemma chat model + local embeddings (cheap).
+- Launch gate: Run `archolith-bench harness longmemeval` direct (no memory) vs proxy/menhir and publish the memory-QA accuracy lift plus token/cost. This is menhir's primary, advertisable capability claim.
+- Command: `archolith-bench harness longmemeval --arms direct,proxy_only,proxy_plus_filter --limit 50`
+- Evidence path: `benchmarks/longmemeval-YYYY-MM-DD.md`
+
+### Deep Memory Retrieval (DMR) (dmr)
+
+- Product: `menhir`
+- Suite: `memory`
+- Authority: MemGPT / Letta; reported by Zep
+- Type: memory retrieval accuracy over conversational history
+- Status: `candidate-before-launch`
+- Source: https://github.com/cpacker/MemGPT
+- Paper: https://arxiv.org/abs/2310.08560
+- Why relevant: The second memory benchmark Zep/Graphiti report on, complementing LongMemEval. Registered under one roof; an adapter is not yet wired.
+- Local coverage: No adapter yet. Candidate — wire after LongMemEval lands, reusing the same in-process A/B pattern.
+- Launch gate: Either wire a DMR adapter and report a direct-vs-proxy retrieval-accuracy delta, or keep DMR a documented future benchmark and lead menhir's memory claim with LongMemEval.
+- Command: `TODO: add a DMR adapter under harness/ (in-process, same pattern as longmemeval)`
+- Evidence path: `benchmarks/dmr-YYYY-MM-DD.md`
+
 ### MTEB retrieval/reranking slices (mteb-retrieval)
 
 - Product: `menhir`
 - Suite: `memory`
 - Authority: Embeddings Benchmark / MTEB
-- Type: retrieval and reranking evaluation
+- Type: embedding retrieval/reranking (COMPONENT diagnostic, not the memory capability)
 - Status: `candidate-before-launch`
 - Source: https://github.com/embeddings-benchmark/mteb
 - Paper: https://arxiv.org/abs/2210.07316
-- Why relevant: Menhir is the durable memory direction. Its closest trusted benchmark family is retrieval evaluation: can stored facts be recalled when queried later?
+- Why relevant: COMPONENT diagnostic only: MTEB measures the embedding model's retrieval quality, not the memory system end-to-end. Useful for an embedder-selection decision (e.g. free local nomic vs OpenAI text-embedding-3-small for menhir), NOT a memory capability claim. menhir's capability benchmark is LongMemEval (and DMR).
 - Local coverage: Official adapter (`harness/external.py` MtebAdapter) runs mteb against an OpenAI-compatible embeddings endpoint, defaulting to a local LM Studio server (text-embedding-nomic-embed-text-v1.5) — so it runs for FREE, no API spend, once the `mteb` extra is installed. SINGLE-ARM BASELINE: the embedding model is a menhir / fact-retrieval dependency, not the chat proxy path, so there is no direct-vs-proxy A/B (a real A/B needs an embeddings proxy/caching layer). Measures the embedding model menhir depends on, not the proxy.
 - Launch gate: Run `archolith-bench harness mteb-retrieval` against the embeddings model and publish the MTEB score as a menhir/embedding-model baseline (not a proxy claim). A proxy A/B requires an embeddings layer that does not exist yet.
 - Command: `archolith-bench harness mteb-retrieval --subset SciFact --arms direct`

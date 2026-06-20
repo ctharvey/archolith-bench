@@ -211,6 +211,56 @@ def test_run_external_ab_with_per_arm_fixtures(tmp_path):
     assert ab.deltas["proxy_only"]["score_delta"] == 0.0
 
 
+# ---- LongMemEval (in-process memory QA) ----
+
+LME_FIXTURE = FIXTURES / "longmemeval_sample.json"
+
+
+def test_longmemeval_load_and_history():
+    from archolith_bench.harness.longmemeval import LongMemEvalAdapter
+    adapter = LongMemEvalAdapter()
+    tasks = adapter.load_tasks(fixture_path=LME_FIXTURE)
+    assert len(tasks) == 3
+    # History flattened into chat turns + final question.
+    assert tasks[0].prompt_messages[0]["role"] == "system"
+    assert any("Biscuit" in m["content"] for m in tasks[0].prompt_messages)
+    assert tasks[0].prompt_messages[-1]["content"] == "What is the name of my dog?"
+
+
+def test_longmemeval_scoring():
+    from archolith_bench.harness.longmemeval import LongMemEvalAdapter
+    adapter = LongMemEvalAdapter()
+    tasks = adapter.load_tasks(fixture_path=LME_FIXTURE)
+    assert adapter.score(tasks[0], "Your dog's name is Biscuit.") is True
+    assert adapter.score(tasks[0], "I think it was Rex.") is False
+    # knowledge-update: must use the latest fact.
+    assert adapter.score(tasks[1], "You live in Denver now.") is True
+    assert adapter.score(tasks[1], "You live in Boston.") is False
+    # abstention: declining is correct.
+    assert adapter.score(tasks[2], "I don't know that.") is True
+    assert adapter.score(tasks[2], "It is Marie.") is False
+
+
+def test_longmemeval_run_ab_offline():
+    from archolith_bench.harness.longmemeval import LongMemEvalAdapter
+    adapter = LongMemEvalAdapter()
+
+    def send_fn(client, base_url, api_key, messages, model, **kwargs):
+        q = messages[-1]["content"]
+        ans = {"dog": "Biscuit", "city": "Denver"}
+        text = "I don't know"
+        if "dog" in q:
+            text = "Biscuit"
+        elif "city" in q:
+            text = "Denver"
+        return text, 1.0, {"prompt_tokens": 200, "completion_tokens": 3}
+
+    ab = run_ab(adapter, arms=("direct",), fixture_path=LME_FIXTURE,
+                send_fn=send_fn, configure_proxy=False)
+    # dog + city correct, abstention correct -> 3/3.
+    assert ab.arms["direct"].score == 1.0
+
+
 def test_harness_cli_external_offline(tmp_path):
     result = subprocess.run(
         [

@@ -32,6 +32,7 @@ from .external import (
     SweBenchAdapter,
 )
 from .longbench_v2 import LongBenchV2Adapter
+from .longmemeval import LongMemEvalAdapter
 
 # Registry of available real-harness adapters, keyed by benchmark_id (the one roof).
 # In-process adapters run via run_ab; ExternalCliAdapter subclasses run via run_external_ab.
@@ -40,6 +41,7 @@ ADAPTERS: dict[str, object] = {
     for a in (
         LongBenchV2Adapter(),
         BigCodeBenchHardAdapter(),
+        LongMemEvalAdapter(),
         SweBenchAdapter(),
         CyberSecEvalAdapter(),
         AgentDojoAdapter(),
@@ -74,6 +76,7 @@ __all__ = [
     "ExternalCliAdapter",
     "HarnessBenchmarkAdapter",
     "LongBenchV2Adapter",
+    "LongMemEvalAdapter",
     "MtebAdapter",
     "SweBenchAdapter",
     "Task",

@@ -1,0 +1,46 @@
+[
+  {
+    "question_id": "lme-sample-001",
+    "question_type": "single-session-user",
+    "question": "What is the name of my dog?",
+    "answer": "Biscuit",
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "I just adopted a golden retriever puppy named Biscuit."},
+        {"role": "assistant", "content": "Congratulations on adopting Biscuit!"}
+      ],
+      [
+        {"role": "user", "content": "Today I bought a new standing desk for my office."},
+        {"role": "assistant", "content": "Nice, standing desks are great for posture."}
+      ]
+    ]
+  },
+  {
+    "question_id": "lme-sample-002",
+    "question_type": "knowledge-update",
+    "question": "Which city do I currently live in?",
+    "answer": "Denver",
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "I live in Boston and work downtown."},
+        {"role": "assistant", "content": "Boston is a great city."}
+      ],
+      [
+        {"role": "user", "content": "Update: I moved last month. I now live in Denver."},
+        {"role": "assistant", "content": "Hope the move to Denver went smoothly!"}
+      ]
+    ]
+  },
+  {
+    "question_id": "lme-sample-003",
+    "question_type": "abstention",
+    "question": "What is my sister's middle name?",
+    "answer": "no answer",
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "I went hiking with my sister last weekend."},
+        {"role": "assistant", "content": "Sounds like a fun weekend!"}
+      ]
+    ]
+  }
+]

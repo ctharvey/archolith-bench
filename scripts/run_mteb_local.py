@@ -9,25 +9,44 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 
 import httpx
 import numpy as np
 
 BASE = os.getenv("EMBEDDINGS_BASE_URL", "http://localhost:1234/v1").rstrip("/")
 MODEL = os.getenv("EMBEDDINGS_MODEL", "text-embedding-nomic-embed-text-v1.5")
+API_KEY = os.getenv("EMBEDDINGS_API_KEY") or os.getenv("OPENAI_API_KEY") or "lm-studio"
 TASK = sys.argv[1] if len(sys.argv) > 1 else "SciFact"
 
 _client = httpx.Client(timeout=120)
 
 
+def _post_batch(batch: list[str], headers: dict, max_retries: int = 4) -> list[list[float]]:
+    """POST one batch, backing off on transient 429s (respecting Retry-After)."""
+    for attempt in range(max_retries + 1):
+        r = _client.post(f"{BASE}/embeddings", json={"model": MODEL, "input": batch}, headers=headers)
+        if r.status_code == 429 and attempt < max_retries:
+            ra = r.headers.get("Retry-After")
+            wait = int(ra) if (ra and ra.isdigit()) else min(2 ** attempt * 5, 60)
+            print(f"  [429] backing off {wait}s (retry {attempt + 1}/{max_retries})", flush=True)
+            time.sleep(wait)
+            continue
+        if r.status_code == 429:
+            raise SystemExit("STOP: persistent 429 after retries; aborting per rate-limit policy.")
+        r.raise_for_status()
+        return [d["embedding"] for d in r.json()["data"]]
+    raise SystemExit("STOP: exhausted retries.")
+
+
 def _embed(sentences: list[str]) -> np.ndarray:
+    headers = {"Authorization": f"Bearer {API_KEY}"}
     out: list[list[float]] = []
-    batch_size = 64
+    batch_size = 32
     for i in range(0, len(sentences), batch_size):
         batch = [s if s and s.strip() else " " for s in sentences[i : i + batch_size]]
-        r = _client.post(f"{BASE}/embeddings", json={"model": MODEL, "input": batch})
-        r.raise_for_status()
-        out.extend(d["embedding"] for d in r.json()["data"])
+        out.extend(_post_batch(batch, headers))
+        time.sleep(0.15)  # gentle throttle to stay under burst limits
     return np.asarray(out, dtype=np.float32)
 
 

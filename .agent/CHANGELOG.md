@@ -1,5 +1,16 @@
 # archolith-bench Changelog
 
+## 2026-06-20 — Token estimator validation
+
+**fix(metrics):** `estimate_tokens()` now uses `tiktoken` `cl100k_base` when available and falls back to the
+existing char-divide heuristic only when the optional tokenizer is absent.
+
+**tests:** Added representative estimator fixtures for prose, JSON/tool schemas, code snippets, and mixed
+OpenAI message arrays.
+
+**docs:** Added `.agent/benchmark-notes/token-estimator-validation-2026-06-20.md` with measured heuristic
+error bounds and a no-change recommendation for `archolith-context` production token accounting.
+
 ## 2026-06-19 — LongMemEval Mode B: persistent-memory (ingest-then-recall) driver
 
 **feat(harness):** Added a third adapter shape for memory benchmarks. `harness/memory_ab.py` `run_memory_ab` drives ingest -> recall -> answer per item: for memory arms it isolates a `group_id`, ingests the haystack sessions, recalls against the question, and answers from recalled memory (not the raw history); the `no_memory` arm is the floor. Reports the memory-QA accuracy lift. `assert_not_production` refuses prod-looking targets before any write.

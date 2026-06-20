@@ -2,18 +2,41 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from functools import lru_cache
+
+try:
+    import tiktoken
+except ImportError:  # pragma: no cover - exercised by environments without the optional extra
+    tiktoken = None
 
 
-def estimate_tokens(text: str | None) -> int:
-    """Estimate token count from text using a simple heuristic."""
-    if not text:
-        return 1
+@lru_cache(maxsize=1)
+def _cl100k_encoding():
+    if tiktoken is None:
+        return None
+    try:
+        return tiktoken.get_encoding("cl100k_base")
+    except Exception:
+        return None
+
+
+def _heuristic_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
+def estimate_tokens(text: str | None) -> int:
+    """Estimate content token count from text using cl100k_base when available."""
+    if not text:
+        return 1
+    encoding = _cl100k_encoding()
+    if encoding is None:
+        return _heuristic_tokens(text)
+    return max(1, len(encoding.encode(text)))
+
+
 def estimate_messages_tokens(messages: list[dict]) -> int:
-    """Estimate total token count from a list of message dicts."""
+    """Estimate total content token count from a list of OpenAI-style message dicts."""
     total = 0
     for m in messages:
         c = m.get("content", "")

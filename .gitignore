@@ -1,5 +1,7 @@
 results/
 __pycache__/
+.pytest_cache/
+.pytest-tmp/
 .env
 .checkpoint_*
 *.pyc

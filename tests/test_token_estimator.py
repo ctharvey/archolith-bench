@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
 from archolith_bench.core.metrics import estimate_messages_tokens, estimate_tokens
+from archolith_bench.suites.token_estimator import (
+    TokenEstimatorSample,
+    compare_message_shapes,
+    measure_sample,
+    write_markdown_report,
+)
 
 
 PLAIN_ENGLISH = (
@@ -117,3 +124,18 @@ def test_legacy_char_divide_heuristic_has_material_fixture_error_when_available(
     assert plain_error > 0.25
     assert code_error < -0.05
     assert abs(json_error) < 0.10
+
+
+def test_token_estimator_suite_writes_plan_report(tmp_path: Path) -> None:
+    sample = TokenEstimatorSample(name="plain-english", content_type="prose", text=PLAIN_ENGLISH)
+    measurement = measure_sample(sample, runs=2)
+    shape_tokens = compare_message_shapes(PLAIN_ENGLISH, MIXED_MESSAGES)
+    output_path = tmp_path / "token-estimator-2026-06-20.md"
+
+    write_markdown_report([measurement], output_path, message_shape_tokens=shape_tokens)
+
+    report = output_path.read_text(encoding="utf-8")
+    assert "Token Estimator Validation" in report
+    assert "plain-english" in report
+    assert "Single large message" in report
+    assert "No `archolith-context` production estimator change" in report

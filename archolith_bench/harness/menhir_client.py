@@ -48,13 +48,14 @@ class StubMenhirClient:
         snippets = self._groups[group_id]
         query_tokens = set(query.lower().split())
 
-        def score_snippet(snippet: str) -> tuple[int, int]:
+        def score_snippet(indexed_snippet: tuple[int, str]) -> tuple[int, int]:
             """Return (negative overlap count, insertion index) for sorting."""
+            index, snippet = indexed_snippet
             snippet_tokens = set(snippet.lower().split())
             overlap = len(query_tokens & snippet_tokens)
-            return (-overlap, snippets.index(snippet))
+            return (-overlap, index)
 
-        ranked = sorted(enumerate(snippets), key=lambda x: score_snippet(x[1]))
+        ranked = sorted(enumerate(snippets), key=score_snippet)
         return [snippet for _, snippet in ranked[:limit]]
 
     def reset(self, group_id: str) -> None:
@@ -91,6 +92,14 @@ class HttpMenhirClient:
         self._headers: dict[str, str] = {}
         if api_key:
             self._headers["Authorization"] = f"Bearer {api_key}"
+
+    def __enter__(self):
+        """Return this client for context-manager use."""
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001
+        """Close the underlying HTTP client on context-manager exit."""
+        self.close()
 
     def new_group(self) -> str:
         """Return a fresh isolated namespace id."""

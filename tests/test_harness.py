@@ -21,6 +21,7 @@ from archolith_bench.harness import (
     run_external_ab,
     write_harness_evidence,
 )
+from archolith_bench.harness.external import _build_subprocess_env, _openai_env
 from archolith_bench.harness.longbench_v2 import LongBenchV2Adapter, _extract_choice
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
@@ -71,6 +72,8 @@ def test_extract_choice():
     assert _extract_choice("answer: C") == "C"
     assert _extract_choice("(D)") == "D"
     assert _extract_choice("A") == "A"
+    assert _extract_choice("I considered A and B. Final answer: C.") == "C"
+    assert _extract_choice("I considered A and B. Final choice C.") == "C"
     assert _extract_choice("I am not sure") == ""
 
 
@@ -119,6 +122,40 @@ def test_get_adapter_unknown_raises():
         raise AssertionError("expected KeyError for unknown benchmark_id")
 
 
+def test_build_subprocess_env_filters_secret_keys(monkeypatch):
+    monkeypatch.setenv("UPSTREAM_API_KEY", "secret")
+    monkeypatch.setenv("OPENAI_API_KEY", "parent-secret")
+
+    env = _build_subprocess_env({})
+
+    assert "UPSTREAM_API_KEY" not in env
+    assert "OPENAI_API_KEY" not in env
+
+
+def test_build_subprocess_env_allows_path(monkeypatch):
+    monkeypatch.setenv("PATH", "local-path")
+
+    env = _build_subprocess_env({})
+
+    assert env["PATH"] == "local-path"
+
+
+def test_build_subprocess_env_overrides_win(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "parent-secret")
+
+    env = _build_subprocess_env({"OPENAI_API_KEY": "adapter-secret"})
+
+    assert env["OPENAI_API_KEY"] == "adapter-secret"
+
+
+def test_openai_env_helper_exposes_expected_keys():
+    assert _openai_env("http://example.test/v1", "secret") == {
+        "OPENAI_BASE_URL": "http://example.test/v1",
+        "OPENAI_API_BASE": "http://example.test/v1",
+        "OPENAI_API_KEY": "secret",
+    }
+
+
 def test_harness_cli_offline(tmp_path):
     result = subprocess.run(
         [
@@ -145,10 +182,31 @@ def test_stub_menhir_client_roundtrip():
     assert c.recall(g, "dog", limit=10) == []
 
 
+def test_stub_menhir_client_recall_preserves_insertion_order_for_ties():
+    from archolith_bench.harness import StubMenhirClient
+    c = StubMenhirClient()
+    g = c.new_group()
+    c.ingest(g, "user", "alpha")
+    c.ingest(g, "assistant", "beta")
+    c.ingest(g, "user", "alpha")
+
+    out = c.recall(g, "unmatched", limit=3)
+
+    assert out == ["user: alpha", "assistant: beta", "user: alpha"]
+
+
 def test_assert_not_production_guards():
     from archolith_bench.harness import assert_not_production
     assert_not_production("http://localhost:7999")  # ok
-    for bad in ("https://menhir.example.com", "http://prod-neo4j:7687", "http://localhost:9800/v1"):
+    assert_not_production("http://localhost:9800/v1")  # proxy port alone is not production.
+    for bad in (
+        "https://menhir.example.com",
+        "http://prod-neo4j:7687",
+        "https://staging.menhir.example.com",
+        "https://preprod-memory.example.com",
+        "https://preview-memory.example.com",
+        "https://release-memory.example.com",
+    ):
         try:
             assert_not_production(bad)
         except SystemExit:
@@ -181,6 +239,153 @@ def test_run_memory_ab_lift_offline():
     assert ab.arms["no_memory"].score < ab.arms["menhir_recall"].score
     assert ab.arms["menhir_recall"].score == 1.0
     assert ab.deltas["menhir_recall"]["score_delta"] > 0
+
+
+def test_run_memory_ab_no_memory_arm_receives_chat_client():
+    from archolith_bench.harness import run_memory_ab
+    from archolith_bench.harness.longmemeval import LongMemEvalMemoryAdapter
+
+    seen_clients = []
+
+    def send_fn(client, base_url, api_key, messages, model, **kwargs):
+        seen_clients.append(client)
+        return "I don't know", 1.0, {"prompt_tokens": 1, "completion_tokens": 1}
+
+    ab = run_memory_ab(
+        LongMemEvalMemoryAdapter(),
+        arms=("no_memory",),
+        fixture_path=LME_FIXTURE,
+        send_fn=send_fn,
+    )
+
+    assert ab.arms["no_memory"].n == 3
+    assert seen_clients
+    assert all(client is not None for client in seen_clients)
+
+
+def test_run_memory_ab_closes_chat_client(monkeypatch):
+    import archolith_bench.harness.memory_ab as memory_ab_module
+    from archolith_bench.harness import run_memory_ab
+    from archolith_bench.harness.longmemeval import LongMemEvalMemoryAdapter
+
+    class FakeChatClient:
+        def __init__(self, timeout):
+            self.timeout = timeout
+            self.closed = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            self.closed = True
+
+    fake_client = FakeChatClient(timeout=300)
+    monkeypatch.setattr(memory_ab_module.httpx, "Client", lambda timeout: fake_client)
+
+    def send_fn(client, base_url, api_key, messages, model, **kwargs):
+        assert client is fake_client
+        return "I don't know", 1.0, {"prompt_tokens": 1, "completion_tokens": 1}
+
+    run_memory_ab(
+        LongMemEvalMemoryAdapter(),
+        arms=("no_memory",),
+        fixture_path=LME_FIXTURE,
+        send_fn=send_fn,
+    )
+
+    assert fake_client.closed is True
+
+
+def test_run_memory_ab_closes_http_menhir_client():
+    from archolith_bench.harness import HttpMenhirClient, run_memory_ab
+    from archolith_bench.harness.longmemeval import LongMemEvalMemoryAdapter
+
+    client = HttpMenhirClient("http://throwaway-menhir.local")
+    closed = False
+
+    def close():
+        nonlocal closed
+        closed = True
+
+    client.close = close
+
+    def send_fn(chat_client, base_url, api_key, messages, model, **kwargs):
+        return "I don't know", 1.0, {"prompt_tokens": 1, "completion_tokens": 1}
+
+    run_memory_ab(
+        LongMemEvalMemoryAdapter(),
+        arms=("no_memory",),
+        fixture_path=LME_FIXTURE,
+        client=client,
+        send_fn=send_fn,
+    )
+
+    assert closed is True
+
+
+def test_run_memory_ab_requires_confirmation_before_real_menhir_reset():
+    from archolith_bench.harness import HttpMenhirClient, run_memory_ab
+    from archolith_bench.harness.longmemeval import LongMemEvalMemoryAdapter
+
+    client = HttpMenhirClient("http://throwaway-menhir.local")
+    try:
+        try:
+            run_memory_ab(
+                LongMemEvalMemoryAdapter(),
+                arms=("menhir_recall",),
+                fixture_path=LME_FIXTURE,
+                client=client,
+                send_fn=lambda *args, **kwargs: ("I don't know", 1.0, {}),
+            )
+        except ValueError as e:
+            assert "--confirm-menhir-reset" in str(e)
+        else:
+            raise AssertionError("expected reset confirmation refusal")
+    finally:
+        client.close()
+
+
+def test_run_memory_ab_dry_run_skips_real_menhir_reset():
+    from archolith_bench.harness import HttpMenhirClient, run_memory_ab
+    from archolith_bench.harness.longmemeval import LongMemEvalMemoryAdapter
+
+    class FakeHttpMenhirClient(HttpMenhirClient):
+        def __init__(self):
+            self.reset_calls = 0
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+        def new_group(self):
+            return "group-1"
+
+        def ingest(self, group_id, role, content):
+            return None
+
+        def recall(self, group_id, query, limit=10):
+            return ["Biscuit"]
+
+        def reset(self, group_id):
+            self.reset_calls += 1
+
+    client = FakeHttpMenhirClient()
+
+    def send_fn(chat_client, base_url, api_key, messages, model, **kwargs):
+        return "Biscuit", 1.0, {"prompt_tokens": 1, "completion_tokens": 1}
+
+    run_memory_ab(
+        LongMemEvalMemoryAdapter(),
+        arms=("menhir_recall",),
+        fixture_path=LME_FIXTURE,
+        client=client,
+        send_fn=send_fn,
+        dry_run_reset=True,
+    )
+
+    assert client.reset_calls == 0
 
 
 def test_harness_cli_memory_offline(tmp_path):
@@ -302,6 +507,7 @@ def test_longmemeval_scoring():
     # abstention: declining is correct.
     assert adapter.score(tasks[2], "I don't know that.") is True
     assert adapter.score(tasks[2], "It is Marie.") is False
+    assert adapter.score(tasks[0], "The answer is not Biscuit.") is False
 
 
 def test_longmemeval_run_ab_offline():
@@ -310,7 +516,6 @@ def test_longmemeval_run_ab_offline():
 
     def send_fn(client, base_url, api_key, messages, model, **kwargs):
         q = messages[-1]["content"]
-        ans = {"dog": "Biscuit", "city": "Denver"}
         text = "I don't know"
         if "dog" in q:
             text = "Biscuit"

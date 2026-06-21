@@ -25,7 +25,8 @@ _SYSTEM_PROMPT = (
     "with only the letter of the correct choice (A, B, C, or D)."
 )
 
-# Prefer an explicit "answer: X" / "answer is X" statement; fall back to a lone letter.
+# Prefer an explicit "answer: X" / "answer is X" statement; fall back to the
+# last standalone letter so "A and B considered, final C" scores as C.
 _ANSWER_RE = re.compile(r"answer\s*(?:is|:)?\s*\(?([ABCD])\)?", re.IGNORECASE)
 _LONE_LETTER_RE = re.compile(r"\b([ABCD])\b")
 
@@ -55,9 +56,9 @@ def _extract_choice(text: str) -> str:
     m = _ANSWER_RE.search(text)
     if m:
         return m.group(1).upper()
-    m = _LONE_LETTER_RE.search(text.strip())
-    if m:
-        return m.group(1).upper()
+    matches = _LONE_LETTER_RE.findall(text.strip())
+    if matches:
+        return matches[-1].upper()
     return ""
 
 

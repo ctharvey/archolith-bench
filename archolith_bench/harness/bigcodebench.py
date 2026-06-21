@@ -16,10 +16,10 @@ import json
 import re
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 from .base import Task
+from .tempfiles import secure_temporary_directory
 
 _SYSTEM_PROMPT = (
     "You are an expert Python programmer. Complete the requested function. "
@@ -52,8 +52,8 @@ def _extract_code(text: str) -> str:
 def _execute_tests(solution: str, test: str, timeout: int = _EXEC_TIMEOUT_S) -> bool:
     """Run solution + unittest `test` in a subprocess; True iff tests pass."""
     script = f"{solution}\n\n{test}\n\nimport unittest\nunittest.main(argv=['x'], exit=False)\n"
-    with tempfile.TemporaryDirectory() as td:
-        path = Path(td) / "candidate.py"
+    with secure_temporary_directory() as workdir:
+        path = workdir / "candidate.py"
         path.write_text(script, encoding="utf-8")
         try:
             proc = subprocess.run(
@@ -61,7 +61,7 @@ def _execute_tests(solution: str, test: str, timeout: int = _EXEC_TIMEOUT_S) -> 
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                cwd=td,
+                cwd=workdir,
             )
         except subprocess.TimeoutExpired:
             return False

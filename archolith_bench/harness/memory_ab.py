@@ -14,18 +14,22 @@ menhir+Neo4j (never production — `assert_not_production` guards the target).
 from __future__ import annotations
 
 from collections.abc import Sequence
+from contextlib import nullcontext
 from statistics import mean
 from typing import Protocol, runtime_checkable
+
+import httpx
 
 from ..core.api import API_KEY, MODEL, PROXY_URL, send_chat
 from ..core.metrics import PricingModel, compute_arm_cost
 from .base import ABResult, ArmResult, TaskResult, _compute_deltas, _pick_pricing, _usage_tokens
+from .menhir_client import HttpMenhirClient
 
 # Arms: a no-memory floor vs memory-recall arms.
 NO_MEMORY = "no_memory"
 DEFAULT_MEMORY_ARMS = (NO_MEMORY, "menhir_recall")
 
-_PROD_MARKERS = ("prod", "production", "menhir.", "9800")
+_PROD_MARKERS = ("prod", "production", "menhir.", "staging.", "preprod", "preview", "release")
 
 
 @runtime_checkable
@@ -79,12 +83,16 @@ def _run_memory_arm(
     items: Sequence[dict],
     *,
     client: MenhirClient | None,
+    chat_client: httpx.Client,
     send_fn,
     chat_base_url: str,
     api_key: str,
     model: str,
     recall_limit: int,
     pricing: PricingModel,
+    reset_memory: bool,
+    reset_confirmed: bool,
+    dry_run_reset: bool,
 ) -> ArmResult:
     results: list[TaskResult] = []
     turn_dicts: list[dict] = []
@@ -101,9 +109,15 @@ def _run_memory_arm(
                 recalled = client.recall(group_id, question, limit=recall_limit)
                 memory_context = "\n".join(recalled)
             finally:
-                client.reset(group_id)
+                if reset_memory:
+                    _reset_memory_group(
+                        client,
+                        group_id,
+                        reset_confirmed=reset_confirmed,
+                        dry_run_reset=dry_run_reset,
+                    )
         messages = adapter.build_messages(memory_context, question)
-        text, latency_ms, usage = send_fn(None, chat_base_url, api_key, messages, model)
+        text, latency_ms, usage = send_fn(chat_client, chat_base_url, api_key, messages, model)
         inp, out = _usage_tokens(usage)
         correct = adapter.score(item, text)
         results.append(
@@ -146,6 +160,9 @@ def run_memory_ab(
     model: str = MODEL,
     recall_limit: int = 10,
     pricing: PricingModel | None = None,
+    reset_memory: bool = True,
+    reset_confirmed: bool = False,
+    dry_run_reset: bool = False,
 ) -> ABResult:
     """Run an ingest-then-recall memory benchmark across arms.
 
@@ -158,22 +175,40 @@ def run_memory_ab(
     needs_client = any(a != NO_MEMORY for a in arms)
     if needs_client and client is None:
         raise ValueError("memory arms require a MenhirClient (got None)")
+    if (
+        needs_client
+        and isinstance(client, HttpMenhirClient)
+        and reset_memory
+        and not reset_confirmed
+        and not dry_run_reset
+    ):
+        raise ValueError(
+            "memory benchmarks with a real Menhir client require --confirm-menhir-reset "
+            "or --dry-run-menhir-reset before any ingest occurs"
+        )
 
     arm_results: dict[str, ArmResult] = {}
-    for arm in arms:
-        arm_client = None if arm == NO_MEMORY else client
-        arm_results[arm] = _run_memory_arm(
-            adapter,
-            arm,
-            items,
-            client=arm_client,
-            send_fn=send_fn,
-            chat_base_url=chat_base_url,
-            api_key=api_key,
-            model=model,
-            recall_limit=recall_limit,
-            pricing=pricing,
-        )
+    memory_client_cm = client if hasattr(client, "__enter__") and hasattr(client, "__exit__") else nullcontext(client)
+    with httpx.Client(timeout=300) as chat_client:
+        with memory_client_cm:
+            for arm in arms:
+                arm_client = None if arm == NO_MEMORY else client
+                arm_results[arm] = _run_memory_arm(
+                    adapter,
+                    arm,
+                    items,
+                    client=arm_client,
+                    chat_client=chat_client,
+                    send_fn=send_fn,
+                    chat_base_url=chat_base_url,
+                    api_key=api_key,
+                    model=model,
+                    recall_limit=recall_limit,
+                    pricing=pricing,
+                    reset_memory=reset_memory,
+                    reset_confirmed=reset_confirmed,
+                    dry_run_reset=dry_run_reset,
+                )
 
     # Deltas vs the no_memory floor (memory lift), reusing the shared helper by
     # aliasing no_memory as the baseline.
@@ -191,3 +226,22 @@ def run_memory_ab(
         arms=arm_results,
         deltas=deltas,
     )
+
+
+def _reset_memory_group(
+    client: MenhirClient,
+    group_id: str,
+    *,
+    reset_confirmed: bool,
+    dry_run_reset: bool,
+) -> None:
+    """Reset a memory group with explicit safety for real HTTP Menhir clients."""
+    if dry_run_reset:
+        print(f"  [memory] dry-run: would reset group {group_id}")
+        return
+    if isinstance(client, HttpMenhirClient) and not reset_confirmed:
+        raise RuntimeError(
+            "Refusing to reset a real Menhir group without confirmation. "
+            "Pass --confirm-menhir-reset for cleanup or --dry-run-menhir-reset to inspect."
+        )
+    client.reset(group_id)

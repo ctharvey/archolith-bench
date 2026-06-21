@@ -16,12 +16,37 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import tempfile
 from pathlib import Path
 
 from .base import ArmResult, arm_result_from_summary
+from .tempfiles import secure_temporary_directory
 
 _DEFAULT_TIMEOUT_S = 3600
+_ALLOWED_OS_ENV = frozenset({
+    "HOME",
+    "USER",
+    "USERNAME",
+    "SHELL",
+    "TERM",
+    "LANG",
+    "LC_ALL",
+    "PATH",
+    "PYTHONPATH",
+    "SYSTEMROOT",
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+})
+
+
+def _build_subprocess_env(env_overrides: dict[str, str]) -> dict[str, str]:
+    """Build a filtered subprocess environment.
+
+    Only a small allowlist of OS env vars is inherited. Adapters that need
+    credentials or service URLs must declare them explicitly in env_overrides.
+    """
+    filtered = {key: value for key, value in os.environ.items() if key in _ALLOWED_OS_ENV}
+    return {**filtered, **env_overrides}
 
 
 class ExternalCliAdapter:
@@ -65,13 +90,14 @@ class ExternalCliAdapter:
         subset: str | None = None,
         limit: int | None = None,
         results_fixture: str | Path | None = None,
+        timeout_s: int = _DEFAULT_TIMEOUT_S,
     ) -> ArmResult:
         if results_fixture is not None:
             with open(results_fixture, encoding="utf-8") as f:
                 data = json.load(f)
         else:
             data = self._run_real(
-                arm, base_url=base_url, api_key=api_key, model=model, subset=subset, limit=limit
+                arm, base_url=base_url, api_key=api_key, model=model, subset=subset, limit=limit, timeout_s=timeout_s
             )
         s = self.parse_summary(data)
         return arm_result_from_summary(
@@ -92,9 +118,9 @@ class ExternalCliAdapter:
         model: str,
         subset: str | None,
         limit: int | None,
+        timeout_s: int = _DEFAULT_TIMEOUT_S,
     ) -> dict:  # pragma: no cover - exercised only with the real tool installed (step 3)
-        with tempfile.TemporaryDirectory() as td:
-            workdir = Path(td)
+        with secure_temporary_directory() as workdir:
             argv, env_overrides = self.build_command(
                 arm=arm,
                 base_url=base_url,
@@ -104,8 +130,8 @@ class ExternalCliAdapter:
                 limit=limit,
                 workdir=workdir,
             )
-            env = {**os.environ, **env_overrides}
-            subprocess.run(argv, env=env, cwd=td, check=True, timeout=_DEFAULT_TIMEOUT_S)
+            env = _build_subprocess_env(env_overrides)
+            subprocess.run(argv, env=env, cwd=workdir, check=True, timeout=timeout_s)
             with open(self.results_path(workdir), encoding="utf-8") as f:
                 return json.load(f)
 
@@ -241,12 +267,15 @@ class MtebAdapter(ExternalCliAdapter):
     name = "MTEB retrieval/reranking"
     extra = "mteb"
 
-    # Local LM Studio embeddings server by default; override via env.
+    # Intentional local LM Studio fallback: MTEB is an embedding-component diagnostic,
+    # so defaulting to local embeddings avoids API spend for this informational suite.
     embeddings_base_url = os.getenv("EMBEDDINGS_BASE_URL", "http://localhost:1234/v1")
     embeddings_model = os.getenv("EMBEDDINGS_MODEL", "text-embedding-nomic-embed-text-v1.5")
 
     def build_command(self, *, arm, base_url, api_key, model, subset, limit, workdir):  # noqa: ANN001
         # MTEB measures the embedding model; the chat arm base_url is irrelevant.
+        if arm != "direct":
+            print("  [WARN] MTEB ignores chat proxy arms; embeddings endpoint is used for all arms.")
         argv = [
             "mteb", "run",
             "-m", self.embeddings_model,

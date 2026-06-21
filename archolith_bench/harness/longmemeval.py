@@ -13,8 +13,9 @@ memory-QA accuracy preserved/improved while tokens drop.
 Online use needs the `longmemeval` extra (`datasets`); offline reads a fixture.
 
 Scoring note: the official benchmark uses a GPT-4 judge. This adapter ships a
-deterministic normalized-containment scorer (good for factual answers, offline,
-no judge spend); an LLM-judge scorer can be added behind a flag later.
+deterministic normalized scorer (good for factual answers, offline, no judge
+spend). It rejects obvious negated-answer false positives; an LLM-judge scorer
+can still be added behind a flag later for official evidence runs.
 """
 
 from __future__ import annotations
@@ -53,6 +54,19 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text.lower().translate(_PUNCT)).strip()
 
 
+def _tokens(text: str) -> list[str]:
+    return _normalize(text).split()
+
+
+def _has_negated_gold(gold: str, resp: str) -> bool:
+    patterns = (
+        rf"\bnot\s+{re.escape(gold)}\b",
+        rf"\bnot\s+(?:the\s+)?(?:answer|name|place|person|city)\s+{re.escape(gold)}\b",
+        rf"\b{re.escape(gold)}\s+(?:is|was)\s+(?:not|wrong|incorrect)\b",
+    )
+    return any(re.search(pattern, resp) for pattern in patterns)
+
+
 def _load_lme_items(subset: str | None, fixture_path: str | Path | None) -> list[dict]:
     """Load raw LongMemEval items (shared by the in-context and memory adapters)."""
     if fixture_path is not None:
@@ -81,7 +95,15 @@ def _score_answer(answer: str, question_type: str | None, response_text: str) ->
         return False
     if question_type == "abstention" or gold in {"", "no answer", "unknown"}:
         return any(p in resp for p in ("dont know", "not sure", "no information", "cannot", "unable"))
-    return bool(gold) and gold in resp
+    if not gold or _has_negated_gold(gold, resp):
+        return False
+
+    gold_tokens = _tokens(answer)
+    resp_tokens = _tokens(response_text)
+    if len(gold_tokens) == 1:
+        return gold_tokens[0] in set(resp_tokens)
+
+    return gold in resp
 
 
 class LongMemEvalAdapter:

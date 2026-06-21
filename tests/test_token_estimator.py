@@ -103,6 +103,53 @@ def test_estimate_messages_tokens_matches_content_only_cl100k_when_available() -
     assert estimate_messages_tokens(MIXED_MESSAGES) == expected
 
 
+def test_estimate_tokens_none() -> None:
+    assert estimate_tokens(None) == 0
+
+
+def test_estimate_tokens_empty_string() -> None:
+    assert estimate_tokens("") == 0
+
+
+def test_estimate_tokens_whitespace_only() -> None:
+    assert estimate_tokens("   ") == 0
+
+
+def test_estimate_tokens_short_text() -> None:
+    assert estimate_tokens("hi") == 1
+
+
+def test_estimate_messages_tokens_empty_list() -> None:
+    assert estimate_messages_tokens([]) == 0
+
+
+def test_estimate_messages_tokens_all_empty_content() -> None:
+    messages = [{"content": ""}, {"content": None}, {"content": "   "}]
+    assert estimate_messages_tokens(messages) == 0
+
+
+def test_estimate_messages_tokens_list_content_with_image_part() -> None:
+    message = {
+        "content": [
+            {"type": "text", "text": "describe this"},
+            {"type": "image_url", "image_url": {"url": "..."}},
+        ]
+    }
+    assert estimate_messages_tokens([message]) == estimate_tokens("describe this")
+
+
+def test_estimate_messages_tokens_list_content_with_string_and_content_part() -> None:
+    message = {
+        "content": [
+            "plain string part",
+            {"type": "tool_result", "content": "tool result text"},
+        ]
+    }
+    assert estimate_messages_tokens([message]) == estimate_tokens("plain string part") + estimate_tokens(
+        "tool result text"
+    )
+
+
 def test_representative_fixture_shapes_stay_exercised_without_tiktoken() -> None:
     assert len(PLAIN_ENGLISH) > 100
     assert json.loads(JSON_TOOL_SCHEMA)["function"]["parameters"]["properties"]["filters"]

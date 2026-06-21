@@ -3,49 +3,32 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from functools import lru_cache
 
-try:
-    import tiktoken
-except ImportError:  # pragma: no cover - exercised by environments without the optional extra
-    tiktoken = None
-
-
-@lru_cache(maxsize=1)
-def _cl100k_encoding():
-    if tiktoken is None:
-        return None
-    try:
-        return tiktoken.get_encoding("cl100k_base")
-    except Exception:
-        return None
-
-
-def _heuristic_tokens(text: str) -> int:
-    return max(1, len(text) // 4)
+from archolith_maintenance.token_accounting import count_text_tokens
 
 
 def estimate_tokens(text: str | None) -> int:
     """Estimate content token count from text using cl100k_base when available."""
-    if not text:
-        return 1
-    encoding = _cl100k_encoding()
-    if encoding is None:
-        return _heuristic_tokens(text)
-    return max(1, len(encoding.encode(text)))
+    if not text or not text.strip():
+        return 0
+    return count_text_tokens(text, minimum=1)
 
 
 def estimate_messages_tokens(messages: list[dict]) -> int:
     """Estimate total content token count from a list of OpenAI-style message dicts."""
     total = 0
-    for m in messages:
-        c = m.get("content", "")
-        if isinstance(c, str):
-            total += estimate_tokens(c)
-        elif isinstance(c, list):
-            for part in c:
-                total += estimate_tokens(part.get("text", ""))
-    return max(1, total)
+    for message in messages:
+        content = message.get("content", "")
+        if isinstance(content, str):
+            total += estimate_tokens(content)
+        elif isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict):
+                    text = part.get("text") or (part.get("content") if isinstance(part.get("content"), str) else "")
+                    total += estimate_tokens(text)
+                elif isinstance(part, str):
+                    total += estimate_tokens(part)
+    return total
 
 
 # ---------------------------------------------------------------------------

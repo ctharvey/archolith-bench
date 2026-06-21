@@ -23,7 +23,7 @@ The benchmark is a **CLI tool**, not a service. It runs offline, sending control
 | Language | Python 3.11+ |
 | HTTP client | httpx >= 0.27 |
 | Config | python-dotenv (`.env` file) |
-| Token counting | tiktoken via archolith-audit dependency |
+| Token counting | archolith-maintenance primitive; tiktoken when available |
 | Filter compression | archolith-filter (peer dependency) |
 | Audit comparison | archolith-audit (peer dependency) |
 | Packaging | setuptools (pyproject.toml) |
@@ -158,7 +158,7 @@ Four arms are in the "proxy family" (`proxy_enabled=True`): `proxy_only`, `proxy
 - `apply_arm_config()` — apply arm config overrides to proxy
 - `get_proxy_trace()` — fetch turn trace for assembly metrics
 - `check_proxy_health()` — `GET /health` to verify proxy is reachable
-- `estimate_tokens()` / `estimate_messages_tokens()` — token estimation via tiktoken or char ÷ 4 fallback
+- `estimate_tokens()` / `estimate_messages_tokens()` — content-only token estimation via `archolith-maintenance`
 
 ### Scenario Models (`core/scenario.py`)
 
@@ -212,11 +212,12 @@ All configuration via `.env` file:
 |------------|---------|----------|
 | archolith-context (proxy) | Proxy endpoint for proxy/stack suites | For proxy/stack suites |
 | archolith-filter | Filter compression in filter suite + filter_only arm | Optional extra: `filter` / `all` |
-| archolith-audit | Token counting + audit comparison | Optional extra: `audit` / `all` |
+| archolith-audit | Audit comparison | Optional extra: `audit` / `all` |
+| archolith-maintenance | Shared token-counting primitive | Yes (pip/editable peer) |
 | httpx | HTTP client for all API calls | Yes (pip) |
 | python-dotenv | `.env` file loading | Yes (pip) |
 | Upstream LLM API | Chat completions for benchmark conversations | Yes (API key) |
-| tiktoken | Accurate token counting (via archolith-audit) | Transitive optional |
+| tiktoken | Accurate token counting through `archolith-maintenance` when installed | Transitive optional |
 
 ## Port Assignment
 

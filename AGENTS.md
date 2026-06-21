@@ -60,7 +60,8 @@ See `.agent/workflows/code_conventions.md` for full rules. Key points:
 ## Project-Specific Notes
 
 - This is a **benchmark suite**, not a production service. It runs offline CLI sessions against a live proxy and upstream API.
-- Token counting uses tiktoken (cl100k_base) when available via archolith-mcp-audit; falls back to char ÷ 4 heuristic.
+- Configuration lives in `.env`; see README Configuration for `UPSTREAM_API_KEY`, `PROXY_URL`, `UPSTREAM_BASE_URL`, and `BENCHMARK_MODEL`.
+- Token counting uses `archolith-maintenance` primitives with tiktoken when available and the shared fallback otherwise.
 - Scenario files in `scenarios/` define multi-turn conversations with optional fact probes. Keep scenarios deterministic and reproducible.
 - The ContinuityTracker in `suites/proxy.py` measures repeat file reads, diagnostics, decision retention, and verification continuity across turns.
 - The industry suite in `suites/industry.py` maps each product to trusted external benchmark families and launch gates; update it when benchmark standards or product scope change.

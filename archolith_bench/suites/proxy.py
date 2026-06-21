@@ -21,12 +21,9 @@ from pathlib import Path
 
 import httpx
 
-from ..arms import ARMS, PROXY_FAMILY_ARMS
+from ..arms import ARMS
 from ..core.api import (
     API_KEY,
-    DIRECT_URL,
-    MODEL,
-    PROXY_URL,
     get_proxy_trace,
     send_chat,
     set_proxy_budget,
@@ -34,7 +31,6 @@ from ..core.api import (
 )
 from ..core.display import COLLAPSE_TOKEN_THRESHOLD, print_cross_scenario_summary, print_summary
 from ..core.metrics import (
-    ContinuityMetrics,
     PricingModel,
     compute_arm_cost,
     compute_turn_cost,
@@ -104,6 +100,53 @@ def _compute_cost_summary(results: list[dict], pricing: PricingModel) -> dict:
     }
 
 
+def _compute_upstream_input_reduction_ratio(total_direct_input: int, total_arm_input: int) -> float:
+    """Compute final upstream input-token reduction vs direct baseline."""
+    return round((total_direct_input - total_arm_input) / total_direct_input, 4) if total_direct_input else 0.0
+
+
+def _select_trace_turn(trace_turns: list[dict], loop_index: int) -> dict:
+    """Select the 1-based proxy trace turn for a 1-based benchmark loop index."""
+    expected_turn = loop_index
+    for turn in reversed(trace_turns):
+        if turn.get("turn_number") == expected_turn:
+            return turn
+    if trace_turns:
+        print(f"  [WARN] trace turn {expected_turn} not found; using last available")
+        return trace_turns[-1]
+    return {}
+
+
+def _build_run_summary(
+    results: list[dict],
+    *,
+    total_savings: int,
+    pricing: PricingModel | None,
+) -> dict:
+    """Aggregate run-level token, collapse, and optional cost fields."""
+    total_direct_input = sum(r["direct"]["input_tokens"] for r in results)
+    total_arm_input = sum(r["arm"]["input_tokens"] for r in results)
+    collapsed_turns = [
+        r["turn"] for r in results
+        if r["arm"]["output_tokens"] < COLLAPSE_TOKEN_THRESHOLD
+    ]
+    summary: dict = {
+        "total_direct_input_tokens": total_direct_input,
+        "total_proxy_input_tokens": total_arm_input,
+        "total_savings_tokens": total_savings,
+        "overall_savings_ratio": round(total_savings / total_direct_input, 4) if total_direct_input else 0,
+        # overall_savings_ratio measures internal curation leverage. This ratio
+        # measures what would hit the upstream billing meter after the arm's
+        # final prompt construction.
+        "upstream_input_reduction_ratio": _compute_upstream_input_reduction_ratio(total_direct_input, total_arm_input),
+        "collapsed_turns": collapsed_turns,
+        "collapse_rate": round(len(collapsed_turns) / len(results), 3) if results else 0,
+    }
+    if pricing is not None and results:
+        summary.update(_compute_cost_summary(results, pricing))
+    return summary
+
+
 # ---------------------------------------------------------------------------
 # Main benchmark runner (arm-aware)
 # ---------------------------------------------------------------------------
@@ -123,11 +166,17 @@ def run_benchmark(
     run_restart: bool = True,
     pricing: PricingModel | None = None,
     collapse_abort: bool = True,
+    poll_interval_s: float = 3.0,
 ) -> dict:
-    """Run the benchmark for a single scenario/arm/budget combination."""
+    """Run the benchmark for a single scenario/arm/budget combination.
+
+    poll_interval_s: wait between proxy turn completion and trace fetch.
+        Default is conservative for trace-write settle; reduce only when the
+        proxy reports trace writes synchronously.
+    """
     arm_def = ARMS.get(arm, ARMS["direct"])
-    arm_label = arm_def["label"]
     arm_config = arm_def["config_overrides"]
+    is_direct_arm = not arm_def["proxy_enabled"] and arm != "filter_only"
     _key = api_key or API_KEY
 
     results: list[dict] = []
@@ -195,7 +244,6 @@ def run_benchmark(
             direct_est = estimate_messages_tokens(direct_history)
             arm_est = estimate_messages_tokens(arm_history)
 
-            is_direct_arm = not arm_def["proxy_enabled"] and arm != "filter_only"
             is_filter_only = arm == "filter_only"
 
             if is_filter_only:
@@ -273,19 +321,12 @@ def run_benchmark(
                 arm_output = arm_usage.get("completion_tokens", estimate_tokens(arm_text))
                 print(f"  [arm={arm}] {arm_input} in / {arm_output} out in {arm_latency:.0f}ms")
 
-                time.sleep(3)
+                time.sleep(poll_interval_s)
                 trace = get_proxy_trace(client, proxy_url, session_id=proxy_session_id)
                 if trace.get("error"):
                     print(f"  [trace]  WARNING: {trace['error']}")
                 trace_turns = trace.get("turns", [])
-                expected_turn = i - 1
-                trace_turn = {}
-                for t in reversed(trace_turns):
-                    if t.get("turn_number") == expected_turn:
-                        trace_turn = t
-                        break
-                if not trace_turn and trace_turns:
-                    trace_turn = trace_turns[-1]
+                trace_turn = _select_trace_turn(trace_turns, i)
 
                 trace_turn = {
                     "assembly_mode": trace_turn.get("assembly_mode", "unknown"),
@@ -393,8 +434,6 @@ def run_benchmark(
     else:
         final_continuity = tracker.compute()
 
-    total_direct_input = sum(r["direct"]["input_tokens"] for r in results)
-    total_arm_input = sum(r["arm"]["input_tokens"] for r in results)
     total_savings = sum(r["trace"].get("savings_tokens", 0) for r in results)
 
     probe_summary = {}
@@ -408,20 +447,10 @@ def run_benchmark(
             "recall_preservation": round(avg_arm_recall / avg_direct_recall, 3) if avg_direct_recall > 0 else 0,
         }
 
-    collapsed_turns = [
-        r["turn"] for r in results
-        if r["arm"]["output_tokens"] < COLLAPSE_TOKEN_THRESHOLD
-    ]
     aborted = consecutive_collapses >= COLLAPSE_CONSECUTIVE_LIMIT
 
     if not results:
         final_continuity = tracker.compute()
-
-    # ---- effective cost (cache-weighted) + passthrough delta ----
-    if pricing is not None and results:
-        arm_cost_dict: dict = _compute_cost_summary(results, pricing)
-    else:
-        arm_cost_dict = {}
 
     bootstrap_result = None
     if run_restart and not is_direct_arm:
@@ -436,15 +465,7 @@ def run_benchmark(
             print(f"  [WARN] Restart/bootstrap failed: {e}")
             bootstrap_result = {"error": str(e)}
 
-    summary: dict = {
-        "total_direct_input_tokens": total_direct_input,
-        "total_proxy_input_tokens": total_arm_input,
-        "total_savings_tokens": total_savings,
-        "overall_savings_ratio": round(total_savings / total_direct_input, 4) if total_direct_input else 0,
-        "collapsed_turns": collapsed_turns,
-        "collapse_rate": round(len(collapsed_turns) / len(results), 3) if results else 0,
-    }
-    summary.update(arm_cost_dict)
+    summary = _build_run_summary(results, total_savings=total_savings, pricing=pricing)
 
     data = {
         "scenario": scenario.name,
@@ -482,6 +503,7 @@ def run_experiment(
     api_key: str,
     max_turns: int | None = None,
     pricing: PricingModel | None = None,
+    poll_interval_s: float = 3.0,
 ) -> Path:
     """Run a named experiment across scenarios x arms x budgets."""
     experiment_dir = output_dir / "experiments" / experiment_name
@@ -504,6 +526,7 @@ def run_experiment(
                     scenario, arm_name, proxy_url, direct_url, model,
                     budget, experiment_dir, resume, api_key=api_key,
                     max_turns=max_turns, pricing=pricing,
+                    poll_interval_s=poll_interval_s,
                 )
                 data["experiment"] = experiment_name
                 print_summary(data)

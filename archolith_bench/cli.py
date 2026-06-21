@@ -39,6 +39,8 @@ def _add_common_proxy_args(parser: argparse.ArgumentParser) -> None:
                         help="Don't abort an arm on consecutive short-output turns "
                              "(the collapse guard mis-fires on agentic scenarios with "
                              "legitimately terse tool-continuation responses)")
+    parser.add_argument("--poll-interval", type=float, default=3.0,
+                        help="Seconds to wait between proxy turn completion and trace fetch")
     parser.add_argument("--provider", default=None,
                         help=f"Pricing provider. Available: {', '.join(PRICING_DEFAULTS)}")
     parser.add_argument("--pricing-file", type=Path, default=None,
@@ -147,6 +149,10 @@ def main(argv: list[str] | None = None) -> None:
                            help="Run offline against a bundled fixture JSON (no API calls)")
     harness_p.add_argument("--menhir-url", default=None,
                            help="Memory benchmarks: throwaway menhir base URL (refuses prod-looking targets)")
+    harness_p.add_argument("--confirm-menhir-reset", action="store_true",
+                           help="Allow memory benchmarks to reset throwaway Menhir groups after each item")
+    harness_p.add_argument("--dry-run-menhir-reset", action="store_true",
+                           help="Print Menhir group resets without performing them")
     harness_p.add_argument("--format", choices=["markdown", "json"], default="markdown",
                            help="Evidence output format (default: markdown)")
     harness_p.add_argument("--output-dir", type=Path, default=Path("results"),
@@ -267,6 +273,7 @@ def _run_proxy(args: argparse.Namespace) -> None:
             api_key=api_key,
             max_turns=args.turns,
             pricing=pricing,
+            poll_interval_s=args.poll_interval,
         )
         return
 
@@ -293,6 +300,7 @@ def _run_proxy(args: argparse.Namespace) -> None:
                     run_restart=not args.no_restart,
                     pricing=pricing,
                     collapse_abort=not args.no_collapse_abort,
+                    poll_interval_s=args.poll_interval,
                 )
                 print_summary(data)
                 save_results(data, args.output_dir)
@@ -379,6 +387,7 @@ def _run_stack(args: argparse.Namespace) -> None:
         run_probes=not args.no_probes,
         run_restart=not args.no_restart,
         pricing=pricing,
+        poll_interval_s=args.poll_interval,
     )
 
     print_four_way_table(all_arm_results)
@@ -513,6 +522,8 @@ def _run_harness(args: argparse.Namespace) -> None:
             client=client,
             send_fn=send_fn,
             fixture_path=args.offline_fixture,
+            reset_confirmed=args.confirm_menhir_reset,
+            dry_run_reset=args.dry_run_menhir_reset,
         )
     elif is_external(adapter):
         results_fixtures = (

@@ -118,6 +118,10 @@ Set environment variables in `.env`:
 - `UPSTREAM_BASE_URL` (default: `https://api.openai.com/v1`)
 - `BENCHMARK_MODEL` (default: `gpt-4o-mini`)
 
+## Checkpoints
+
+Resumable benchmark runs may create `.checkpoint_*.json` files in the working directory. They contain local run state only and are safe to delete after a run finishes or when intentionally starting fresh.
+
 ## License
 
 Source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE).

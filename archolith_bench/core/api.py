@@ -59,7 +59,6 @@ def send_chat(
 
     total_start = time.monotonic()
     for attempt in range(max_retries + 1):
-        start = time.monotonic()
         try:
             resp = client.post(url, json=body, headers=headers, timeout=300)
         except httpx.TimeoutException:

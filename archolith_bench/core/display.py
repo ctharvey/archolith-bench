@@ -6,9 +6,6 @@ cross-scenario summaries, and four-way comparison tables.
 
 from __future__ import annotations
 
-from typing import Any
-
-
 COLLAPSE_TOKEN_THRESHOLD = 50
 
 
@@ -110,7 +107,7 @@ def print_summary(data: dict) -> None:
 
     if data.get("quality"):
         q = data["quality"]
-        print(f"\n  Fact Probe Quality:")
+        print("\n  Fact Probe Quality:")
         print(f"    Probes run:              {q['total_probes']}")
         print(f"    Avg direct recall:       {q['avg_direct_recall']:.1%}")
         print(f"    Avg arm recall:          {q.get('avg_arm_recall', q.get('avg_proxy_recall', 0)):.1%}")
@@ -118,7 +115,7 @@ def print_summary(data: dict) -> None:
 
     if data.get("continuity"):
         c = data["continuity"]
-        print(f"\n  Continuity Metrics:")
+        print("\n  Continuity Metrics:")
         print(f"    Repeat file reads:       {c.get('repeat_file_reads', 0)}")
         print(f"    Repeat diagnostics:      {c.get('repeat_diagnostics', 0)}")
         print(f"    Decision retention:      {c.get('decision_retention', 0):.1%}")
@@ -214,7 +211,6 @@ def print_four_way_table(all_arm_results: list[dict]) -> None:
 
     print("-" * 100)
 
-    arms_seen = set(d.get("stack_arm", d.get("arm", "")) for d in all_arm_results)
     for arm in ["direct", "filter_only", "proxy_only", "proxy_plus_filter"]:
         arm_results = [d for d in all_arm_results if d.get("stack_arm", d.get("arm", "")) == arm]
         if arm_results:

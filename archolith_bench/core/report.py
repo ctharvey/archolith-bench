@@ -49,6 +49,10 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
     """
     results_dir = Path(results_dir)
     out_path = Path(out_path)
+    benchmark_results = {
+        path: _load_json(path)
+        for path in sorted(results_dir.glob("benchmark_*.json"))
+    }
 
     lines: list[str] = []
     lines.append("# archolith-bench — Benchmark Results\n")
@@ -80,39 +84,56 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
     # ---- Proxy section ----
     # Glob ALL benchmark arm files (incl. *_direct.json baselines) -- the cost
     # verdict needs the passthrough/direct arm, not just *proxy* files.
-    proxy_results = sorted(results_dir.glob("benchmark_*.json"))
-    if proxy_results:
+    if benchmark_results:
         lines.append("## Proxy Suite\n")
         lines.append("Multi-turn token savings, effective cost, and continuity metrics across proxy experiment arms.\n")
+        lines.append(
+            "\n> **Stale evidence caveat:** existing proxy result files include dated, single-scenario or "
+            "single-model runs. Do not use these as refreshed launch headline numbers until P4 evidence "
+            "refresh lands after the remediation sessions.\n\n"
+        )
 
         # Check if any results have cost data
-        has_cost = False
-        for rp in proxy_results:
-            with open(rp, encoding="utf-8") as f:
-                d = json.load(f)
-            if "total_effective_cost_usd" in d.get("summary", {}):
-                has_cost = True
-                break
+        has_cost = any(
+            "total_effective_cost_usd" in d.get("summary", {})
+            for d in benchmark_results.values()
+        )
 
         if has_cost:
-            lines.append("| Scenario | Arm | Budget | Direct In | Arm In | Savings | Eff Cost | Cache | Recall Pres. |\n")
-            lines.append("|----------|-----|--------|-----------|--------|---------|----------|-------|-------------|\n")
+            lines.append(
+                "| Scenario | Arm | Budget | Direct In | Arm In | Upstream Input Reduction | "
+                "Internal Curation Savings | Eff Cost | Cache | Recall Pres. |\n"
+            )
+            lines.append(
+                "|----------|-----|--------|-----------|--------|--------------------------|"
+                "---------------------------|----------|-------|-------------|\n"
+            )
         else:
-            lines.append("| Scenario | Arm | Budget | Direct In | Arm In | Savings | Recall Pres. |\n")
-            lines.append("|----------|-----|--------|-----------|--------|---------|-------------|\n")
+            lines.append(
+                "| Scenario | Arm | Budget | Direct In | Arm In | Upstream Input Reduction | "
+                "Internal Curation Savings | Recall Pres. |\n"
+            )
+            lines.append(
+                "|----------|-----|--------|-----------|--------|--------------------------|"
+                "---------------------------|-------------|\n"
+            )
 
         cost_passthrough: dict[str, dict] = {}  # scenario -> {"cost", "cache_ok"}
 
-        for rp in proxy_results:
-            with open(rp, encoding="utf-8") as f:
-                d = json.load(f)
+        for d in benchmark_results.values():
             s = d.get("summary", {})
             q = d.get("quality", {})
             recall = f"{q.get('recall_preservation', 0):.0%}" if q else "N/A"
+            upstream_reduction = s.get("upstream_input_reduction_ratio")
+            if upstream_reduction is None:
+                direct_in = s.get("total_direct_input_tokens", 0)
+                arm_in = s.get("total_proxy_input_tokens", 0)
+                upstream_reduction = ((direct_in - arm_in) / direct_in) if direct_in else 0.0
             line = (
                 f"| {d.get('scenario', '?')} | {d.get('arm', '?')} | "
                 f"{d.get('budget') or 'default'} | {s.get('total_direct_input_tokens', 0):,} | "
-                f"{s.get('total_proxy_input_tokens', 0):,} | {s.get('overall_savings_ratio', 0):.1%} |"
+                f"{s.get('total_proxy_input_tokens', 0):,} | {upstream_reduction:.1%} | "
+                f"{s.get('overall_savings_ratio', 0):.1%} |"
             )
             if has_cost and "total_effective_cost_usd" in s:
                 cost_str = f" ${s['total_effective_cost_usd']:.4f}"
@@ -134,9 +155,7 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
 
         if has_cost and cost_passthrough:
             lines.append("\n### Cost Verdict\n\n")
-            for rp in proxy_results:
-                with open(rp, encoding="utf-8") as f:
-                    d = json.load(f)
+            for d in benchmark_results.values():
                 s = d.get("summary", {})
                 arm = d.get("arm", "")
                 scenario = d.get("scenario", "")
@@ -242,3 +261,8 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
         f.writelines(lines)
+
+
+def _load_json(path: Path) -> dict:
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)

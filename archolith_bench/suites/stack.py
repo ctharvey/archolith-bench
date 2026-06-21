@@ -29,6 +29,7 @@ def run_stack_suite(
     run_probes: bool = True,
     run_restart: bool = True,
     pricing: PricingModel | None = None,
+    poll_interval_s: float = 3.0,
 ) -> list[dict]:
     """Run each scenario through the four stack arms and collect results."""
     all_arm_results: list[dict] = []
@@ -51,6 +52,7 @@ def run_stack_suite(
                 run_probes=run_probes,
                 run_restart=run_restart,
                 pricing=pricing,
+                poll_interval_s=poll_interval_s,
             )
             data["stack_arm"] = arm
             all_arm_results.append(data)

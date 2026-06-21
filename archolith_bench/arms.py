@@ -27,9 +27,7 @@ ARM_DEFINITIONS = {
         "label": "Filter only",
         "filter_enabled": True,
         "proxy_enabled": False,
-        "config_overrides": {
-            "filter_enabled": False,
-        },
+        "config_overrides": {},
     },
     "proxy_only": {
         "label": "Proxy only (baseline assembly)",

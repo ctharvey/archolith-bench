@@ -1,5 +1,69 @@
 # archolith-bench Changelog
 
+## 2026-06-21 — Shared Token Counting Primitive
+
+**refactor(metrics):** `estimate_tokens()` and `estimate_messages_tokens()` now delegate primitive text counts to `archolith-maintenance` while preserving benchmark-owned content-only semantics.
+
+**packaging:** Added `archolith-maintenance` as the shared helper dependency for canonical token accounting.
+
+## 2026-06-21 — Token Metrics Phantom Count Remediation
+
+**fix(metrics):** `estimate_tokens()` now returns `0` for `None`, empty, and whitespace-only content, and `estimate_messages_tokens()` no longer applies a minimum-one floor to empty message sets.
+
+**tests:** Added regression coverage for empty inputs, multipart text/content parts, and image-only parts that should not add phantom tokens.
+
+## 2026-06-21 — Remediation Safe Fixes
+
+**packaging/docs:** Removed the deprecated license classifier, added `ruff` to the dev extra, corrected project URLs to the current remote, documented checkpoint lifecycle, and refreshed agent notes for configuration and shared token counting.
+
+**maintenance:** Cleared safe ruff findings in API/display/proxy/restart/cost/harness tests, removed the dead `filter_only` proxy override, hoisted direct-arm detection out of the turn loop, added a trace fallback warning, and made external harness timeout configurable without changing the default.
+
+**safety:** Updated memory benchmark production guards so proxy port `9800` is allowed for throwaway/local targets while staging/preprod/preview/release-like hosts are refused.
+
+## 2026-06-21 — Memory A/B Client Threading
+
+**fix(harness):** `run_memory_ab()` now creates a real chat `httpx.Client` and passes it into `send_fn`, fixing the real `send_chat` path that previously received `None`.
+
+**lifecycle:** `HttpMenhirClient` now supports context-manager use and closes its underlying client when `run_memory_ab()` exits.
+
+## 2026-06-21 — External Harness Env Hardening
+
+**security:** External benchmark subprocesses now inherit only an explicit allowlist of OS environment variables plus adapter-declared overrides, preventing accidental parent-secret leakage.
+
+**tests:** Added coverage for secret filtering, allowlisted `PATH`, override precedence, and OpenAI-compatible env construction.
+
+## 2026-06-21 — Proxy Trace Polling and Upstream Reduction Metric
+
+**fix(proxy):** Proxy trace matching now uses the benchmark's 1-based turn loop index and warns before falling back to the last trace turn.
+
+**feat(proxy):** Added configurable proxy trace polling via `--poll-interval` and persisted `upstream_input_reduction_ratio` as the billing-meter prompt reduction metric separate from internal curation leverage.
+
+**tests:** Added focused offline regressions for trace selection, fallback warning, upstream reduction calculation, and poll-interval entrypoint defaults.
+
+## 2026-06-21 — Remediation Coverage and Benchmark Report Refresh
+
+**test(proxy):** Added offline coverage for the main `run_benchmark()` loop, checkpoint resume, checkpoint cleanup, and collapse-abort behavior.
+
+**test(restart/report):** Added restart/bootstrap scoring regressions plus report persistence and generated `BENCHMARKS.md` coverage.
+
+**docs(report):** Regenerated `BENCHMARKS.md` through the CLI with the stale-evidence caveat intact and separate upstream-input versus internal-curation savings columns.
+
+## 2026-06-21 — Tier 2 Metric Quality Remediation
+
+**fix(probes):** Fact probes now use dependency-free morphology-aware keyword matching so simple inflections do not undercount recall.
+
+**fix(continuity/restart):** Continuity path extraction now recognizes Windows, relative, dotfile, and common no-extension paths; restart/bootstrap scoring flags re-read intent without penalizing recovered facts.
+
+**fix(longmemeval):** Deterministic LongMemEval scoring now rejects obvious negated-answer false positives while keeping official LLM-judge scoring deferred to a budgeted evidence pass.
+
+## 2026-06-21 — Tier 3 Backlog Cleanup
+
+**fix(harness):** Stub Menhir recall now ranks in O(n log n) without `list.index()`, LongBench letter extraction uses the last fallback letter, and real Menhir reset cleanup requires explicit confirmation or dry-run.
+
+**security:** External benchmark temp directories now use a shared secure tempdir helper with best-effort `0700` permissions.
+
+**maintenance/tests:** Extracted proxy run summary aggregation, added pricing-default completeness tests, and documented why `scripts/run_mteb_local.py` intentionally stays separate from `MtebAdapter`.
+
 ## 2026-06-20 — Token estimator validation
 
 **fix(metrics):** `estimate_tokens()` now uses `tiktoken` `cl100k_base` when available and falls back to the

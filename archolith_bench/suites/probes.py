@@ -2,10 +2,52 @@
 
 from __future__ import annotations
 
+import re
+
 import httpx
 
 from ..core.api import API_KEY, send_chat
 from ..core.scenario import Scenario
+
+_WORD_RE = re.compile(r"[a-z0-9]+")
+
+
+def _stem_token(token: str) -> str:
+    """Small dependency-free stemmer for benchmark probe keywords.
+
+    This is intentionally conservative: it handles common English inflections
+    that caused recall undercounts (`run` vs `running`, plurals, simple past)
+    without pulling in a heavy NLP dependency for the benchmark CLI.
+    """
+    token = token.lower()
+    for suffix in ("ing", "ed", "es", "s"):
+        min_len = len(suffix) + 2
+        if len(token) > min_len and token.endswith(suffix):
+            stem = token[: -len(suffix)]
+            if len(stem) >= 3 and stem[-1] == stem[-2]:
+                stem = stem[:-1]
+            return stem
+    return token
+
+
+def _keyword_hit(keyword: str, response_text: str) -> bool:
+    """Return True when a probe keyword or phrase is recalled.
+
+    Exact normalized phrase matching still wins. If that misses, compare simple
+    stems for every token in the keyword phrase so inflection-only differences
+    don't count as recall loss.
+    """
+    keyword_tokens = [_stem_token(t) for t in _WORD_RE.findall(keyword.lower())]
+    response_tokens = {_stem_token(t) for t in _WORD_RE.findall(response_text.lower())}
+    if not keyword_tokens:
+        return False
+
+    normalized_keyword = " ".join(_WORD_RE.findall(keyword.lower()))
+    normalized_response = " ".join(_WORD_RE.findall(response_text.lower()))
+    if normalized_keyword and normalized_keyword in normalized_response:
+        return True
+
+    return all(token in response_tokens for token in keyword_tokens)
 
 
 def run_fact_probes(
@@ -41,8 +83,8 @@ def run_fact_probes(
             client, proxy_url, _key, arm_messages, model,
             session_id=proxy_session_id, session_config=arm_config,
         )
-        direct_hits = sum(1 for kw in probe.expected_keywords if kw.lower() in direct_text.lower())
-        arm_hits = sum(1 for kw in probe.expected_keywords if kw.lower() in arm_text.lower())
+        direct_hits = sum(1 for kw in probe.expected_keywords if _keyword_hit(kw, direct_text))
+        arm_hits = sum(1 for kw in probe.expected_keywords if _keyword_hit(kw, arm_text))
         total_kw = len(probe.expected_keywords)
         result = {
             "after_turn": probe.after_turn,

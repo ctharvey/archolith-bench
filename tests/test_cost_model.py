@@ -2,17 +2,11 @@
 
 from __future__ import annotations
 
-import json
-import tempfile
-from pathlib import Path
-
 import pytest
 
 from archolith_bench.core.metrics import (
     PRICING_DEFAULTS,
-    ArmCost,
     PricingModel,
-    TurnCost,
     compute_arm_cost,
     compute_turn_cost,
 )
@@ -36,6 +30,27 @@ def test_pricing_defaults_exist() -> None:
     d = PRICING_DEFAULTS["deepseek-v4-flash"]
     assert d.input_cache_hit < d.input_full  # cache hits are cheaper
     assert d.input_cache_write is None  # deepseek has no write asymmetry
+
+
+def test_pricing_defaults_helper_rate_completeness() -> None:
+    """Providers with helper pricing must include input, output, and cache-hit rates."""
+    for name, pricing in PRICING_DEFAULTS.items():
+        helper_rates = (pricing.helper_input, pricing.helper_output, pricing.helper_cache_hit)
+        if any(rate > 0 for rate in helper_rates):
+            assert pricing.helper_input > 0, name
+            assert pricing.helper_output > 0, name
+            assert pricing.helper_cache_hit > 0, name
+            assert pricing.helper_cache_hit <= pricing.helper_input, name
+
+
+def test_pricing_defaults_required_rates_are_positive() -> None:
+    """Every pricing default needs complete upstream input/cache/output rates."""
+    for name, pricing in PRICING_DEFAULTS.items():
+        assert pricing.provider == name
+        assert pricing.input_full > 0, name
+        assert pricing.input_cache_hit > 0, name
+        assert pricing.input_cache_miss > 0, name
+        assert pricing.output > 0, name
 
 
 def test_anthropic_cache_write_asymmetry() -> None:

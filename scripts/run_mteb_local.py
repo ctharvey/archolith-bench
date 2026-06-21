@@ -3,6 +3,11 @@
 Baseline measurement of an embedding model (no proxy A/B). Defaults to the local
 LM Studio server. Usage:
     python scripts/run_mteb_local.py [task] [limit_corpus]
+
+This remains a standalone measurement script instead of reusing `MtebAdapter`
+because it drives the official in-process MTEB encoder API directly and writes
+MTEB's native output folder. `MtebAdapter` is the archolith-bench harness wrapper
+that parses or shells out per arm for uniform evidence reporting.
 """
 
 from __future__ import annotations

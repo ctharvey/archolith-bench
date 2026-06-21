@@ -6,7 +6,16 @@ import re
 
 from ..core.metrics import ContinuityMetrics
 
-_FILE_PATH_RE = re.compile(r'(?:/[\w.\-]+/){1,}[\w.\-]+\.\w{1,12}', re.IGNORECASE)
+_FILE_PATH_RE = re.compile(
+    r"""
+    (?:[A-Z]:\\[^\s`'"]+)
+    |(?:(?:\.{1,2}|[\w.-]+)[\\/][^\s`'"]+)
+    |(?:/[\w.\-]+(?:/[\w.\-]+)+)
+    |(?<!\S)\.[A-Za-z0-9_.-]+
+    |(?<!\S)(?:README|Makefile|Dockerfile|LICENSE|AGENTS\.md|pyproject\.toml|package\.json)(?=$|[\s,.;:)\]}])
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
 _COMMAND_RE = re.compile(r'(?:npm|pip|python|git|cargo|go|docker|kubectl|make)\s+\S+', re.IGNORECASE)
 
 _REREAD_PHRASES = re.compile(
@@ -16,6 +25,16 @@ _REREAD_PHRASES = re.compile(
     r"|show me (?:the |that |those )?(?:file|content|output|result)s?)",
     re.IGNORECASE,
 )
+
+
+def _extract_file_paths(response: str) -> set[str]:
+    """Extract POSIX, Windows, relative, dotfile, and common no-extension paths."""
+    paths = set()
+    for match in _FILE_PATH_RE.finditer(response):
+        path = match.group(0).rstrip(".,;)]}")
+        if path:
+            paths.add(path)
+    return paths
 
 
 class ContinuityTracker:
@@ -46,7 +65,7 @@ class ContinuityTracker:
 
     def observe_turn(self, turn: int, response: str) -> dict:
         """Scan a response, update internal state, and return per-turn stats."""
-        files_in_response = set(_FILE_PATH_RE.findall(response))
+        files_in_response = _extract_file_paths(response)
         commands_in_response = set(_COMMAND_RE.findall(response))
 
         repeat_files = 0

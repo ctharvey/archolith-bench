@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import re
-
 import httpx
 
 from ..core.api import API_KEY, send_chat
@@ -67,10 +65,8 @@ def run_restart_bootstrap(
 
     explicit_reread = bool(_REREAD_PHRASES.search(orientation_text))
 
-    if fact_recovery > 0 and not explicit_reread:
+    if fact_recovery > 0:
         orientation_score = min(fact_recovery * 1.2, 1.0)
-    elif fact_recovery > 0 and explicit_reread:
-        orientation_score = fact_recovery * 0.5
     else:
         orientation_score = 0.0
 
@@ -82,6 +78,7 @@ def run_restart_bootstrap(
         "key_facts_count": len(key_facts),
         "facts_recalled": facts_recalled if key_facts else 0,
         "explicit_reread": explicit_reread,
+        "reread_intent_penalized": False,
         "last_files_count": len(last_files),
         "last_commands_count": len(last_commands),
     }

@@ -71,18 +71,22 @@ class HttpMenhirClient:
         base_url: str,
         *,
         api_key: str = "",
-        ingest_path: str = "/ingest",
-        recall_path: str = "/recall",
+        ingest_path: str = "/api/memory",
+        recall_path: str = "/api/recall",
         timeout: float = 60.0,
     ) -> None:
         """
-        Initialize HTTP client with configurable paths and auth.
+        Initialize HTTP client against a real menhir instance.
+
+        A benchmark "group_id" maps to a menhir namespace (silo). Memory is ingested
+        with ``wait=true`` so enrichment completes before recall; teardown uses
+        ``DELETE /api/namespace/{namespace}``.
 
         Args:
             base_url: Root URL of the menhir instance.
-            api_key: Optional Bearer token for authorization.
-            ingest_path: Endpoint path for ingestion (default "/ingest").
-            recall_path: Endpoint path for recall (default "/recall").
+            api_key: Optional Bearer token (menhir MENHIR_API_KEY) for authorization.
+            ingest_path: Episode ingest endpoint (default "/api/memory").
+            recall_path: Recall endpoint (default "/api/recall").
             timeout: Request timeout in seconds.
         """
         self._base_url = base_url
@@ -106,10 +110,18 @@ class HttpMenhirClient:
         return uuid.uuid4().hex
 
     def ingest(self, group_id: str, role: str, content: str) -> None:
-        """POST a snippet to the ingest endpoint."""
+        """Ingest a snippet as a menhir episode in the group's namespace silo.
+
+        Uses ``wait=true`` so the episode is fully enriched (and therefore
+        recallable) before the call returns.
+        """
+        if not content:
+            return
         url = self._base_url.rstrip("/") + self._ingest_path
-        payload = {"group_id": group_id, "role": role, "content": content}
-        response = self._client.post(url, json=payload, headers=self._headers)
+        payload = {"episode": f"{role}: {content}", "namespace": group_id}
+        response = self._client.post(
+            url, params={"wait": "true"}, json=payload, headers=self._headers
+        )
         response.raise_for_status()
 
     def recall(
@@ -123,7 +135,7 @@ class HttpMenhirClient:
         dict with "text"/"content"/"summary" key.
         """
         url = self._base_url.rstrip("/") + self._recall_path
-        payload = {"group_id": group_id, "query": query, "limit": limit}
+        payload = {"query": query, "limit": limit, "namespace": group_id}
         response = self._client.post(url, json=payload, headers=self._headers)
         response.raise_for_status()
         data = response.json()
@@ -152,11 +164,13 @@ class HttpMenhirClient:
         return snippets
 
     def reset(self, group_id: str) -> None:
-        """Best-effort reset; swallow any exception."""
+        """Best-effort silo teardown via DELETE /api/namespace/{namespace}.
+
+        Swallows any exception (menhir refuses the default namespace with 400).
+        """
         try:
-            url = self._base_url.rstrip("/") + "/reset"
-            payload = {"group_id": group_id}
-            response = self._client.post(url, json=payload, headers=self._headers)
+            url = self._base_url.rstrip("/") + "/api/namespace/" + group_id
+            response = self._client.delete(url, headers=self._headers)
             response.raise_for_status()
         except Exception:
             pass

@@ -70,9 +70,13 @@ pip install -e .
 archolith-bench proxy --list
 ```
 
-Install optional suite dependencies when you need filter or audit runs:
+Install optional suite dependencies when you need filter or audit runs. The launch-supported
+source checkout workflow is to install the sibling repos editable first, then install the
+bench extras:
 
 ```bash
+python -m pip install -e ../archolith-filter
+python -m pip install -e ../archolith-mcp-audit
 pip install -e ".[all]"
 
 # Run a single scenario against a live proxy
@@ -93,10 +97,10 @@ separates implemented local coverage from candidate-before-launch work such as
 SWE-bench, LongBench v2, CyberSecEval, AgentDojo, OWASP security checks, and
 real audit logs.
 
-The base install supports the CLI, report generation, and proxy orchestration.
-The `filter`, `audit`, and `all` extras install sibling Archolith suite
-dependencies when those packages are available from your package index or local
-editable environment.
+The base install supports the CLI, report generation, and proxy orchestration. Until
+`archolith-filter` and `archolith-audit` are published to the package index used by your
+environment, `pip install -e ".[all]"` is not a standalone public install command; use the
+source checkout workflow above or install those packages from their eventual release artifacts first.
 
 ## Experiment Arms
 

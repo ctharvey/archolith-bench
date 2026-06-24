@@ -19,7 +19,9 @@ These instructions apply to the entire repository.
 # Install with dev dependencies
 pip install -e ".[dev]"
 
-# Install optional benchmark-suite dependencies
+# Install optional benchmark-suite dependencies from the Archolith source checkout
+python -m pip install -e ../archolith-filter
+python -m pip install -e ../archolith-mcp-audit
 pip install -e ".[all]"
 
 # Run all tests

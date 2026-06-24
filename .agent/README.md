@@ -13,7 +13,9 @@ Unified benchmark suite for the archolith product family. Measures token savings
 ## How to Run
 ```bash
 pip install -e .
-pip install -e ".[all]"                 # optional filter/audit suite deps
+python -m pip install -e ../archolith-filter
+python -m pip install -e ../archolith-mcp-audit
+pip install -e ".[all]"                 # optional filter/audit suite deps after sibling editable installs
 archolith-bench proxy --list          # list scenarios (no proxy needed)
 archolith-bench proxy --all --arms direct,proxy_only  # run against live proxy
 archolith-bench industry --launch-only                # generate launch benchmark coverage matrix
@@ -35,5 +37,5 @@ and defer polish unless it blocks installability, reproducibility, or trust.
 
 ## FOLLOW-UP
 - GitHub remote `archolith/archolith-bench` still needs creating. Add with: `git remote add origin git@github.com:archolith/archolith-bench.git`
-- `archolith-filter` and `archolith-audit` are optional extras (`filter`, `audit`, `all`) so base install remains usable before those sibling packages are published.
+- `archolith-filter` and `archolith-audit` are optional extras (`filter`, `audit`, `all`) so base install remains usable before those sibling packages are published. For source checkouts, install sibling repos editable from `../archolith-filter` and `../archolith-mcp-audit` before `pip install -e ".[all]"`.
 - The industry benchmark registry is launch-facing. Candidate benchmarks are gates, not completed evidence, until a tracked artifact exists under `benchmarks/`.

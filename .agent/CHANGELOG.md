@@ -1,5 +1,11 @@
 # archolith-bench Changelog
 
+## 2026-06-21 — Optional Suite Install Path
+
+**docs(packaging):** Documented the launch-supported source checkout path for optional filter/audit dependencies: install `../archolith-filter` and `../archolith-mcp-audit` editable before `pip install -e ".[all]"`.
+
+**launch:** Marked the optional sibling package publication-path gate resolved as source-first, while keeping standalone `.[all]` unavailable until sibling packages are published to the configured package index.
+
 ## 2026-06-21 — Shared Token Counting Primitive
 
 **refactor(metrics):** `estimate_tokens()` and `estimate_messages_tokens()` now delegate primitive text counts to `archolith-maintenance` while preserving benchmark-owned content-only semantics.

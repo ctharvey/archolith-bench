@@ -56,6 +56,12 @@ def send_chat(
         "max_tokens": 2048,
         "temperature": 0.3,
     }
+    # deepseek-v4-flash "thinks" by default (~2.3x latency, ~3x output tokens). The
+    # benchmark answers do not need chain-of-thought, so disable it for deepseek
+    # targets. This is the ONLY accepted disable form for the DeepSeek API
+    # (boolean / enable_thinking / reasoning_effort are rejected or ignored).
+    if "deepseek" in (base_url or "").lower() or "deepseek" in (model or "").lower():
+        body["thinking"] = {"type": "disabled"}
 
     total_start = time.monotonic()
     for attempt in range(max_retries + 1):

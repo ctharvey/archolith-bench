@@ -132,6 +132,12 @@ export ENV_FILE="${EMPTY_ENV}"
 export MENHIR_BENCHMARK_MODE=1
 export MENHIR_API_HOST=127.0.0.1
 export MENHIR_API_PORT="${MENHIR_PORT}"
+# Kill telemetry export: no Langfuse/OTLP collector runs in the throwaway, and the
+# default exporter blocks ~5s per span batch trying localhost:3001, starving the
+# event loop and aggravating upstream (deepseek) connect timeouts.
+export OTEL_SDK_DISABLED=true
+export LANGFUSE_TRACING_ENABLED=false
+export LANGFUSE_PUBLIC_KEY="" LANGFUSE_SECRET_KEY="" LANGFUSE_HOST=""
 # auth disabled on the throwaway (no keys -> BearerAuthMiddleware is a pass-through)
 export MENHIR_OPERATOR_KEY="" MENHIR_AGENT_KEY="" MENHIR_READONLY_KEY="" MENHIR_API_KEY=""
 # throwaway Neo4j

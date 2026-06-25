@@ -73,7 +73,7 @@ class HttpMenhirClient:
         api_key: str = "",
         ingest_path: str = "/api/memory",
         recall_path: str = "/api/recall",
-        timeout: float = 60.0,
+        timeout: float = 180.0,
     ) -> None:
         """
         Initialize HTTP client against a real menhir instance.
@@ -135,7 +135,16 @@ class HttpMenhirClient:
         dict with "text"/"content"/"summary" key.
         """
         url = self._base_url.rstrip("/") + self._recall_path
-        payload = {"query": query, "limit": limit, "namespace": group_id}
+        # include_session=True: benchmark memories are freshly ingested and live at
+        # SESSION scope (promotion to PERSISTENT only happens via the scheduler, which
+        # is off under MENHIR_BENCHMARK_MODE). Without this the HTTP recall filters them
+        # all out. Matches the menhir MCP recall tools, which always pass include_session=True.
+        payload = {
+            "query": query,
+            "limit": limit,
+            "namespace": group_id,
+            "include_session": True,
+        }
         response = self._client.post(url, json=payload, headers=self._headers)
         response.raise_for_status()
         data = response.json()
@@ -150,16 +159,31 @@ class HttpMenhirClient:
                     items = data[key]
                     break
 
-        # Extract snippet strings from items
+        # Extract snippet strings from items. menhir's RecallResponse items carry
+        # both "name" (entity name / fact) and an optional "content" (which is often
+        # None), so prefer content but fall back to name/fact and skip empty values
+        # -- otherwise recalled memory silently collapses to an empty context.
         snippets: list[str] = []
         for item in items:
             if isinstance(item, str):
-                snippets.append(item)
+                if item.strip():
+                    snippets.append(item)
             elif isinstance(item, dict):
-                for key in ("text", "content", "summary"):
-                    if key in item and isinstance(item[key], str):
-                        snippets.append(item[key])
-                        break
+                name = item.get("name") if isinstance(item.get("name"), str) else ""
+                body = next(
+                    (
+                        item[k]
+                        for k in ("content", "text", "summary", "fact")
+                        if isinstance(item.get(k), str) and item[k].strip()
+                    ),
+                    "",
+                )
+                if name and body and name.strip() != body.strip():
+                    snippets.append(f"{name.strip()}: {body.strip()}")
+                elif body.strip():
+                    snippets.append(body.strip())
+                elif name.strip():
+                    snippets.append(name.strip())
 
         return snippets
 

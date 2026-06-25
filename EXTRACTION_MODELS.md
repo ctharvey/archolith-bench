@@ -113,8 +113,17 @@ Even with thinking off, gpt-5-nano (1.2 s/call) stayed ~2× slower than gpt-4.1-
 - **DeepSeek** rejects the `json_schema` response format entirely (HTTP 400 "unavailable").
   Use `response_format: json_object` **and put the schema in the prompt**, or it returns
   generic JSON and extracts *zero* entities.
-- **Groq `gpt-oss`** failed JSON validation under `json_object` on some prompts.
+- **Groq `gpt-oss-20b`** is the opposite: it works under `json_schema` (a single call was
+  perfect, ~0.46 s — faster than nano) but **400s under the `json_object` fallback**, and
+  on the harder resolution/edge schemas its valid-JSON rate dropped to ~53% (a 20B model
+  conforming less reliably to strict schemas, compounded by free-tier 429s). Fast and
+  cheap, but needs the paid tier and validation tuning before trusting it.
 - **OpenAI / Gemini** support `json_schema` natively and were the most reliable.
+
+A robust harness must (a) probe `json_schema` vs `json_object` per model and (b) tolerate
+a single failed call (rate limit, transient, or non-conforming output) without aborting
+the whole run — the `json` column then surfaces a model's real structured-output
+reliability instead of hiding it behind a crash.
 
 A good harness probes this per-model (try `json_schema`, fall back to `json_object` +
 schema-in-prompt) rather than trusting a spec sheet.
@@ -149,9 +158,11 @@ thousands of calls) needs the paid Developer tier.
 
 Wired or easy to add — drop the provider key and re-run:
 
-- **Cerebras** (`llama-3.3-70b` / `llama-3.1-8b`) — the other wafer-scale speed leader.
-- **Groq `gpt-oss-20b/120b`** — fix the json_object validation path first.
-- **Gemini 2.5 Flash-Lite** — cheap + thinking-off by default (503'd transiently in our run).
+- **Cerebras** (`llama-3.3-70b` / `llama-3.1-8b`) — the other wafer-scale speed leader (needs key).
+- **Groq `gpt-oss-120b`** — the 20B was fast but only ~53% valid-JSON on the full pipeline;
+  the 120B may conform better. Use `json_schema`, not the `json_object` fallback.
+- **Gemini 2.5 Flash-Lite** — cheap + thinking-off by default; couldn't measure (persistent
+  Google-side 503 "high demand" during testing — retry later).
 - **Mistral** `ministral-3b/8b`, **Qwen** 2.5/3, **Llama-4 Scout** — small, fast, cheap.
 
 ## Reproduce it

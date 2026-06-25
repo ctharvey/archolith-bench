@@ -117,6 +117,7 @@ class ModelResult:
     cached_input_tokens: int = 0
     wall_clock_s: float = 0.0
     error: str = ""
+    last_call_error: str = ""
 
     @property
     def cache_hit_rate(self) -> float:
@@ -252,8 +253,19 @@ def simulate_model(label: str, base_url: str, api_key: str, model: str, *, corpu
         res.error = str(e)[:160]
         return res
 
+    def _safe_call(system: str, user: str, schema: dict) -> tuple[float, str, bool, dict]:
+        """Per-call resilience: a single failed call (rate limit, transient, or a model
+        that can't conform to the schema) is recorded as invalid JSON and the run
+        continues, instead of aborting the whole model."""
+        try:
+            return _call(system, user, schema)
+        except Exception as e:
+            res.last_call_error = str(e)[:120]
+            return 0.0, "", False, {}
+
     def _record(dt: float, ok: bool, usage: dict) -> None:
-        res.call_latencies.append(dt)
+        if dt > 0:
+            res.call_latencies.append(dt)
         res.total_calls += 1
         if ok:
             res.valid_json += 1
@@ -272,7 +284,7 @@ def simulate_model(label: str, base_url: str, api_key: str, model: str, *, corpu
             for ep in corpus:
                 ep_start = time.time()
                 # Stage 1: entity extraction
-                dt, text, ok, usage = _call(
+                dt, text, ok, usage = _safe_call(
                     "Extract every distinct named entity (people, places, orgs, products) from the message. "
                     "Return JSON {\"entities\":[{\"name\":..,\"type\":..}]}.",
                     ep["text"], _ENT_SCHEMA)
@@ -284,7 +296,7 @@ def simulate_model(label: str, base_url: str, api_key: str, model: str, *, corpu
                     names = []
 
                 # Stage 2: entity resolution / dedupe against the growing graph
-                dt, text, ok, usage = _call(
+                dt, text, ok, usage = _safe_call(
                     "Given NEW entities and EXISTING entities, return JSON {\"resolutions\":[{\"name\":..,"
                     "\"duplicate_of\":..}]} marking any new entity that duplicates an existing one.",
                     f"NEW: {json.dumps(names)}\nEXISTING: {json.dumps(known_entities[-40:])}", _RES_SCHEMA)
@@ -292,7 +304,7 @@ def simulate_model(label: str, base_url: str, api_key: str, model: str, *, corpu
                 known_entities.extend(n for n in names if n)
 
                 # Stage 3: edge / fact extraction
-                dt, text, ok, usage = _call(
+                dt, text, ok, usage = _safe_call(
                     "Extract relationships/facts between the entities in the message. "
                     "Return JSON {\"edges\":[{\"source\":..,\"target\":..,\"fact\":..}]}.",
                     f"MESSAGE: {ep['text']}\nENTITIES: {json.dumps(names)}", _EDGE_SCHEMA)

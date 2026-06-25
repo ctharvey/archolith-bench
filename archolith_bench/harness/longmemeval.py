@@ -21,6 +21,7 @@ can still be added behind a flag later for official evidence runs.
 from __future__ import annotations
 
 import json
+import os
 import re
 import string
 from pathlib import Path
@@ -73,15 +74,27 @@ def _load_lme_items(subset: str | None, fixture_path: str | Path | None) -> list
         with open(fixture_path, encoding="utf-8") as f:
             items = json.load(f)
     else:
+        # The xiaowu0162/longmemeval HF repo stores raw JSON arrays as extension-less
+        # files (longmemeval_s / longmemeval_m / longmemeval_oracle), so the dataset
+        # auto-loader cannot map them to a split. Download the chosen variant directly
+        # and parse it. Variant selectable via LONGMEMEVAL_VARIANT (s|m|oracle);
+        # default "s" is the canonical reported benchmark (~115k-token haystacks).
         try:
-            from datasets import load_dataset
+            from huggingface_hub import hf_hub_download
         except ImportError as e:  # pragma: no cover - online only
             raise RuntimeError(
-                "LongMemEval requires the 'datasets' package. "
+                "LongMemEval requires the 'datasets' extra (huggingface_hub). "
                 "Install with: pip install '.[longmemeval]', or pass fixture_path for offline use."
             ) from e
-        ds = load_dataset("xiaowu0162/longmemeval", split="train")  # pragma: no cover - network
-        items = [dict(row) for row in ds]
+        variant = (os.getenv("LONGMEMEVAL_VARIANT", "s") or "s").strip().lower()
+        filename = {"s": "longmemeval_s", "m": "longmemeval_m", "oracle": "longmemeval_oracle"}.get(
+            variant, "longmemeval_s"
+        )
+        path = hf_hub_download(  # pragma: no cover - network
+            repo_id="xiaowu0162/longmemeval", filename=filename, repo_type="dataset"
+        )
+        with open(path, encoding="utf-8") as f:
+            items = json.load(f)
     if subset:
         items = [it for it in items if it.get("question_type") == subset]
     return items

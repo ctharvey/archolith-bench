@@ -521,6 +521,12 @@ def _run_harness(args: argparse.Namespace) -> None:
             model=args.model,
             client=client,
             send_fn=send_fn,
+            # Mode B answers the question directly from recalled memory; the answer
+            # model talks straight to the upstream, NOT the archolith-context proxy
+            # (which need not be running for memory benchmarks). Default chat_base_url
+            # is PROXY_URL, which would send every answer call to a dead port.
+            chat_base_url=DIRECT_URL,
+            api_key=API_KEY,
             fixture_path=args.offline_fixture,
             reset_confirmed=args.confirm_menhir_reset,
             dry_run_reset=args.dry_run_menhir_reset,

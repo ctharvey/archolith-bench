@@ -73,7 +73,7 @@ down menhir + the throwaway Neo4j (`down -v`) on exit.
 Validates the A/B → score → evidence pipeline only (stub menhir client):
 
 ```sh
-archolith-bench harness longmemeval \
+archolith-bench harness longmemeval-menhir \
   --offline-fixture fixtures/longmemeval_sample.json --format markdown
 ```
 

@@ -168,7 +168,7 @@ export UPSTREAM_BASE_URL="${DEEPSEEK_BASE}"
 export UPSTREAM_API_KEY="${DEEPSEEK_KEY}"
 export BENCHMARK_MODEL="${DEEPSEEK_MODEL}"
 
-cmd=( "${BENCH_BIN}" harness longmemeval
+cmd=( "${BENCH_BIN}" harness longmemeval-menhir
       --menhir-url "${MENHIR_URL}"
       --confirm-menhir-reset
       --model "${DEEPSEEK_MODEL}"

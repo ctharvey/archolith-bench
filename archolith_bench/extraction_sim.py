@@ -59,6 +59,29 @@ _EDGE_SCHEMA = {"type": "object", "properties": {"edges": {"type": "array", "ite
     "fact": {"type": "string"}}, "required": ["fact"]}}}, "required": ["edges"]}
 
 
+# (cache_hit_in, cache_miss_in, output) USD per 1M tokens. Matched by substring on model.
+# Cached-input rates are what make a repetitive-prefix workload (system prompt + schema)
+# cheap; where a provider has no separate cache rate, cache_hit == cache_miss.
+PRICING: dict[str, tuple[float, float, float]] = {
+    "deepseek-v4-flash": (0.0028, 0.14, 0.28),
+    "deepseek-v4-pro": (0.003625, 0.435, 0.87),
+    "gpt-4.1-nano": (0.02, 0.20, 1.25),
+    "gpt-4.1-mini": (0.10, 0.40, 1.60),
+    "gpt-4o-mini": (0.075, 0.15, 0.60),
+    "llama-3.1-8b": (0.05, 0.05, 0.08),       # Groq, no cache tier
+    "llama-3.3-70b": (0.59, 0.59, 0.79),       # Groq/Cerebras approx, no cache tier
+    "gemini-2.5-flash-lite": (0.025, 0.10, 0.40),
+}
+
+
+def _pricing_for(model: str) -> tuple[float, float, float] | None:
+    low = model.lower()
+    for key, p in PRICING.items():
+        if key in low:
+            return p
+    return None
+
+
 @dataclass
 class ModelResult:
     label: str
@@ -71,8 +94,25 @@ class ModelResult:
     total_calls: int = 0
     entity_recall: list[float] = field(default_factory=list)
     fact_recall: list[float] = field(default_factory=list)
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cached_input_tokens: int = 0
     wall_clock_s: float = 0.0
     error: str = ""
+
+    @property
+    def cache_hit_rate(self) -> float:
+        return (self.cached_input_tokens / self.input_tokens) if self.input_tokens else 0.0
+
+    def cost_per_1k_episodes(self) -> float | None:
+        """Estimated USD per 1,000 episodes, using the measured cache hit/miss split."""
+        p = _pricing_for(self.model)
+        if p is None or self.episodes == 0:
+            return None
+        hit_in, miss_in, out = p
+        miss = max(0, self.input_tokens - self.cached_input_tokens)
+        cost = (self.cached_input_tokens * hit_in + miss * miss_in + self.output_tokens * out) / 1_000_000
+        return cost / self.episodes * 1000
 
     def _p(self, q: float) -> float:
         if not self.call_latencies:
@@ -163,13 +203,15 @@ def simulate_model(label: str, base_url: str, api_key: str, model: str, *, corpu
             if resp.status_code == 400 and ("response_format" in txt or "unavailable" in txt or "json_schema" in txt):
                 raise _SchemaUnavailable(resp.text[:160])
             raise RuntimeError(f"{resp.status_code}: {resp.text[:140]}")
-        text = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "") or ""
+        data = resp.json()
+        text = data.get("choices", [{}])[0].get("message", {}).get("content", "") or ""
+        usage = data.get("usage", {}) or {}
         ok = True
         try:
             json.loads(text)
         except Exception:
             ok = False
-        return dt, text, ok
+        return dt, text, ok, usage
 
     # Detect response_format mode once (json_schema, else json_object+prompt like menhir).
     try:
@@ -180,11 +222,18 @@ def simulate_model(label: str, base_url: str, api_key: str, model: str, *, corpu
         res.error = str(e)[:160]
         return res
 
-    def _record(dt: float, ok: bool) -> None:
+    def _record(dt: float, ok: bool, usage: dict) -> None:
         res.call_latencies.append(dt)
         res.total_calls += 1
         if ok:
             res.valid_json += 1
+        res.input_tokens += int(usage.get("prompt_tokens") or 0)
+        res.output_tokens += int(usage.get("completion_tokens") or 0)
+        # DeepSeek reports prompt_cache_hit_tokens; OpenAI nests cached_tokens.
+        cached = usage.get("prompt_cache_hit_tokens")
+        if cached is None:
+            cached = (usage.get("prompt_tokens_details") or {}).get("cached_tokens")
+        res.cached_input_tokens += int(cached or 0)
 
     known_entities: list[str] = []
     wall_start = time.time()
@@ -193,11 +242,11 @@ def simulate_model(label: str, base_url: str, api_key: str, model: str, *, corpu
             for ep in corpus:
                 ep_start = time.time()
                 # Stage 1: entity extraction
-                dt, text, ok = _call(
+                dt, text, ok, usage = _call(
                     "Extract every distinct named entity (people, places, orgs, products) from the message. "
                     "Return JSON {\"entities\":[{\"name\":..,\"type\":..}]}.",
                     ep["text"], _ENT_SCHEMA)
-                _record(dt, ok)
+                _record(dt, ok, usage)
                 res.entity_recall.append(_recall(ep["entities"], text))
                 try:
                     names = [str(e.get("name", "")) for e in json.loads(text).get("entities", []) if isinstance(e, dict)]
@@ -205,19 +254,19 @@ def simulate_model(label: str, base_url: str, api_key: str, model: str, *, corpu
                     names = []
 
                 # Stage 2: entity resolution / dedupe against the growing graph
-                dt, text, ok = _call(
+                dt, text, ok, usage = _call(
                     "Given NEW entities and EXISTING entities, return JSON {\"resolutions\":[{\"name\":..,"
                     "\"duplicate_of\":..}]} marking any new entity that duplicates an existing one.",
                     f"NEW: {json.dumps(names)}\nEXISTING: {json.dumps(known_entities[-40:])}", _RES_SCHEMA)
-                _record(dt, ok)
+                _record(dt, ok, usage)
                 known_entities.extend(n for n in names if n)
 
                 # Stage 3: edge / fact extraction
-                dt, text, ok = _call(
+                dt, text, ok, usage = _call(
                     "Extract relationships/facts between the entities in the message. "
                     "Return JSON {\"edges\":[{\"source\":..,\"target\":..,\"fact\":..}]}.",
                     f"MESSAGE: {ep['text']}\nENTITIES: {json.dumps(names)}", _EDGE_SCHEMA)
-                _record(dt, ok)
+                _record(dt, ok, usage)
                 res.fact_recall.append(_fact_recall(ep["facts"], text))
 
                 res.episode_latencies.append(time.time() - ep_start)
@@ -274,9 +323,9 @@ def default_targets() -> list[dict]:
 def render_results(results: list[ModelResult]) -> str:
     lines = [
         "Backend extraction simulation (3 calls/episode: entities -> resolve -> edges)",
-        f"{'model':22}{'mode':18}{'ep/s':>7}{'call_p50':>10}{'call_p95':>10}{'call_max':>10}"
-        f"{'ep_avg':>9}{'json':>7}{'ent_rec':>9}{'fact_rec':>9}",
-        "-" * 118,
+        f"{'model':22}{'mode':18}{'ep/s':>7}{'call_p50':>10}{'call_p95':>10}"
+        f"{'ep_avg':>9}{'json':>7}{'ent_rec':>9}{'fact_rec':>9}{'cacheHit':>9}{'$/1k_ep':>10}",
+        "-" * 130,
     ]
     # rank by episode throughput (episodes / wall clock)
     for r in sorted(results, key=lambda x: (x.error != "", -(x.episodes / x.wall_clock_s if x.wall_clock_s else 0))):
@@ -284,8 +333,14 @@ def render_results(results: list[ModelResult]) -> str:
             lines.append(f"{r.label:22}ERROR  {r.error}")
             continue
         eps = r.episodes / r.wall_clock_s if r.wall_clock_s else 0.0
+        cost = r.cost_per_1k_episodes()
+        cost_s = f"${cost:8.2f}" if cost is not None else "   n/a"
         lines.append(
-            f"{r.label:22}{r.mode:18}{eps:>7.2f}{r.call_p50:>9.2f}s{r.call_p95:>9.2f}s{r.call_max:>9.2f}s"
+            f"{r.label:22}{r.mode:18}{eps:>7.2f}{r.call_p50:>9.2f}s{r.call_p95:>9.2f}s"
             f"{r.episode_avg:>8.2f}s{r.valid_json_rate:>7.0%}{r.mean_entity_recall:>9.2f}{r.mean_fact_recall:>9.2f}"
+            f"{r.cache_hit_rate:>9.0%}{cost_s:>10}"
         )
+    lines.append("")
+    lines.append("$/1k_ep = est. extraction cost per 1,000 episodes using the MEASURED cache hit/miss split.")
+    lines.append("Note: cold-run cache-hit rates understate production; a warm cache (repeated prefixes) lowers $ further.")
     return "\n".join(lines)

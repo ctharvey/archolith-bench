@@ -70,3 +70,21 @@ def test_modelresult_percentiles():
     r.call_latencies = [0.1, 0.2, 0.3, 0.4, 1.0]
     assert r.call_max == 1.0
     assert r.call_p50 == 0.3
+
+
+def test_cost_uses_cache_split_and_pricing():
+    # deepseek-v4-flash: cache_hit $0.0028, miss $0.14, out $0.28 per 1M.
+    r = ModelResult(label="ds", model="deepseek-v4-flash", mode="json_object+prompt", episodes=10)
+    r.input_tokens = 100_000
+    r.cached_input_tokens = 80_000  # 80% cache hit
+    r.output_tokens = 10_000
+    assert abs(r.cache_hit_rate - 0.8) < 1e-9
+    # cost = (80k*0.0028 + 20k*0.14 + 10k*0.28)/1e6 = (224 + 2800 + 2800)/1e6 = 0.005824
+    # per 1k episodes = /10*1000
+    assert abs(r.cost_per_1k_episodes() - 0.5824) < 1e-4
+
+
+def test_cost_none_for_unknown_model():
+    r = ModelResult(label="x", model="some-unknown-model", mode="json_schema", episodes=5)
+    r.input_tokens = 100
+    assert r.cost_per_1k_episodes() is None

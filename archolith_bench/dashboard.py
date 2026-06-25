@@ -39,6 +39,7 @@ class RunSnapshot:
     model: str
     arms: dict[str, ArmAgg] = field(default_factory=dict)
     mtime: float = 0.0
+    source: str = ""  # the checkpoint's folder, distinguishes same-named runs (e.g. ext-deepseek)
 
     @property
     def total_done(self) -> int:
@@ -75,7 +76,8 @@ def _parse_checkpoint_name(path: Path) -> tuple[str, str, str]:
 def read_checkpoint(path: Path) -> RunSnapshot:
     benchmark, variant, model = _parse_checkpoint_name(path)
     snap = RunSnapshot(checkpoint=path, benchmark=benchmark, variant=variant, model=model,
-                       mtime=path.stat().st_mtime if path.exists() else 0.0)
+                       mtime=path.stat().st_mtime if path.exists() else 0.0,
+                       source=path.parent.name)
     if not path.exists():
         return snap
     with open(path, encoding="utf-8") as f:
@@ -164,7 +166,8 @@ def render(
         n_arms = max(1, len(s.arms))
         grand_total = per_arm_total * n_arms if per_arm_total else None
         lines.append("")
-        lines.append(f"  {s.benchmark}  variant={s.variant}  answer-model={s.model}")
+        src = f"  [{s.source}]" if s.source and s.source != "results" else ""
+        lines.append(f"  {s.benchmark}{src}  variant={s.variant}  answer-model={s.model}")
         lines.append(f"  progress {_bar(s.total_done, grand_total)}")
         if rate_per_min:
             eta_txt = f"  ETA ~{eta_min:.0f} min" if eta_min is not None else ""
@@ -230,8 +233,9 @@ def render_html(
                 f"<td class='num'>{a.output_tokens:,}</td></tr>"
             )
         lift = f"<span class='lift'>memory lift: {s.lift:+.3f}</span>" if s.lift is not None else ""
+        src = f" <span class='src'>[{_esc(s.source)}]</span>" if s.source and s.source != "results" else ""
         rows.append(
-            f"<div class='run'><h2>{_esc(s.benchmark)} "
+            f"<div class='run'><h2>{_esc(s.benchmark)}{src} "
             f"<span class='muted'>variant={_esc(s.variant)} &middot; answer-model={_esc(s.model)}</span></h2>"
             f"<div class='prog'>{bar}</div>"
             f"<table><thead><tr><th>arm</th><th>done</th><th>acc</th><th>in_tok</th><th>out_tok</th></tr></thead>"
@@ -258,6 +262,7 @@ def render_html(
  body{{font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:#0d1117;color:#c9d1d9;margin:0;padding:24px}}
  h1{{font-size:18px;margin:0 0 4px}} h2{{font-size:15px;margin:18px 0 8px}}
  .muted{{color:#8b949e;font-weight:normal}} .up{{color:#3fb950}} .down{{color:#f85149}}
+ .src{{color:#d29922}}
  .lift{{color:#58a6ff}} table{{border-collapse:collapse;margin:6px 0}}
  th,td{{padding:4px 14px 4px 0;text-align:left}} th{{color:#8b949e;font-weight:normal;border-bottom:1px solid #30363d}}
  td.num{{text-align:right;font-variant-numeric:tabular-nums}}

@@ -145,13 +145,25 @@ export NEO4J_URI="bolt://localhost:${NEO4J_BOLT_PORT}"
 export NEO4J_USER="neo4j"
 export NEO4J_PASSWORD="${NEO4J_PASSWORD}"
 export NEO4J_DATABASE="neo4j"
-# extraction = deepseek via OpenAI-compatible "local" kind (cloud URL -> no scheduler)
-export GRAPHITI_PROVIDER="local"
+# extraction = deepseek via OpenAI-compatible "local" kind (cloud URL -> no scheduler).
+# CRITICAL: the provider env var is GRAPHITI_LLM_PROVIDER / LLM_CHAT_PROVIDER, NOT
+# GRAPHITI_PROVIDER (which menhir does not read). We also explicitly pin every
+# provider/model var here so the throwaway is deterministic and ISOLATED from the
+# launching shell's environment -- menhir settings read straight from os.environ
+# (no override guard), so an inherited GRAPHITI_LLM_PROVIDER=openai / OPENAI_CHAT_MODEL
+# silently wins over the intended config otherwise. (This is the wiring bug that made
+# extraction quietly run on gpt-4.1-nano@openai instead of deepseek.)
+export GRAPHITI_LLM_PROVIDER="local" MEMORY_GRAPHITI_PROVIDER="local"
+export LLM_CHAT_PROVIDER="local" MEMORY_CHAT_PROVIDER="local"
+export GRAPHITI_RERANKER_PROVIDER="local" MEMORY_GRAPHITI_RERANKER_PROVIDER="local"
 export LOCAL_LLM_BASE_URL="${DEEPSEEK_BASE}"
 export LOCAL_LLM_CHAT_MODEL="${DEEPSEEK_MODEL}"
 export LOCAL_LLM_API_KEY="${DEEPSEEK_KEY}"
+# Neutralize any inherited OpenAI chat-model override so it cannot leak into the
+# local/deepseek chat path (the embedder uses OPENAI_EMBED_MODEL, set below).
+unset OPENAI_CHAT_MODEL
 # embedding = openai text-embedding-3-small (1536-dim, matches prod)
-export GRAPHITI_EMBED_PROVIDER="openai"
+export GRAPHITI_EMBED_PROVIDER="openai" MEMORY_GRAPHITI_EMBED_PROVIDER="openai"
 export OPENAI_API_KEY="${OPENAI_KEY}"
 export OPENAI_EMBED_MODEL="${OPENAI_EMBED_MODEL}"
 

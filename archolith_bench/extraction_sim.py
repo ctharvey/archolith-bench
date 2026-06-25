@@ -63,22 +63,40 @@ _EDGE_SCHEMA = {"type": "object", "properties": {"edges": {"type": "array", "ite
 # Cached-input rates are what make a repetitive-prefix workload (system prompt + schema)
 # cheap; where a provider has no separate cache rate, cache_hit == cache_miss.
 PRICING: dict[str, tuple[float, float, float]] = {
+    # OpenAI (June 2026 published rates: cache-hit / input / output per 1M)
+    "gpt-5.2-pro": (21.00, 21.00, 168.00),
+    "gpt-5.2": (0.175, 1.75, 14.00),
+    "gpt-5.1": (0.125, 1.25, 10.00),
+    "gpt-5-nano": (0.005, 0.05, 0.40),
+    "gpt-5-mini": (0.025, 0.25, 2.00),
+    "gpt-5-pro": (15.00, 15.00, 120.00),
+    "gpt-5": (0.125, 1.25, 10.00),
+    "gpt-4.1-nano": (0.025, 0.10, 0.40),
+    "gpt-4.1-mini": (0.10, 0.40, 1.60),
+    "gpt-4.1": (0.50, 2.00, 8.00),
+    "gpt-4o-mini": (0.075, 0.15, 0.60),
+    "gpt-4o": (1.25, 2.50, 10.00),
+    # DeepSeek (api-docs.deepseek.com/quick_start/pricing)
     "deepseek-v4-flash": (0.0028, 0.14, 0.28),
     "deepseek-v4-pro": (0.003625, 0.435, 0.87),
-    "gpt-4.1-nano": (0.02, 0.20, 1.25),
-    "gpt-4.1-mini": (0.10, 0.40, 1.60),
-    "gpt-4o-mini": (0.075, 0.15, 0.60),
-    "llama-3.1-8b": (0.05, 0.05, 0.08),       # Groq, no cache tier
-    "llama-3.3-70b": (0.59, 0.59, 0.79),       # Groq/Cerebras approx, no cache tier
-    "gemini-2.5-flash-lite": (0.025, 0.10, 0.40),
+    # Google (cloud.google.com/.../generative-ai/pricing)
+    "gemini-2.5-flash-lite": (0.01, 0.10, 0.40),
+    "gemini-2.5-flash": (0.03, 0.30, 2.50),
+    # Groq (groq.com/pricing) -- cache hit is 50% off input
+    "llama-3.1-8b": (0.025, 0.05, 0.08),
+    "llama-3.3-70b": (0.295, 0.59, 0.79),
+    "gpt-oss-20b": (0.0375, 0.075, 0.30),
+    "gpt-oss-120b": (0.075, 0.15, 0.60),
 }
 
 
 def _pricing_for(model: str) -> tuple[float, float, float] | None:
+    """Match the most specific (longest) pricing key contained in the model name, so
+    'gpt-5-nano' resolves to gpt-5-nano rather than the shorter 'gpt-5'."""
     low = model.lower()
-    for key, p in PRICING.items():
+    for key in sorted(PRICING, key=len, reverse=True):
         if key in low:
-            return p
+            return PRICING[key]
     return None
 
 
@@ -185,9 +203,18 @@ def simulate_model(label: str, base_url: str, api_key: str, model: str, *, corpu
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     http = httpx.Client(timeout=60.0)
 
+    low = model.lower()
+    needs_completion_tokens = low.startswith(("gpt-5", "o1", "o3", "o4"))
+
     def _call(system: str, user: str, schema: dict) -> tuple[float, str, bool]:
         msgs = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-        body: dict = {"model": model, "messages": msgs, "temperature": 0.0, "max_tokens": 500}
+        body: dict = {"model": model, "messages": msgs}
+        if needs_completion_tokens:
+            # gpt-5 / o-series require max_completion_tokens and only the default temperature.
+            body["max_completion_tokens"] = 800
+        else:
+            body["max_tokens"] = 500
+            body["temperature"] = 0.0
         if res.mode == "json_schema":
             body["response_format"] = {"type": "json_schema", "json_schema": {"name": "out", "schema": schema}}
         else:
@@ -301,20 +328,41 @@ def default_targets() -> list[dict]:
 
     menhir_env = r"C:\Users\thron\IdeaProjects\projects\archolith\menhir\.env"
     delegate_env = r"C:\Users\thron\IdeaProjects\projects\ctharvey\cth.mcp.delegate\.env"
-    openai_key = os.getenv("OPENAI_API_KEY") or _read_env_file(menhir_env, "OPENAI_API_KEY")
-    deepseek_key = os.getenv("DEEPSEEK_API_KEY") or _read_env_file(delegate_env, "DELEGATE_API_KEY")
+
+    def _key(*envvars: str, files_keys: tuple[tuple[str, str], ...] = ()) -> str:
+        """First non-empty value from env vars, then (file, key) pairs."""
+        for v in envvars:
+            if os.getenv(v):
+                return os.getenv(v)
+        for path, k in files_keys:
+            val = _read_env_file(path, k)
+            if val:
+                return val
+        return ""
+
+    openai_key = _key("OPENAI_API_KEY", files_keys=((menhir_env, "OPENAI_API_KEY"),))
+    deepseek_key = _key("DEEPSEEK_API_KEY", files_keys=((delegate_env, "DELEGATE_API_KEY"),))
+    groq_key = _key("GROQ_API_KEY", files_keys=((menhir_env, "GROQ_API_KEY"),))
+    gemini_key = _key("GEMINI_API_KEY", "GOOGLE_API_KEY",
+                      files_keys=((menhir_env, "GEMINI_API_KEY"), (menhir_env, "GOOGLE_API_KEY")))
+    cerebras_key = _key("CEREBRAS_API_KEY", files_keys=((menhir_env, "CEREBRAS_API_KEY"),))
 
     candidates = [
+        ("gpt-5-nano", "https://api.openai.com/v1", openai_key, "gpt-5-nano"),
+        ("gpt-5-mini", "https://api.openai.com/v1", openai_key, "gpt-5-mini"),
         ("gpt-4.1-nano", "https://api.openai.com/v1", openai_key, "gpt-4.1-nano"),
         ("gpt-4.1-mini", "https://api.openai.com/v1", openai_key, "gpt-4.1-mini"),
         ("gpt-4o-mini", "https://api.openai.com/v1", openai_key, "gpt-4o-mini"),
         ("deepseek-v4-flash", "https://api.deepseek.com/v1", deepseek_key, "deepseek-v4-flash"),
-        # Fast-inference providers: enabled when the key env var is present.
-        ("groq-llama3.1-8b", "https://api.groq.com/openai/v1", os.getenv("GROQ_API_KEY"), "llama-3.1-8b-instant"),
-        ("groq-llama3.3-70b", "https://api.groq.com/openai/v1", os.getenv("GROQ_API_KEY"), "llama-3.3-70b-versatile"),
+        # Fast-inference providers: enabled when the key is present (env var or .env).
+        ("groq-llama3.1-8b", "https://api.groq.com/openai/v1", groq_key, "llama-3.1-8b-instant"),
+        ("groq-llama3.3-70b", "https://api.groq.com/openai/v1", groq_key, "llama-3.3-70b-versatile"),
+        ("groq-gpt-oss-20b", "https://api.groq.com/openai/v1", groq_key, "openai/gpt-oss-20b"),
         ("gemini-2.5-flash-lite", "https://generativelanguage.googleapis.com/v1beta/openai/",
-         os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"), "gemini-2.5-flash-lite"),
-        ("cerebras-llama3.3-70b", "https://api.cerebras.ai/v1", os.getenv("CEREBRAS_API_KEY"), "llama-3.3-70b"),
+         gemini_key, "gemini-2.5-flash-lite"),
+        ("gemini-2.5-flash", "https://generativelanguage.googleapis.com/v1beta/openai/",
+         gemini_key, "gemini-2.5-flash"),
+        ("cerebras-llama3.3-70b", "https://api.cerebras.ai/v1", cerebras_key, "llama-3.3-70b"),
     ]
     return [{"label": lbl, "base_url": url, "api_key": key, "model": m}
             for (lbl, url, key, m) in candidates if key]

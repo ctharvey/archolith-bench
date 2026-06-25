@@ -79,10 +79,9 @@ PRICING: dict[str, tuple[float, float, float]] = {
     # DeepSeek (api-docs.deepseek.com/quick_start/pricing)
     "deepseek-v4-flash": (0.0028, 0.14, 0.28),
     "deepseek-v4-pro": (0.003625, 0.435, 0.87),
-    # Google (cloud.google.com/.../generative-ai/pricing)
-    "gemini-3.1-flash-lite": (0.01, 0.10, 0.40),   # est ~flash-lite tier; verify official 3.x pricing
-    "gemini-3.5-flash": (0.03, 0.30, 2.50),         # est
-    "gemini-3-flash": (0.03, 0.30, 2.50),           # est
+    # Google (cloud.google.com/.../generative-ai/pricing) -- Global standard tier
+    "gemini-3.1-flash-lite": (0.025, 0.25, 1.50),   # 3.x is pricier than 2.5: output $1.50 (3.75x nano)
+    "gemini-3.5-flash": (0.15, 1.50, 9.00),
     "gemini-2.5-flash-lite": (0.01, 0.10, 0.40),
     "gemini-2.5-flash": (0.03, 0.30, 2.50),
     # Groq (groq.com/pricing) -- cache hit is 50% off input

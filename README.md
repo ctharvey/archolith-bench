@@ -76,12 +76,12 @@ latency, quality, and **cache-aware** cost. Full writeup, pricing, and findings:
 | model | provider | call p50 | ent/fact recall | cache hit | $/1k ep |
 |-------|----------|---------:|----------------:|----------:|--------:|
 | llama-3.3-70b | Groq (LPU) | 0.35 s | 1.00 / 0.80 | – | $0.53 |
-| **gpt-4.1-nano** | OpenAI | 0.54 s | 0.90 / 0.80 | 0% | **$0.09** |
-| **gemini-3.1-flash-lite** | Google | 0.65 s | 1.00 / **0.90** | 0% | ~$0.09 |
+| **gpt-4.1-nano** | OpenAI | 0.54 s | 0.90 / 0.80 | 0% | **$0.10** |
+| **gemini-3.1-flash-lite** | Google | 0.63 s | 1.00 / **0.90** | 0% | $0.20 |
 | **deepseek-v4-flash** | DeepSeek | 1.19 s | 1.00 / 0.80 | 74% | **$0.05** |
 | local qwen ~9B | LM Studio | 4.56 s | 1.00 / 0.80 | – | $0 |
 
-- **Default:** `gpt-4.1-nano` or `gemini-3.1-flash-lite` — both nano-class speed; the Gemini posts the best fact recall.
+- **Best value:** `gpt-4.1-nano` (~$0.10/1k). **Best quality:** `gemini-3.1-flash-lite` (best fact recall, but ~2× cost).
 - **Cheapest:** `deepseek-v4-flash` — caching makes it cheapest (50× cache discount).
 - **Fastest:** Groq LPU (paid tier). **Free/private:** local Qwen (slower, $0).
 

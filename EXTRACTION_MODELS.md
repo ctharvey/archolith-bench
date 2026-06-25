@@ -48,8 +48,8 @@ load-dependent; re-run for your own region/tier.
 | model | provider | call p50 | ep_avg | ent_rec | fact_rec | cache hit | $/1k ep |
 |-------|----------|---------:|-------:|--------:|---------:|----------:|--------:|
 | **llama-3.3-70b** | Groq (LPU) | **0.35 s** | **1.10 s** | 1.00 | 0.80 | – | $0.53 |
-| **gpt-4.1-nano** | OpenAI | 0.54 s | 1.72 s | 0.90 | 0.80 | 0% | **$0.09** |
-| **gemini-3.1-flash-lite** | Google | 0.65 s | 2.31 s | **1.00** | **0.90** | 0% | ~$0.09\* |
+| **gpt-4.1-nano** | OpenAI | 0.54 s | 1.72 s | 0.90 | 0.80 | 0% | **$0.10** |
+| **gemini-3.1-flash-lite** | Google | 0.63 s | 1.95 s | **1.00** | **0.90** | 0% | $0.20 |
 | gpt-4.1-mini | OpenAI | 0.81 s | 2.55 s | 1.00 | 0.85 | 0% | $0.32 |
 | gpt-4o-mini | OpenAI | 0.89 s | 2.85 s | 1.00 | 0.80 | 0% | $0.12 |
 | **deepseek-v4-flash** | DeepSeek | 1.19 s | 3.52 s | 1.00 | 0.80 | **74%** | **$0.05** |
@@ -59,13 +59,19 @@ load-dependent; re-run for your own region/tier.
 | gemini-3.5-flash | Google | 3.41 s | 10.6 s | **0.05** | 0.20 | 0% | – |
 | local qwen3.5-9b | LM Studio (self-hosted) | 4.56 s | ~14 s | 1.00 | 0.80 | – | **$0** |
 
-\* gemini-3.1-flash-lite cost estimated at the Flash-Lite tier; confirm official 3.x pricing.
-
 The Gemini generations diverge sharply for this task: **`gemini-3.1-flash-lite` is a
-front-runner** — nano-class speed (0.65 s) with the best fact recall measured (0.90) and
-100% valid JSON — while the heavier `gemini-2.5-flash` / `gemini-3.5-flash` are slow and
-weak (3.5-flash collapses to 0.05 entity recall, likely thinking-heavy and non-conforming).
-For extraction, pick the **Flash-Lite** line, not full Flash.
+front-runner on speed and quality** — nano-class speed (0.63 s) with the best fact recall
+measured (0.90) and 100% valid JSON — while the heavier `gemini-2.5-flash` /
+`gemini-3.5-flash` are slow and weak (3.5-flash collapses to 0.05 entity recall, likely
+thinking-heavy and non-conforming). For extraction, pick the **Flash-Lite** line, not full
+Flash.
+
+But note **3.1-flash-lite costs ~2× nano** ($0.20 vs $0.10 per 1k episodes). Gemini 3.x is
+priced well above 2.5: input $0.25, cached $0.025, **output $1.50** per 1M (Global; +10%
+non-global from 2026-07-01). The output rate dominates extraction cost and — per Google's
+schedule — **bills reasoning tokens as output**, and output can't be cached, so the input
+cache discount only partially helps. So `3.1-flash-lite` is the **quality** pick; `gpt-4.1-nano`
+is the **value** pick at half the cost for a small fact-recall trade.
 
 > `cacheHit` is measured cold here; in production the repeated system-prompt + schema
 > prefix warms the cache and pushes cost lower — most for providers with a deep cache
@@ -84,6 +90,8 @@ call repeats the same system prompt and JSON schema.
 | gpt-4.1-mini | $0.10 | $0.40 | $1.60 |
 | gpt-4o-mini | $0.075 | $0.15 | $0.60 |
 | deepseek-v4-flash | **$0.0028** | $0.14 | $0.28 |
+| gemini-3.1-flash-lite | $0.025 | $0.25 | **$1.50** |
+| gemini-3.5-flash | $0.15 | $1.50 | $9.00 |
 | gemini-2.5-flash-lite | $0.01 | $0.10 | $0.40 |
 | gemini-2.5-flash | $0.03 | $0.30 | $2.50 |
 | groq llama-3.1-8b | $0.025 | $0.05 | $0.08 |
@@ -157,7 +165,8 @@ thousands of calls) needs the paid Developer tier.
 
 | if you want… | pick | notes |
 |--------------|------|-------|
-| **Sensible default** | `gpt-4.1-nano` **or** `gemini-3.1-flash-lite` | both nano-class speed; the Gemini posts the best fact recall (0.90) |
+| **Best value** | `gpt-4.1-nano` | nano-class speed, ~$0.10/1k, reliable json_schema |
+| **Best quality** | `gemini-3.1-flash-lite` | same speed, best fact recall (0.90), but ~2× the cost ($0.20/1k, $1.50 output) |
 | **Lowest cost at scale** | `deepseek-v4-flash` | caching makes it cheapest; slower; needs json_object + schema-in-prompt |
 | **Lowest latency** | Groq `llama-3.3-70b` (paid tier) | ~3× faster; pay-to-scale |
 | **Free / private / offline** | local Qwen ~9B (LM Studio / vLLM / Ollama) | $0, no rate limits, same quality; ~8× slower |

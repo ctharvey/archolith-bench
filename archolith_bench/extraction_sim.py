@@ -211,7 +211,10 @@ def simulate_model(label: str, base_url: str, api_key: str, model: str, *, corpu
         body: dict = {"model": model, "messages": msgs}
         if needs_completion_tokens:
             # gpt-5 / o-series require max_completion_tokens and only the default temperature.
+            # reasoning_effort=minimal disables thinking (448 reasoning tokens -> 0, ~4x faster);
+            # extraction is structured and needs no chain-of-thought.
             body["max_completion_tokens"] = 800
+            body["reasoning_effort"] = "minimal"
         else:
             body["max_tokens"] = 500
             body["temperature"] = 0.0

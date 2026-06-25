@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -152,6 +153,15 @@ def main(argv: list[str] | None = None) -> None:
     harness_p.add_argument("--resume", action="store_true",
                            help="Memory benchmarks: checkpoint each item and skip already-completed "
                                 "items on rerun (survives crashes/rate-limit aborts). Rerun the same command.")
+    harness_p.add_argument("--scorer", choices=["containment", "llm-judge"], default="containment",
+                           help="Memory benchmarks: 'containment' (fast, offline) or 'llm-judge' "
+                                "(LongMemEval protocol; comparable to published Mem0/Zep numbers).")
+    harness_p.add_argument("--judge-model", default="gpt-4o-mini",
+                           help="llm-judge: grader model (default gpt-4o-mini; use gpt-4o for paper-fidelity)")
+    harness_p.add_argument("--judge-url", default=None,
+                           help="llm-judge: grader base URL (default: UPSTREAM_BASE_URL/OpenAI)")
+    harness_p.add_argument("--judge-api-key", default=None,
+                           help="llm-judge: grader API key (default: OPENAI_API_KEY env)")
     harness_p.add_argument("--confirm-menhir-reset", action="store_true",
                            help="Allow memory benchmarks to reset throwaway Menhir groups after each item")
     harness_p.add_argument("--dry-run-menhir-reset", action="store_true",
@@ -486,6 +496,7 @@ def _run_harness(args: argparse.Namespace) -> None:
         ADAPTERS,
         DEFAULT_MEMORY_ARMS,
         HttpMenhirClient,
+        LLMJudgeScorer,
         MemoryCheckpoint,
         StubMenhirClient,
         assert_not_production,
@@ -542,6 +553,21 @@ def _run_harness(args: argparse.Namespace) -> None:
             checkpoint = MemoryCheckpoint(ckpt_path)
             done = checkpoint.done_count()
             print(f"  [resume] checkpoint {ckpt_path} ({done} item-results already recorded)")
+        score_fn = None
+        if getattr(args, "scorer", "containment") == "llm-judge":
+            if offline:
+                print("ERROR: --scorer llm-judge needs network; not valid with --offline-fixture", file=sys.stderr)
+                sys.exit(1)
+            judge_key = args.judge_api_key or os.getenv("OPENAI_API_KEY", "")
+            if not judge_key:
+                print("ERROR: --scorer llm-judge needs an API key (--judge-api-key or OPENAI_API_KEY)", file=sys.stderr)
+                sys.exit(1)
+            score_fn = LLMJudgeScorer(
+                base_url=args.judge_url or os.getenv("UPSTREAM_BASE_URL") or "https://api.openai.com/v1",
+                api_key=judge_key,
+                model=args.judge_model,
+            )
+            print(f"  [scorer] llm-judge model={args.judge_model} (LongMemEval-comparable)")
         ab = run_memory_ab(
             adapter,
             arms=mem_arms,
@@ -560,6 +586,7 @@ def _run_harness(args: argparse.Namespace) -> None:
             reset_confirmed=args.confirm_menhir_reset,
             dry_run_reset=args.dry_run_menhir_reset,
             checkpoint=checkpoint,
+            score_fn=score_fn,
         )
     elif is_external(adapter):
         results_fixtures = (

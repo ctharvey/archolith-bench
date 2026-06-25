@@ -43,6 +43,7 @@ from .memory_ab import (
     run_memory_ab,
 )
 from .menhir_client import HttpMenhirClient, StubMenhirClient
+from .scoring import LLMJudgeScorer
 
 # Registry of available real-harness adapters, keyed by benchmark_id (the one roof).
 # In-process: run_ab. ExternalCliAdapter: run_external_ab. MemoryQAAdapter: run_memory_ab.
@@ -93,6 +94,7 @@ __all__ = [
     "ExternalCliAdapter",
     "HarnessBenchmarkAdapter",
     "HttpMenhirClient",
+    "LLMJudgeScorer",
     "LongBenchV2Adapter",
     "LongMemEvalAdapter",
     "LongMemEvalMemoryAdapter",

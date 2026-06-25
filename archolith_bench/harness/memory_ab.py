@@ -97,6 +97,7 @@ def _run_memory_arm(
     reset_confirmed: bool,
     dry_run_reset: bool,
     checkpoint: "MemoryCheckpoint | None" = None,
+    score_fn=None,  # noqa: ANN001
 ) -> ArmResult:
     results: list[TaskResult] = []
     turn_dicts: list[dict] = []
@@ -132,7 +133,7 @@ def _run_memory_arm(
         messages = adapter.build_messages(memory_context, question)
         text, latency_ms, usage = send_fn(chat_client, chat_base_url, api_key, messages, model)
         inp, out = _usage_tokens(usage)
-        correct = adapter.score(item, text)
+        correct = score_fn(item, text) if score_fn is not None else adapter.score(item, text)
         tr = TaskResult(
             task_id=task_id,
             response_text=text,
@@ -179,6 +180,7 @@ def run_memory_ab(
     reset_confirmed: bool = False,
     dry_run_reset: bool = False,
     checkpoint: "MemoryCheckpoint | None" = None,
+    score_fn=None,  # noqa: ANN001
 ) -> ABResult:
     """Run an ingest-then-recall memory benchmark across arms.
 
@@ -189,6 +191,10 @@ def run_memory_ab(
     `checkpoint`: optional MemoryCheckpoint. When given, each item's result is
     persisted as it completes and already-recorded items are skipped, so a long run
     survives crashes and rate-limit aborts (rerun the same command to resume).
+
+    `score_fn`: optional `(item, response_text) -> bool` override for grading (e.g. an
+    LLMJudgeScorer for LongMemEval-comparable accuracy). Defaults to `adapter.score`
+    (the offline containment scorer). If it exposes `.close()`, it is closed on exit.
     """
     items = adapter.load_items(subset, limit, fixture_path)
     pricing = _pick_pricing(model, pricing)
@@ -209,27 +215,32 @@ def run_memory_ab(
 
     arm_results: dict[str, ArmResult] = {}
     memory_client_cm = client if hasattr(client, "__enter__") and hasattr(client, "__exit__") else nullcontext(client)
-    with httpx.Client(timeout=300) as chat_client:
-        with memory_client_cm:
-            for arm in arms:
-                arm_client = None if arm == NO_MEMORY else client
-                arm_results[arm] = _run_memory_arm(
-                    adapter,
-                    arm,
-                    items,
-                    client=arm_client,
-                    chat_client=chat_client,
-                    send_fn=send_fn,
-                    chat_base_url=chat_base_url,
-                    api_key=api_key,
-                    model=model,
-                    recall_limit=recall_limit,
-                    pricing=pricing,
-                    reset_memory=reset_memory,
-                    reset_confirmed=reset_confirmed,
-                    dry_run_reset=dry_run_reset,
-                    checkpoint=checkpoint,
-                )
+    try:
+        with httpx.Client(timeout=300) as chat_client:
+            with memory_client_cm:
+                for arm in arms:
+                    arm_client = None if arm == NO_MEMORY else client
+                    arm_results[arm] = _run_memory_arm(
+                        adapter,
+                        arm,
+                        items,
+                        client=arm_client,
+                        chat_client=chat_client,
+                        send_fn=send_fn,
+                        chat_base_url=chat_base_url,
+                        api_key=api_key,
+                        model=model,
+                        recall_limit=recall_limit,
+                        pricing=pricing,
+                        reset_memory=reset_memory,
+                        reset_confirmed=reset_confirmed,
+                        dry_run_reset=dry_run_reset,
+                        checkpoint=checkpoint,
+                        score_fn=score_fn,
+                    )
+    finally:
+        if score_fn is not None and hasattr(score_fn, "close"):
+            score_fn.close()
 
     # Deltas vs the no_memory floor (memory lift), reusing the shared helper by
     # aliasing no_memory as the baseline.

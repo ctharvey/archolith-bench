@@ -55,6 +55,7 @@ load-dependent; re-run for your own region/tier.
 | gpt-5-nano (thinking off) | OpenAI | 1.20 s | 4.07 s | 0.80 | 0.90 | 0% | $0.11 |
 | gpt-5-mini (thinking off) | OpenAI | 1.39 s | 4.81 s | 1.00 | 0.85 | 0% | $0.46 |
 | gemini-2.5-flash | Google | 1.52 s | 4.74 s | 1.00 | **0.40** | 0% | $0.27 |
+| local qwen3.5-9b | LM Studio (self-hosted) | 4.56 s | ~14 s | 1.00 | 0.80 | – | **$0** |
 
 > `cacheHit` is measured cold here; in production the repeated system-prompt + schema
 > prefix warms the cache and pushes cost lower — most for providers with a deep cache
@@ -118,7 +119,16 @@ Even with thinking off, gpt-5-nano (1.2 s/call) stayed ~2× slower than gpt-4.1-
 A good harness probes this per-model (try `json_schema`, fall back to `json_object` +
 schema-in-prompt) rather than trusting a spec sheet.
 
-### 5. Speed leaders need a paid tier
+### 5. Local / self-hosted is free and private — but throughput-bound
+A local ~9B Qwen in LM Studio matched the cloud models on quality (1.00 entity / 0.80
+fact recall, 100% valid JSON via native `json_schema`) at **$0 marginal cost and no rate
+limits**. The trade-off is speed: ~4.5 s/call (~40–50 tok/s on consumer hardware) →
+~14 s/episode, roughly 8× slower than `gpt-4.1-nano`. Excellent for privacy-sensitive,
+offline, or cost-capped workloads at small/medium scale; throughput-limited for very
+large runs unless you batch across more local GPUs. Point any OpenAI-compatible local
+server (LM Studio, llama.cpp, vLLM, Ollama) at the harness to measure your own box.
+
+### 6. Speed leaders need a paid tier
 Groq's LPU (`llama-3.3-70b` at 0.35 s/call) and Cerebras are the fastest by far, but Groq's
 **free tier is 30 RPM / 6,000 TPM / 14,400 RPD** — the 6K tokens/minute cap is the real
 ceiling for schema-heavy calls and 429s quickly. A production-scale run (hundreds of
@@ -131,6 +141,7 @@ thousands of calls) needs the paid Developer tier.
 | **Sensible default** | `gpt-4.1-nano` | fast, cheap, reliable json_schema, no rate-limit pain |
 | **Lowest cost at scale** | `deepseek-v4-flash` | caching makes it cheapest; slower; needs json_object + schema-in-prompt |
 | **Lowest latency** | Groq `llama-3.3-70b` (paid tier) | ~3× faster; pay-to-scale |
+| **Free / private / offline** | local Qwen ~9B (LM Studio / vLLM / Ollama) | $0, no rate limits, same quality; ~8× slower |
 | **All-Google stack** | `gemini-2.5-flash-lite` | cheap; set `thinking_budget: 0`; avoid full Flash for extraction |
 | **Avoid** | gpt-5-nano/mini, default Gemini-Flash thinking | reasoning overhead for no quality gain |
 

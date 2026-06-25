@@ -163,6 +163,18 @@ def main(argv: list[str] | None = None) -> None:
     harness_p.add_argument("--out", type=Path, default=None,
                            help="Optional explicit evidence output file")
 
+    # ---- dashboard subcommand ----
+    dash_p = subparsers.add_parser("dashboard", help="Live view of in-progress memory runs (reads checkpoints)")
+    dash_p.add_argument("--results-dir", type=Path, default=Path("results"),
+                        help="Directory holding .checkpoint_*.jsonl files (default: results)")
+    dash_p.add_argument("--menhir-url", default=None,
+                        help="Throwaway menhir base URL to probe for live activity (e.g. http://localhost:8101)")
+    dash_p.add_argument("--interval", type=float, default=5.0,
+                        help="Refresh interval seconds (default: 5)")
+    dash_p.add_argument("--once", action="store_true", help="Print a single snapshot and exit")
+    dash_p.add_argument("--total-items", type=int, default=None,
+                        help="Per-arm item total for the progress bar (default: inferred from variant)")
+
     # ---- report subcommand ----
     report_p = subparsers.add_parser("report", help="Generate BENCHMARKS.md from results/")
     report_p.add_argument("--out", type=Path, default=Path("BENCHMARKS.md"),
@@ -190,6 +202,8 @@ def main(argv: list[str] | None = None) -> None:
         _run_industry(args)
     elif args.suite == "harness":
         _run_harness(args)
+    elif args.suite == "dashboard":
+        _run_dashboard(args)
     elif args.suite == "report":
         _run_report(args)
     else:
@@ -593,6 +607,21 @@ def _offline_send_fn(client, base_url, api_key, messages, model, **kwargs):  # n
     prompt_tokens = sum(len(str(m.get("content", ""))) for m in messages) // 4
     usage = {"prompt_tokens": max(1, prompt_tokens), "completion_tokens": 1}
     return "A", 0.0, usage
+
+
+def _run_dashboard(args: argparse.Namespace) -> None:
+    from .dashboard import run_dashboard
+
+    try:
+        run_dashboard(
+            args.results_dir,
+            menhir_url=args.menhir_url,
+            interval=args.interval,
+            once=args.once,
+            total_items=args.total_items,
+        )
+    except KeyboardInterrupt:
+        print("\n(dashboard stopped)")
 
 
 def _run_report(args: argparse.Namespace) -> None:

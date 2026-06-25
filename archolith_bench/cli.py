@@ -189,6 +189,12 @@ def main(argv: list[str] | None = None) -> None:
     dash_p.add_argument("--host", default="127.0.0.1", help="Web dashboard bind host (default: 127.0.0.1)")
     dash_p.add_argument("--port", type=int, default=8200, help="Web dashboard port (default: 8200)")
 
+    # ---- ports subcommand ----
+    ports_p = subparsers.add_parser("ports", help="Index running stack processes by label + port")
+    ports_p.add_argument("--all", action="store_true", dest="show_all",
+                         help="Show every listening port, not just menhir/neo4j/bench/etc.")
+    ports_p.add_argument("--json", action="store_true", dest="as_json", help="Emit JSON")
+
     # ---- report subcommand ----
     report_p = subparsers.add_parser("report", help="Generate BENCHMARKS.md from results/")
     report_p.add_argument("--out", type=Path, default=Path("BENCHMARKS.md"),
@@ -218,6 +224,8 @@ def main(argv: list[str] | None = None) -> None:
         _run_harness(args)
     elif args.suite == "dashboard":
         _run_dashboard(args)
+    elif args.suite == "ports":
+        _run_ports(args)
     elif args.suite == "report":
         _run_report(args)
     else:
@@ -663,6 +671,17 @@ def _run_dashboard(args: argparse.Namespace) -> None:
             )
     except KeyboardInterrupt:
         print("\n(dashboard stopped)")
+
+
+def _run_ports(args: argparse.Namespace) -> None:
+    from .procindex import discover, filter_relevant, render
+
+    entries = discover()
+    if args.as_json:
+        rows = filter_relevant(entries, show_all=args.show_all)
+        print(json.dumps([{"port": e.port, "pid": e.pid, "label": e.label, "cmd": e.cmd} for e in rows], indent=2))
+    else:
+        print(render(entries, show_all=args.show_all))
 
 
 def _run_report(args: argparse.Namespace) -> None:

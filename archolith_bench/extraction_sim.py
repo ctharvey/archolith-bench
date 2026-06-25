@@ -80,6 +80,9 @@ PRICING: dict[str, tuple[float, float, float]] = {
     "deepseek-v4-flash": (0.0028, 0.14, 0.28),
     "deepseek-v4-pro": (0.003625, 0.435, 0.87),
     # Google (cloud.google.com/.../generative-ai/pricing)
+    "gemini-3.1-flash-lite": (0.01, 0.10, 0.40),   # est ~flash-lite tier; verify official 3.x pricing
+    "gemini-3.5-flash": (0.03, 0.30, 2.50),         # est
+    "gemini-3-flash": (0.03, 0.30, 2.50),           # est
     "gemini-2.5-flash-lite": (0.01, 0.10, 0.40),
     "gemini-2.5-flash": (0.03, 0.30, 2.50),
     # Groq (groq.com/pricing) -- cache hit is 50% off input
@@ -373,10 +376,10 @@ def default_targets() -> list[dict]:
         ("groq-llama3.1-8b", "https://api.groq.com/openai/v1", groq_key, "llama-3.1-8b-instant"),
         ("groq-llama3.3-70b", "https://api.groq.com/openai/v1", groq_key, "llama-3.3-70b-versatile"),
         ("groq-gpt-oss-20b", "https://api.groq.com/openai/v1", groq_key, "openai/gpt-oss-20b"),
+        ("gemini-3.1-flash-lite", "https://generativelanguage.googleapis.com/v1beta/openai/",
+         gemini_key, "gemini-3.1-flash-lite"),
         ("gemini-2.5-flash-lite", "https://generativelanguage.googleapis.com/v1beta/openai/",
          gemini_key, "gemini-2.5-flash-lite"),
-        ("gemini-2.5-flash", "https://generativelanguage.googleapis.com/v1beta/openai/",
-         gemini_key, "gemini-2.5-flash"),
         ("cerebras-llama3.3-70b", "https://api.cerebras.ai/v1", cerebras_key, "llama-3.3-70b"),
     ]
     return [{"label": lbl, "base_url": url, "api_key": key, "model": m}

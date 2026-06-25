@@ -193,6 +193,121 @@ def render(
     return "\n".join(lines)
 
 
+def _esc(s: object) -> str:
+    import html
+    return html.escape(str(s))
+
+
+def render_html(
+    snaps: list[RunSnapshot],
+    menhir: dict | None,
+    *,
+    total_items: int | None,
+    refresh_s: int = 5,
+) -> str:
+    """Self-contained auto-refreshing HTML page for the same data as render()."""
+    rows: list[str] = []
+    for s in snaps:
+        per_arm_total = total_items or _KNOWN_VARIANT_ITEMS.get(s.variant)
+        n_arms = max(1, len(s.arms))
+        grand_total = per_arm_total * n_arms if per_arm_total else None
+        pct = (s.total_done / grand_total * 100.0) if grand_total else None
+        bar = (
+            f'<div class="bar"><div class="fill" style="width:{min(100.0, pct):.1f}%"></div></div>'
+            f'<span class="muted">{s.total_done}{"/" + str(grand_total) if grand_total else ""}'
+            f'{f" ({pct:.1f}%)" if pct is not None else ""}</span>'
+        ) if True else ""
+        arm_rows = ""
+        for arm in sorted(s.arms):
+            a = s.arms[arm]
+            done = f"{a.n}/{per_arm_total}" if per_arm_total else str(a.n)
+            arm_rows += (
+                f"<tr><td>{_esc(arm)}</td><td class='num'>{_esc(done)}</td>"
+                f"<td class='num'>{a.score:.3f}</td><td class='num'>{a.input_tokens:,}</td>"
+                f"<td class='num'>{a.output_tokens:,}</td></tr>"
+            )
+        lift = f"<span class='lift'>memory lift: {s.lift:+.3f}</span>" if s.lift is not None else ""
+        rows.append(
+            f"<div class='run'><h2>{_esc(s.benchmark)} "
+            f"<span class='muted'>variant={_esc(s.variant)} &middot; answer-model={_esc(s.model)}</span></h2>"
+            f"<div class='prog'>{bar}</div>"
+            f"<table><thead><tr><th>arm</th><th>done</th><th>acc</th><th>in_tok</th><th>out_tok</th></tr></thead>"
+            f"<tbody>{arm_rows}</tbody></table>{lift}</div>"
+        )
+    body = "".join(rows) or "<p class='muted'>No checkpoints yet — start a run with --resume.</p>"
+
+    if menhir is None:
+        mh = "<span class='muted'>menhir: not probed</span>"
+    elif menhir.get("health"):
+        enr = menhir.get("enrichment") or {}
+        rate = enr.get("episodes_per_min") or enr.get("rate") or enr.get("per_min")
+        mh = (f"<span class='up'>&#9679; menhir UP</span> "
+              f"<span class='muted'>mode={_esc(menhir.get('startup_mode'))} &middot; "
+              f"queue_depth={_esc(menhir.get('queue_depth'))}"
+              f"{f' &middot; enrich~{_esc(rate)}/min' if rate else ''}</span>")
+    else:
+        mh = "<span class='down'>&#9679; menhir starting/degraded</span>"
+
+    return f"""<!doctype html><html><head><meta charset="utf-8">
+<meta http-equiv="refresh" content="{refresh_s}">
+<title>archolith-bench dashboard</title>
+<style>
+ body{{font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:#0d1117;color:#c9d1d9;margin:0;padding:24px}}
+ h1{{font-size:18px;margin:0 0 4px}} h2{{font-size:15px;margin:18px 0 8px}}
+ .muted{{color:#8b949e;font-weight:normal}} .up{{color:#3fb950}} .down{{color:#f85149}}
+ .lift{{color:#58a6ff}} table{{border-collapse:collapse;margin:6px 0}}
+ th,td{{padding:4px 14px 4px 0;text-align:left}} th{{color:#8b949e;font-weight:normal;border-bottom:1px solid #30363d}}
+ td.num{{text-align:right;font-variant-numeric:tabular-nums}}
+ .bar{{display:inline-block;width:320px;height:12px;background:#21262d;border-radius:6px;overflow:hidden;vertical-align:middle;margin-right:8px}}
+ .fill{{height:100%;background:linear-gradient(90deg,#1f6feb,#3fb950)}}
+ .run{{border:1px solid #30363d;border-radius:8px;padding:10px 16px;margin:12px 0;max-width:760px}}
+ footer{{color:#8b949e;margin-top:18px;max-width:760px}}
+</style></head><body>
+<h1>archolith-bench &mdash; memory benchmark</h1>
+<div class="muted">{time.strftime('%Y-%m-%d %H:%M:%S')} &middot; auto-refresh {refresh_s}s</div>
+<div style="margin:10px 0">{mh}</div>
+{body}
+<footer>Token columns are ANSWER-model only; menhir ingestion (OpenAI extraction+embedding)
+spend is not tracked by the bench. Progress is by item-count across arms.</footer>
+</body></html>"""
+
+
+def serve_dashboard(
+    results_dir: Path,
+    *,
+    menhir_url: str | None = None,
+    host: str = "127.0.0.1",
+    port: int = 8200,
+    total_items: int | None = None,
+    refresh_s: int = 5,
+) -> None:
+    """Serve the dashboard as an auto-refreshing web page until interrupted."""
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *a):  # silence access logs
+            pass
+
+        def do_GET(self):  # noqa: N802
+            snaps = scan_runs(results_dir)
+            menhir = probe_menhir(menhir_url) if menhir_url else None
+            page = render_html(snaps, menhir, total_items=total_items, refresh_s=refresh_s)
+            data = page.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+    server = ThreadingHTTPServer((host, port), Handler)
+    print(f"dashboard serving at http://{host}:{port}  (Ctrl-C to stop)")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\n(dashboard stopped)")
+        server.shutdown()
+
+
 def run_dashboard(
     results_dir: Path,
     *,

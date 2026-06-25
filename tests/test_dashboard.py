@@ -8,6 +8,7 @@ from archolith_bench.dashboard import (
     _parse_checkpoint_name,
     read_checkpoint,
     render,
+    render_html,
     scan_runs,
 )
 
@@ -85,3 +86,25 @@ def test_scan_and_render_smoke(tmp_path):
 
 def test_scan_runs_empty_dir(tmp_path):
     assert scan_runs(tmp_path) == []
+
+
+def test_render_html_is_valid_autorefreshing_page(tmp_path):
+    ck = tmp_path / ".checkpoint_longmemeval-menhir_oracle_deepseek-v4-flash.jsonl"
+    _write_checkpoint(ck, [
+        ("no_memory", "q1", False, 100, 5),
+        ("menhir_recall", "q1", True, 900, 20),
+    ])
+    snaps = scan_runs(tmp_path)
+    html = render_html(snaps, {"health": True, "queue_depth": 0, "startup_mode": "full"},
+                       total_items=500, refresh_s=5)
+    assert html.startswith("<!doctype html>")
+    assert 'http-equiv="refresh"' in html
+    assert "longmemeval-menhir" in html
+    assert "menhir UP" in html
+    assert "memory lift" in html
+
+
+def test_render_html_handles_no_runs_and_no_menhir():
+    html = render_html([], None, total_items=None)
+    assert "<!doctype html>" in html
+    assert "No checkpoints yet" in html

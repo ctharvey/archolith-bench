@@ -174,6 +174,10 @@ def main(argv: list[str] | None = None) -> None:
     dash_p.add_argument("--once", action="store_true", help="Print a single snapshot and exit")
     dash_p.add_argument("--total-items", type=int, default=None,
                         help="Per-arm item total for the progress bar (default: inferred from variant)")
+    dash_p.add_argument("--serve", action="store_true",
+                        help="Serve an auto-refreshing web dashboard instead of the terminal view")
+    dash_p.add_argument("--host", default="127.0.0.1", help="Web dashboard bind host (default: 127.0.0.1)")
+    dash_p.add_argument("--port", type=int, default=8200, help="Web dashboard port (default: 8200)")
 
     # ---- report subcommand ----
     report_p = subparsers.add_parser("report", help="Generate BENCHMARKS.md from results/")
@@ -610,16 +614,26 @@ def _offline_send_fn(client, base_url, api_key, messages, model, **kwargs):  # n
 
 
 def _run_dashboard(args: argparse.Namespace) -> None:
-    from .dashboard import run_dashboard
+    from .dashboard import run_dashboard, serve_dashboard
 
     try:
-        run_dashboard(
-            args.results_dir,
-            menhir_url=args.menhir_url,
-            interval=args.interval,
-            once=args.once,
-            total_items=args.total_items,
-        )
+        if args.serve:
+            serve_dashboard(
+                args.results_dir,
+                menhir_url=args.menhir_url,
+                host=args.host,
+                port=args.port,
+                total_items=args.total_items,
+                refresh_s=int(args.interval),
+            )
+        else:
+            run_dashboard(
+                args.results_dir,
+                menhir_url=args.menhir_url,
+                interval=args.interval,
+                once=args.once,
+                total_items=args.total_items,
+            )
     except KeyboardInterrupt:
         print("\n(dashboard stopped)")
 

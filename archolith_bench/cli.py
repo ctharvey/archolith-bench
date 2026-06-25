@@ -149,6 +149,9 @@ def main(argv: list[str] | None = None) -> None:
                            help="Run offline against a bundled fixture JSON (no API calls)")
     harness_p.add_argument("--menhir-url", default=None,
                            help="Memory benchmarks: throwaway menhir base URL (refuses prod-looking targets)")
+    harness_p.add_argument("--resume", action="store_true",
+                           help="Memory benchmarks: checkpoint each item and skip already-completed "
+                                "items on rerun (survives crashes/rate-limit aborts). Rerun the same command.")
     harness_p.add_argument("--confirm-menhir-reset", action="store_true",
                            help="Allow memory benchmarks to reset throwaway Menhir groups after each item")
     harness_p.add_argument("--dry-run-menhir-reset", action="store_true",
@@ -465,8 +468,10 @@ def _run_harness(args: argparse.Namespace) -> None:
         ADAPTERS,
         DEFAULT_MEMORY_ARMS,
         HttpMenhirClient,
+        MemoryCheckpoint,
         StubMenhirClient,
         assert_not_production,
+        checkpoint_path_for,
         get_adapter,
         is_external,
         is_memory,
@@ -513,6 +518,12 @@ def _run_harness(args: argparse.Namespace) -> None:
             assert_not_production(args.menhir_url)
             client = HttpMenhirClient(args.menhir_url, api_key=API_KEY)
             send_fn = send_chat
+        checkpoint = None
+        if getattr(args, "resume", False):
+            ckpt_path = checkpoint_path_for(args.output_dir, adapter.benchmark_id, args.model)
+            checkpoint = MemoryCheckpoint(ckpt_path)
+            done = checkpoint.done_count()
+            print(f"  [resume] checkpoint {ckpt_path} ({done} item-results already recorded)")
         ab = run_memory_ab(
             adapter,
             arms=mem_arms,
@@ -530,6 +541,7 @@ def _run_harness(args: argparse.Namespace) -> None:
             fixture_path=args.offline_fixture,
             reset_confirmed=args.confirm_menhir_reset,
             dry_run_reset=args.dry_run_menhir_reset,
+            checkpoint=checkpoint,
         )
     elif is_external(adapter):
         results_fixtures = (

@@ -1,0 +1,96 @@
+"""Resumable checkpoint for the Mode-B memory harness.
+
+A full LongMemEval Mode B run ingests hundreds of thousands of episodes and takes
+hours; the memory harness has no native resume, so a crash or rate-limit abort loses
+everything. This persists each per-item TaskResult to an append-only JSONL file keyed
+by (arm, task_id). On restart the driver skips items already recorded and continues,
+so the run survives interruptions and OpenAI 429s (rerun the same command).
+
+The checkpoint stores ANSWER-level results (score/tokens), not the menhir graph: each
+benchmark item uses a fresh, immediately-reset namespace, so completed items need no
+graph state and the throwaway menhir/Neo4j can be torn down between runs safely.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+from dataclasses import asdict
+from pathlib import Path
+
+from .base import TaskResult
+
+
+def _slug(value: str) -> str:
+    return re.sub(r"[^A-Za-z0-9._-]+", "-", (value or "").strip()).strip("-") or "default"
+
+
+def checkpoint_path_for(
+    output_dir: str | Path,
+    benchmark_id: str,
+    model: str,
+    *,
+    variant: str | None = None,
+) -> Path:
+    """Deterministic checkpoint file for a (benchmark, variant, answer-model) run.
+
+    Keyed on the answer model and dataset variant because both change the scored
+    outcome; mixing them in one checkpoint would corrupt the aggregate.
+    """
+    variant = variant if variant is not None else (os.getenv("LONGMEMEVAL_VARIANT", "s") or "s")
+    name = f".checkpoint_{_slug(benchmark_id)}_{_slug(variant)}_{_slug(model)}.jsonl"
+    return Path(output_dir) / name
+
+
+class MemoryCheckpoint:
+    """Append-only JSONL checkpoint of completed (arm, task_id) TaskResults."""
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+        self._done: dict[tuple[str, str], TaskResult] = {}
+        if self.path.exists():
+            self._load()
+
+    def _load(self) -> None:
+        with open(self.path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                    arm = str(rec["arm"])
+                    res = rec["result"]
+                    tr = TaskResult(
+                        task_id=str(res["task_id"]),
+                        response_text=str(res.get("response_text") or ""),
+                        input_tokens=int(res.get("input_tokens") or 0),
+                        output_tokens=int(res.get("output_tokens") or 0),
+                        latency_ms=float(res.get("latency_ms") or 0.0),
+                        correct=bool(res.get("correct")),
+                        raw_usage=dict(res.get("raw_usage") or {}),
+                    )
+                except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+                    # Tolerate a torn final line from a hard kill; skip it.
+                    continue
+                self._done[(arm, tr.task_id)] = tr
+
+    def get(self, arm: str, task_id: str) -> TaskResult | None:
+        """Return the recorded result for (arm, task_id), or None if not yet done."""
+        return self._done.get((arm, task_id))
+
+    def record(self, arm: str, task_id: str, result: TaskResult) -> None:
+        """Append a completed result and flush so a later crash keeps it."""
+        self._done[(arm, task_id)] = result
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"arm": arm, "task_id": task_id, "result": asdict(result)}, ensure_ascii=False) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+
+    def done_count(self, arm: str | None = None) -> int:
+        """Number of completed items, optionally for one arm."""
+        if arm is None:
+            return len(self._done)
+        return sum(1 for (a, _t) in self._done if a == arm)

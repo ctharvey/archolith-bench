@@ -16,9 +16,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from contextlib import nullcontext
 from statistics import mean
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import httpx
+
+if TYPE_CHECKING:
+    from .checkpoint import MemoryCheckpoint
 
 from ..core.api import API_KEY, MODEL, PROXY_URL, send_chat
 from ..core.metrics import PricingModel, compute_arm_cost
@@ -93,10 +96,20 @@ def _run_memory_arm(
     reset_memory: bool,
     reset_confirmed: bool,
     dry_run_reset: bool,
+    checkpoint: "MemoryCheckpoint | None" = None,
 ) -> ArmResult:
     results: list[TaskResult] = []
     turn_dicts: list[dict] = []
     for i, item in enumerate(items):
+        task_id = str(item.get("question_id") or f"item-{i}")
+        # Resume: if this (arm, item) was already scored in a prior run, reuse it and
+        # skip re-ingesting its haystack -- the expensive, abort-prone part.
+        if checkpoint is not None:
+            cached = checkpoint.get(arm, task_id)
+            if cached is not None:
+                results.append(cached)
+                turn_dicts.append({"input_tokens": cached.input_tokens, "output_tokens": cached.output_tokens})
+                continue
         question = adapter.question(item)
         if arm == NO_MEMORY or client is None:
             memory_context = ""
@@ -120,18 +133,20 @@ def _run_memory_arm(
         text, latency_ms, usage = send_fn(chat_client, chat_base_url, api_key, messages, model)
         inp, out = _usage_tokens(usage)
         correct = adapter.score(item, text)
-        results.append(
-            TaskResult(
-                task_id=str(item.get("question_id") or f"item-{i}"),
-                response_text=text,
-                input_tokens=inp,
-                output_tokens=out,
-                latency_ms=latency_ms,
-                correct=correct,
-                raw_usage=usage,
-            )
+        tr = TaskResult(
+            task_id=task_id,
+            response_text=text,
+            input_tokens=inp,
+            output_tokens=out,
+            latency_ms=latency_ms,
+            correct=correct,
+            raw_usage=usage,
         )
+        results.append(tr)
         turn_dicts.append({"input_tokens": inp, "output_tokens": out})
+        # Persist immediately so a later crash/rate-limit abort keeps this item.
+        if checkpoint is not None:
+            checkpoint.record(arm, task_id, tr)
 
     score = mean(1.0 if r.correct else 0.0 for r in results) if results else 0.0
     arm_cost = compute_arm_cost(turn_dicts, pricing)
@@ -163,12 +178,17 @@ def run_memory_ab(
     reset_memory: bool = True,
     reset_confirmed: bool = False,
     dry_run_reset: bool = False,
+    checkpoint: "MemoryCheckpoint | None" = None,
 ) -> ABResult:
     """Run an ingest-then-recall memory benchmark across arms.
 
     `no_memory` answers with an empty memory context (the floor); memory arms
     ingest+recall via `client`. Offline: pass `fixture_path` and a stub `client`
     + deterministic `send_fn`. Real runs require a throwaway menhir client.
+
+    `checkpoint`: optional MemoryCheckpoint. When given, each item's result is
+    persisted as it completes and already-recorded items are skipped, so a long run
+    survives crashes and rate-limit aborts (rerun the same command to resume).
     """
     items = adapter.load_items(subset, limit, fixture_path)
     pricing = _pick_pricing(model, pricing)
@@ -208,6 +228,7 @@ def run_memory_ab(
                     reset_memory=reset_memory,
                     reset_confirmed=reset_confirmed,
                     dry_run_reset=dry_run_reset,
+                    checkpoint=checkpoint,
                 )
 
     # Deltas vs the no_memory floor (memory lift), reusing the shared helper by

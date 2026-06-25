@@ -72,9 +72,11 @@ OPENAI_EXTRACTION_MODEL="gpt-4.1-nano"
 LIMIT=""
 SUBSET=""
 CHECK_ONLY=0
+RESUME=0
 for ((i=1; i<=$#; i++)); do
   case "${!i}" in
     --check)  CHECK_ONLY=1 ;;
+    --resume) RESUME=1 ;;
     --limit)  n=$((i+1)); LIMIT="${!n}"; i=$n ;;
     --subset) n=$((i+1)); SUBSET="${!n}"; i=$n ;;
     *) ;;
@@ -182,7 +184,7 @@ export GRAPHITI_EMBED_PROVIDER="openai" MEMORY_GRAPHITI_EMBED_PROVIDER="openai"
 export OPENAI_API_KEY="${OPENAI_KEY}"
 export OPENAI_EMBED_MODEL="${OPENAI_EMBED_MODEL}"
 
-log "starting menhir serve on ${MENHIR_URL} (extraction=${DEEPSEEK_MODEL}, embed=${OPENAI_EMBED_MODEL})..."
+log "starting menhir serve on ${MENHIR_URL} (extraction=${EXTRACTION_PROVIDER}, embed=${OPENAI_EMBED_MODEL})..."
 ( cd "${MENHIR_DIR}" && "${MENHIR_BIN}" serve --port "${MENHIR_PORT}" ) &
 MENHIR_PID=$!
 
@@ -209,6 +211,11 @@ cmd=( "${BENCH_BIN}" harness longmemeval-menhir
       --out "${BENCH_DIR}/results/harness_longmemeval_modeb.md" )
 [ -n "${LIMIT}"  ] && cmd+=( --limit "${LIMIT}" )
 [ -n "${SUBSET}" ] && cmd+=( --subset "${SUBSET}" )
+# --resume: checkpoint each item so a crash / rate-limit abort is recoverable by
+# rerunning the same command. Required for the full longmemeval_s run (hours, no
+# native resume). The checkpoint lives in results/ on the host, so tearing down the
+# throwaway menhir/Neo4j between runs is safe.
+[ "${RESUME}" = "1" ] && cmd+=( --resume )
 
 log "running: ${cmd[*]}"
 ( cd "${BENCH_DIR}" && "${cmd[@]}" )

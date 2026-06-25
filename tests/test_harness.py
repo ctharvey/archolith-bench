@@ -241,6 +241,50 @@ def test_run_memory_ab_lift_offline():
     assert ab.deltas["menhir_recall"]["score_delta"] > 0
 
 
+def test_run_memory_ab_checkpoint_resumes_and_skips_done(tmp_path):
+    """A second run with the same checkpoint reuses recorded items and re-issues no calls."""
+    from archolith_bench.harness import MemoryCheckpoint, StubMenhirClient, run_memory_ab
+    from archolith_bench.harness.longmemeval import LongMemEvalMemoryAdapter
+
+    calls = {"n": 0}
+
+    def send_fn(client, base_url, api_key, messages, model, **kwargs):
+        calls["n"] += 1
+        user = messages[-1]["content"]
+        text = "Biscuit" if "Biscuit" in user else ("Denver" if "Denver" in user else "I don't know")
+        return text, 1.0, {"prompt_tokens": max(1, len(user) // 4), "completion_tokens": 2}
+
+    ckpt_path = tmp_path / "ckpt.jsonl"
+
+    first = run_memory_ab(
+        LongMemEvalMemoryAdapter(),
+        arms=("no_memory", "menhir_recall"),
+        fixture_path=LME_FIXTURE,
+        client=StubMenhirClient(),
+        send_fn=send_fn,
+        checkpoint=MemoryCheckpoint(ckpt_path),
+    )
+    calls_after_first = calls["n"]
+    assert calls_after_first > 0
+    assert ckpt_path.exists()
+
+    # Fresh checkpoint object loads the persisted results; a rerun must answer no calls.
+    second = run_memory_ab(
+        LongMemEvalMemoryAdapter(),
+        arms=("no_memory", "menhir_recall"),
+        fixture_path=LME_FIXTURE,
+        client=StubMenhirClient(),
+        send_fn=send_fn,
+        checkpoint=MemoryCheckpoint(ckpt_path),
+    )
+    assert calls["n"] == calls_after_first, "resume should not re-issue any answer calls"
+    # Identical aggregates from the checkpoint as from the live run.
+    for arm in ("no_memory", "menhir_recall"):
+        assert second.arms[arm].n == first.arms[arm].n
+        assert second.arms[arm].score == first.arms[arm].score
+        assert second.arms[arm].input_tokens == first.arms[arm].input_tokens
+
+
 def test_run_memory_ab_no_memory_arm_receives_chat_client():
     from archolith_bench.harness import run_memory_ab
     from archolith_bench.harness.longmemeval import LongMemEvalMemoryAdapter

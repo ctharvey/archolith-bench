@@ -33,6 +33,7 @@ from .external import (
 )
 from .longbench_v2 import LongBenchV2Adapter
 from .longmemeval import LongMemEvalAdapter, LongMemEvalMemoryAdapter
+from .checkpoint import MemoryCheckpoint, checkpoint_path_for
 from .memory_ab import (
     DEFAULT_MEMORY_ARMS,
     NO_MEMORY,
@@ -95,9 +96,11 @@ __all__ = [
     "LongBenchV2Adapter",
     "LongMemEvalAdapter",
     "LongMemEvalMemoryAdapter",
+    "MemoryCheckpoint",
     "MemoryQAAdapter",
     "MenhirClient",
     "MtebAdapter",
+    "checkpoint_path_for",
     "NO_MEMORY",
     "StubMenhirClient",
     "SweBenchAdapter",

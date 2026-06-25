@@ -189,6 +189,15 @@ def main(argv: list[str] | None = None) -> None:
     dash_p.add_argument("--host", default="127.0.0.1", help="Web dashboard bind host (default: 127.0.0.1)")
     dash_p.add_argument("--port", type=int, default=8200, help="Web dashboard port (default: 8200)")
 
+    # ---- extraction-bench subcommand ----
+    ext_p = subparsers.add_parser("extraction-bench",
+                                  help="Simulate menhir's backend extraction pipeline to compare models on speed+quality")
+    ext_p.add_argument("--repeats", type=int, default=1,
+                       help="Replay the corpus N times to amplify sustained load (default 1)")
+    ext_p.add_argument("--targets-file", type=Path, default=None,
+                       help="JSON list of {label,base_url,api_key_env,model} to add to the defaults")
+    ext_p.add_argument("--out", type=Path, default=None, help="Optional evidence output file")
+
     # ---- ports subcommand ----
     ports_p = subparsers.add_parser("ports", help="Index running stack processes by label + port")
     ports_p.add_argument("--all", action="store_true", dest="show_all",
@@ -224,6 +233,8 @@ def main(argv: list[str] | None = None) -> None:
         _run_harness(args)
     elif args.suite == "dashboard":
         _run_dashboard(args)
+    elif args.suite == "extraction-bench":
+        _run_extraction_bench(args)
     elif args.suite == "ports":
         _run_ports(args)
     elif args.suite == "report":
@@ -671,6 +682,36 @@ def _run_dashboard(args: argparse.Namespace) -> None:
             )
     except KeyboardInterrupt:
         print("\n(dashboard stopped)")
+
+
+def _run_extraction_bench(args: argparse.Namespace) -> None:
+    from .extraction_sim import default_targets, render_results, simulate_model
+
+    targets = default_targets()
+    if args.targets_file:
+        extra = json.loads(Path(args.targets_file).read_text(encoding="utf-8"))
+        for t in extra:
+            key = os.getenv(t.get("api_key_env", "")) if t.get("api_key_env") else t.get("api_key")
+            if key:
+                targets.append({"label": t["label"], "base_url": t["base_url"], "api_key": key, "model": t["model"]})
+    if not targets:
+        print("ERROR: no targets with available keys. Set OPENAI_API_KEY / GROQ_API_KEY / GEMINI_API_KEY / "
+              "CEREBRAS_API_KEY (fast providers auto-enable when their key is present).", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Simulating backend extraction over {len(targets)} model(s), repeats={args.repeats} "
+          f"(~{3 * 5 * args.repeats} calls each)...")
+    results = []
+    for t in targets:
+        print(f"  probing {t['label']} ...", flush=True)
+        results.append(simulate_model(t["label"], t["base_url"], t["api_key"], t["model"], repeats=args.repeats))
+
+    report = render_results(results)
+    print("\n" + report)
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(report + "\n", encoding="utf-8")
+        print(f"\nEvidence written to {args.out}")
 
 
 def _run_ports(args: argparse.Namespace) -> None:

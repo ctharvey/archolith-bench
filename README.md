@@ -28,6 +28,9 @@ and [`benchmarks/`](benchmarks/) for tracked evidence summaries.
 | `stack` | Experimental four-way comparison; pending refreshed live run |
 | `industry` | Launch coverage matrix mapping products to trusted external benchmark families |
 | `harness` | Runs official external benchmarks (e.g. LongBench v2) as a direct-vs-proxy A/B |
+| `extraction-bench` | Compare extraction models on the real backend pipeline (speed/quality/cache-aware cost) |
+| `dashboard` | Live view of in-progress memory runs (terminal or `--serve` web); reads run checkpoints |
+| `ports` | Index running stack processes by label + port (find stray menhir/neo4j/dashboard instances) |
 
 ### Harness: official benchmarks as direct-vs-proxy A/B
 
@@ -59,6 +62,34 @@ official tool (per arm, direct vs proxy base URL) and parse its results. SWE-ben
 AgentDojo/MTEB are scaffolded — real runs (datasets, agent scaffolds, API budget) land at launch
 step 3. **MTEB caveat:** it measures embeddings, which the chat proxy doesn't sit in front of, so
 its proxy-arm delta is a no-op until an embeddings layer exists.
+
+## Extraction model selection
+
+Graph-memory extraction is a multi-call structured-JSON pipeline per episode, so the choice
+of extraction model is a real speed / cost / quality decision. `archolith-bench
+extraction-bench` replays that real pipeline against any OpenAI-compatible model and reports
+latency, quality, and **cache-aware** cost. Full writeup, pricing, and findings:
+**[EXTRACTION_MODELS.md](EXTRACTION_MODELS.md)**.
+
+**TL;DR:** quality is a tie among capable small models, so optimize speed + cost.
+
+| model | provider | call p50 | ent/fact recall | cache hit | $/1k ep |
+|-------|----------|---------:|----------------:|----------:|--------:|
+| llama-3.3-70b | Groq (LPU) | 0.35 s | 1.00 / 0.80 | – | $0.53 |
+| **gpt-4.1-nano** | OpenAI | 0.54 s | 0.90 / 0.80 | 0% | **$0.09** |
+| **deepseek-v4-flash** | DeepSeek | 1.19 s | 1.00 / 0.80 | 74% | **$0.05** |
+| gemini-2.5-flash | Google | 1.52 s | 1.00 / 0.40 | 0% | $0.27 |
+| local qwen ~9B | LM Studio | 4.56 s | 1.00 / 0.80 | – | $0 |
+
+- **Default:** `gpt-4.1-nano` — fast, cheap, reliable, no rate-limit walls.
+- **Cheapest:** `deepseek-v4-flash` — caching makes it cheapest (50× cache discount).
+- **Fastest:** Groq LPU (paid tier). **Free/private:** local Qwen (slower, $0).
+
+```bash
+# keys read from env or menhir/.env; fast providers auto-enable when their key is present
+archolith-bench extraction-bench --repeats 2
+archolith-bench extraction-bench --repeats 2 --exclude gpt-5   # skip slow reasoning models
+```
 
 ## Quick Start
 

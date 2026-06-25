@@ -56,8 +56,17 @@ MENHIR_PORT=8101
 MENHIR_URL="http://localhost:${MENHIR_PORT}"
 
 DEEPSEEK_BASE="https://api.deepseek.com/v1"
-DEEPSEEK_MODEL="deepseek-v4-flash"
+DEEPSEEK_MODEL="deepseek-v4-flash"   # the ANSWER model (bench send_chat -> upstream)
 OPENAI_EMBED_MODEL="text-embedding-3-small"
+
+# menhir EXTRACTION LLM (Graphiti entity/edge extraction). Single switch:
+#   openai   -> gpt-4.1-nano @ api.openai.com  (fast: finishes within menhir's 60s
+#               per-episode wait=true cap; this is the WORKING config)
+#   deepseek -> deepseek-v4-flash @ api.deepseek.com  (the marketing-intended model,
+#               but ~4-5s/call currently overruns the 60s wait so recall races ahead
+#               of enrichment -> empty recall. Revisit with a longer enrichment wait.)
+EXTRACTION_PROVIDER="openai"          # openai | deepseek
+OPENAI_EXTRACTION_MODEL="gpt-4.1-nano"
 
 # ---- args -------------------------------------------------------------------
 LIMIT=""
@@ -145,23 +154,29 @@ export NEO4J_URI="bolt://localhost:${NEO4J_BOLT_PORT}"
 export NEO4J_USER="neo4j"
 export NEO4J_PASSWORD="${NEO4J_PASSWORD}"
 export NEO4J_DATABASE="neo4j"
-# extraction = deepseek via OpenAI-compatible "local" kind (cloud URL -> no scheduler).
-# CRITICAL: the provider env var is GRAPHITI_LLM_PROVIDER / LLM_CHAT_PROVIDER, NOT
-# GRAPHITI_PROVIDER (which menhir does not read). We also explicitly pin every
-# provider/model var here so the throwaway is deterministic and ISOLATED from the
-# launching shell's environment -- menhir settings read straight from os.environ
-# (no override guard), so an inherited GRAPHITI_LLM_PROVIDER=openai / OPENAI_CHAT_MODEL
-# silently wins over the intended config otherwise. (This is the wiring bug that made
-# extraction quietly run on gpt-4.1-nano@openai instead of deepseek.)
-export GRAPHITI_LLM_PROVIDER="local" MEMORY_GRAPHITI_PROVIDER="local"
-export LLM_CHAT_PROVIDER="local" MEMORY_CHAT_PROVIDER="local"
-export GRAPHITI_RERANKER_PROVIDER="local" MEMORY_GRAPHITI_RERANKER_PROVIDER="local"
-export LOCAL_LLM_BASE_URL="${DEEPSEEK_BASE}"
-export LOCAL_LLM_CHAT_MODEL="${DEEPSEEK_MODEL}"
-export LOCAL_LLM_API_KEY="${DEEPSEEK_KEY}"
-# Neutralize any inherited OpenAI chat-model override so it cannot leak into the
-# local/deepseek chat path (the embedder uses OPENAI_EMBED_MODEL, set below).
-unset OPENAI_CHAT_MODEL
+# Extraction LLM provider selection. We pin every provider/model var with CANONICAL
+# names so the throwaway is deterministic and ISOLATED from the launching shell --
+# menhir settings read straight from os.environ with no override guard, so an inherited
+# GRAPHITI_LLM_PROVIDER / OPENAI_CHAT_MODEL would otherwise silently win. (The canonical
+# var is GRAPHITI_LLM_PROVIDER, NOT GRAPHITI_PROVIDER, which menhir historically dropped.)
+if [ "${EXTRACTION_PROVIDER}" = "deepseek" ]; then
+  # deepseek via the OpenAI-compatible "local" kind (cloud URL -> no scheduler).
+  export GRAPHITI_LLM_PROVIDER="local" MEMORY_GRAPHITI_PROVIDER="local"
+  export LLM_CHAT_PROVIDER="local" MEMORY_CHAT_PROVIDER="local"
+  export GRAPHITI_RERANKER_PROVIDER="local" MEMORY_GRAPHITI_RERANKER_PROVIDER="local"
+  export LOCAL_LLM_BASE_URL="${DEEPSEEK_BASE}"
+  export LOCAL_LLM_CHAT_MODEL="${DEEPSEEK_MODEL}"
+  export LOCAL_LLM_API_KEY="${DEEPSEEK_KEY}"
+  unset OPENAI_CHAT_MODEL
+  log "extraction LLM = deepseek (${DEEPSEEK_MODEL})"
+else
+  # openai gpt-4.1-nano (working config: fast enough for the 60s per-episode wait).
+  export GRAPHITI_LLM_PROVIDER="openai" MEMORY_GRAPHITI_PROVIDER="openai"
+  export LLM_CHAT_PROVIDER="openai" MEMORY_CHAT_PROVIDER="openai"
+  export GRAPHITI_RERANKER_PROVIDER="openai" MEMORY_GRAPHITI_RERANKER_PROVIDER="openai"
+  export OPENAI_CHAT_MODEL="${OPENAI_EXTRACTION_MODEL}"
+  log "extraction LLM = openai (${OPENAI_EXTRACTION_MODEL})"
+fi
 # embedding = openai text-embedding-3-small (1536-dim, matches prod)
 export GRAPHITI_EMBED_PROVIDER="openai" MEMORY_GRAPHITI_EMBED_PROVIDER="openai"
 export OPENAI_API_KEY="${OPENAI_KEY}"

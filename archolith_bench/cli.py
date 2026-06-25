@@ -196,6 +196,9 @@ def main(argv: list[str] | None = None) -> None:
                        help="Replay the corpus N times to amplify sustained load (default 1)")
     ext_p.add_argument("--targets-file", type=Path, default=None,
                        help="JSON list of {label,base_url,api_key_env,model} to add to the defaults")
+    ext_p.add_argument("--exclude", default=None,
+                       help="Comma-separated substrings; skip any target whose label/model matches "
+                            "(e.g. 'gpt-5' to drop slow reasoning models)")
     ext_p.add_argument("--out", type=Path, default=None, help="Optional evidence output file")
 
     # ---- ports subcommand ----
@@ -694,6 +697,9 @@ def _run_extraction_bench(args: argparse.Namespace) -> None:
             key = os.getenv(t.get("api_key_env", "")) if t.get("api_key_env") else t.get("api_key")
             if key:
                 targets.append({"label": t["label"], "base_url": t["base_url"], "api_key": key, "model": t["model"]})
+    if args.exclude:
+        pats = [p.strip().lower() for p in args.exclude.split(",") if p.strip()]
+        targets = [t for t in targets if not any(p in (t["label"] + t["model"]).lower() for p in pats)]
     if not targets:
         print("ERROR: no targets with available keys. Set OPENAI_API_KEY / GROQ_API_KEY / GEMINI_API_KEY / "
               "CEREBRAS_API_KEY (fast providers auto-enable when their key is present).", file=sys.stderr)

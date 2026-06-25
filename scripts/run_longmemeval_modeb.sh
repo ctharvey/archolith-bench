@@ -65,12 +65,15 @@ OPENAI_EMBED_MODEL="text-embedding-3-small"
 #   deepseek -> deepseek-v4-flash @ api.deepseek.com  (the marketing-intended model,
 #               but ~4-5s/call currently overruns the 60s wait so recall races ahead
 #               of enrichment -> empty recall. Revisit with a longer enrichment wait.)
-EXTRACTION_PROVIDER="openai"          # openai | deepseek
+# Env-overridable so a single run can select deepseek without editing the file:
+#   EXTRACTION_PROVIDER=deepseek bash scripts/run_longmemeval_modeb.sh --resume ...
+EXTRACTION_PROVIDER="${EXTRACTION_PROVIDER:-openai}"   # openai | deepseek
 OPENAI_EXTRACTION_MODEL="gpt-4.1-nano"
 
 # ---- args -------------------------------------------------------------------
 LIMIT=""
 SUBSET=""
+ARMS=""
 CHECK_ONLY=0
 RESUME=0
 for ((i=1; i<=$#; i++)); do
@@ -79,9 +82,15 @@ for ((i=1; i<=$#; i++)); do
     --resume) RESUME=1 ;;
     --limit)  n=$((i+1)); LIMIT="${!n}"; i=$n ;;
     --subset) n=$((i+1)); SUBSET="${!n}"; i=$n ;;
+    --arms)   n=$((i+1)); ARMS="${!n}"; i=$n ;;
     *) ;;
   esac
 done
+
+# Isolate each extraction config's checkpoint + evidence in its own folder so runs with
+# different extraction LLMs never share a checkpoint (mixing configs would pollute the
+# scored results). e.g. results/ext-openai/ vs results/ext-deepseek/.
+RUN_OUTPUT_DIR="${BENCH_DIR}/results/ext-${EXTRACTION_PROVIDER}"
 
 log() { printf '[modeb] %s\n' "$*" >&2; }
 die() { printf '[modeb] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -203,14 +212,17 @@ export UPSTREAM_BASE_URL="${DEEPSEEK_BASE}"
 export UPSTREAM_API_KEY="${DEEPSEEK_KEY}"
 export BENCHMARK_MODEL="${DEEPSEEK_MODEL}"
 
+mkdir -p "${RUN_OUTPUT_DIR}"
 cmd=( "${BENCH_BIN}" harness longmemeval-menhir
       --menhir-url "${MENHIR_URL}"
       --confirm-menhir-reset
       --model "${DEEPSEEK_MODEL}"
       --format markdown
-      --out "${BENCH_DIR}/results/harness_longmemeval_modeb.md" )
+      --output-dir "${RUN_OUTPUT_DIR}"
+      --out "${RUN_OUTPUT_DIR}/harness_longmemeval_modeb.md" )
 [ -n "${LIMIT}"  ] && cmd+=( --limit "${LIMIT}" )
 [ -n "${SUBSET}" ] && cmd+=( --subset "${SUBSET}" )
+[ -n "${ARMS}"   ] && cmd+=( --arms "${ARMS}" )
 # --resume: checkpoint each item so a crash / rate-limit abort is recoverable by
 # rerunning the same command. Required for the full longmemeval_s run (hours, no
 # native resume). The checkpoint lives in results/ on the host, so tearing down the

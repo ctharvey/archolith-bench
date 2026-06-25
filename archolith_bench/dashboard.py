@@ -100,7 +100,10 @@ def read_checkpoint(path: Path) -> RunSnapshot:
 def scan_runs(results_dir: Path) -> list[RunSnapshot]:
     if not results_dir.exists():
         return []
-    snaps = [read_checkpoint(p) for p in sorted(results_dir.glob(".checkpoint_*.jsonl"))]
+    # rglob so isolated per-config runs in subfolders (results/ext-deepseek/...) show too.
+    paths = {p for p in results_dir.glob(".checkpoint_*.jsonl")}
+    paths |= {p for p in results_dir.rglob(".checkpoint_*.jsonl")}
+    snaps = [read_checkpoint(p) for p in sorted(paths)]
     snaps.sort(key=lambda s: s.mtime, reverse=True)
     return snaps
 

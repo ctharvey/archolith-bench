@@ -257,14 +257,16 @@ def _feed_rows_html(s: RunSnapshot, items_n: int) -> str:
         if q or recalled:
             # Summary shows the QUESTION (visible at a glance); expanding reveals what was
             # retrieved, the gold answer, and the model's response.
+            did = _slug_id(runkey, it["arm"], it["task_id"])
             recalled_disp = _esc(recalled) if recalled else "<em>(nothing recalled)</em>"
             detail = (
                 f"<summary>{_esc(q) or _esc(full)}</summary>"
-                f"<div class='blk'><span class='lbl'>retrieved memory</span><pre>{recalled_disp}</pre></div>"
+                f"<div class='blk'><span class='lbl'>retrieved memory</span>"
+                f"<pre id='{did}_pre' class='keepscroll'>{recalled_disp}</pre></div>"
                 f"<div class='blk'><span class='lbl'>gold answer</span><div>{_esc(gold)}</div></div>"
                 f"<div class='blk'><span class='lbl'>llm response</span><div>{_esc(full)}</div></div>"
             )
-            ans_cell = f"<details id='{_slug_id(runkey, it['arm'], it['task_id'])}'>{detail}</details>"
+            ans_cell = f"<details id='{did}'>{detail}</details>"
         else:
             ans_cell = f"<span title='{_esc(full)}'>{_esc(full)}</span>"
         cells += (
@@ -380,12 +382,20 @@ async function tick() {{
     const html = await (await fetch(location.href, {{cache: 'no-store'}})).text();
     const fresh = new DOMParser().parseFromString(html, 'text/html').getElementById('content');
     if (!fresh) return;
+    // preserve: which questions are open, page scroll, and each retrieved-memory box's scroll
     const openIds = new Set(
       Array.from(document.querySelectorAll('details[open]')).map(d => d.id).filter(Boolean)
     );
+    const innerScroll = {{}};
+    document.querySelectorAll('.keepscroll[id]').forEach(el => {{
+      if (el.scrollTop > 0) innerScroll[el.id] = el.scrollTop;
+    }});
     const sy = window.scrollY;
     document.getElementById('content').replaceWith(fresh);
     fresh.querySelectorAll('details[id]').forEach(d => {{ d.open = openIds.has(d.id); }});
+    fresh.querySelectorAll('.keepscroll[id]').forEach(el => {{
+      if (innerScroll[el.id] != null) el.scrollTop = innerScroll[el.id];
+    }});
     window.scrollTo(0, sy);
   }} catch (e) {{ /* transient fetch error; try again next tick */ }}
 }}

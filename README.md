@@ -83,6 +83,7 @@ latency, quality, and **cache-aware** cost. Full writeup, pricing, and findings:
 | local qwen ~9B | LM Studio | 4.56 s | 1.00 / 0.80 | – | $0 |
 
 - **Best value:** `gpt-4.1-nano` (~$0.10/1k). **Best quality:** `gemini-3.1-flash-lite` (best fact recall, but ~2× cost).
+- **Best open-weight:** `qwen3-next-80b` via OpenRouter (0.85 fact recall, 100% JSON, $0.22/1k — gemini-3.1 tier, no Google).
 - **Cheapest:** `deepseek-v4-flash` — caching makes it cheapest (50× cache discount).
 - **Fastest:** Cerebras `gpt-oss-120b` (0.30 s) — but only 0.40 fact recall, so *not* recommended for graph memory. **Free/private:** local Qwen (slower, $0).
 

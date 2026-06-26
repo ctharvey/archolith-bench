@@ -98,6 +98,15 @@ PRICING: dict[str, tuple[float, float, float]] = {
     "cerebras/qwen-3-32b": (0.40, 0.40, 0.80),
     "cerebras/llama-3.3-70b": (0.85, 0.85, 1.20),
     "cerebras/llama3.1-8b": (0.10, 0.10, 0.10),
+    # OpenRouter (openrouter.ai/api/v1) -- paid routes, from the live model catalog.
+    # No separate cache rate (hit == input). Provider-scoped to avoid colliding with the
+    # Groq open-weight entries of the same name (OpenRouter routes elsewhere at other prices).
+    "openrouter/gpt-oss-120b": (0.03, 0.03, 0.15),
+    "openrouter/gpt-oss-20b": (0.029, 0.029, 0.14),
+    "openrouter/llama-3.3-70b-instruct": (0.10, 0.10, 0.32),
+    "openrouter/llama-3.2-3b-instruct": (0.051, 0.051, 0.335),
+    "openrouter/qwen3-next-80b": (0.09, 0.09, 1.10),
+    "openrouter/gemma-4-31b": (0.12, 0.12, 0.35),
 }
 
 
@@ -109,11 +118,14 @@ def _pricing_for(model: str, base_url: str = "") -> tuple[float, float, float] |
     that provider, so a Cerebras-hosted open model is priced at Cerebras rates rather than
     colliding with the cheaper Groq entry for the same weights."""
     low = model.lower()
+    bl = base_url.lower()
     keys = sorted(PRICING, key=len, reverse=True)
-    if "cerebras" in base_url.lower():
-        for key in keys:
-            if key.startswith("cerebras/") and key.split("/", 1)[1] in low:
-                return PRICING[key]
+    for host, prefix in (("cerebras", "cerebras/"), ("openrouter", "openrouter/")):
+        if host in bl:
+            for key in keys:
+                if key.startswith(prefix) and key.split("/", 1)[1] in low:
+                    return PRICING[key]
+            break
     for key in keys:
         if "/" in key:  # provider-scoped; only used in the provider pass above
             continue
@@ -452,15 +464,16 @@ def default_targets() -> list[dict]:
         # This account's key exposes only gpt-oss-120b and zai-glm-4.7 (Llama/Qwen 404).
         ("cerebras-gpt-oss-120b", "https://api.cerebras.ai/v1", cerebras_key, "gpt-oss-120b"),
         ("cerebras-glm-4.7", "https://api.cerebras.ai/v1", cerebras_key, "zai-glm-4.7"),
-        # OpenRouter free tier (one key -> many models, $0, rate-limited ~20 RPM).
-        # Non-thinking instruct models good for structured extraction; 429s are retried
-        # with backoff and the wait is excluded from latency/throughput.
-        ("or-llama-3.3-70b", _or, openrouter_key, "meta-llama/llama-3.3-70b-instruct:free"),
-        ("or-qwen3-next-80b", _or, openrouter_key, "qwen/qwen3-next-80b-a3b-instruct:free"),
-        ("or-gemma-4-31b", _or, openrouter_key, "google/gemma-4-31b-it:free"),
-        ("or-nemotron-nano-9b", _or, openrouter_key, "nvidia/nemotron-nano-9b-v2:free"),
-        ("or-llama-3.2-3b", _or, openrouter_key, "meta-llama/llama-3.2-3b-instruct:free"),
-        ("or-gpt-oss-20b", _or, openrouter_key, "openai/gpt-oss-20b:free"),
+        # OpenRouter paid routes (one key -> many models via reliable providers). The :free
+        # tier is too upstream-throttled to benchmark (instant 429s); paid routes cost a
+        # fraction of a cent for a full run. Non-thinking instruct models for extraction;
+        # 429s still retried with backoff and excluded from latency/throughput.
+        ("or-llama-3.3-70b", _or, openrouter_key, "meta-llama/llama-3.3-70b-instruct"),
+        ("or-qwen3-next-80b", _or, openrouter_key, "qwen/qwen3-next-80b-a3b-instruct"),
+        ("or-gemma-4-31b", _or, openrouter_key, "google/gemma-4-31b-it"),
+        ("or-llama-3.2-3b", _or, openrouter_key, "meta-llama/llama-3.2-3b-instruct"),
+        ("or-gpt-oss-20b", _or, openrouter_key, "openai/gpt-oss-20b"),
+        ("or-gpt-oss-120b", _or, openrouter_key, "openai/gpt-oss-120b"),
     ]
     return [{"label": lbl, "base_url": url, "api_key": key, "model": m}
             for (lbl, url, key, m) in candidates if key]

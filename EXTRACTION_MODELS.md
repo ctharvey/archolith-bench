@@ -78,6 +78,34 @@ is the **value** pick at half the cost for a small fact-recall trade.
 > prefix warms the cache and pushes cost lower — most for providers with a deep cache
 > discount (DeepSeek, Gemini, Groq).
 
+### Via OpenRouter gateway (one key, many open-weight models)
+
+OpenRouter routes a single key to dozens of providers. Its **`:free` tier is unusable for
+benchmarking** — the shared free upstreams (Venice, etc.) return instant `429 temporarily
+rate-limited upstream`, so a few-second backoff can't get a clean run. **Paid routes** cost
+a fraction of a cent (this whole table: **$0.01**) and respond reliably.
+
+Measured June 2026, `--repeats 2`. **Latency includes gateway routing overhead and is NOT
+comparable to the direct-provider table above** (e.g. `llama-3.3-70b` is 0.35 s direct on
+Groq vs 1.30 s routed here). Use OpenRouter for **quality/cost screening**, not latency.
+
+| model | call p50 | json | ent_rec | fact_rec | $/1k ep | verdict |
+|-------|---------:|-----:|--------:|---------:|--------:|---------|
+| **qwen3-next-80b** | 0.85 s | 100% | 1.00 | **0.85** | $0.22 | quality standout — gemini-3.1 tier |
+| **llama-3.3-70b** | 1.30 s | 100% | 1.00 | 0.75 | **$0.08** | cheap + solid open-weight |
+| gemma-4-31b | 1.72 s | 93% | 1.00 | 0.70 | $0.10 | decent, but 25 s p95 tail (unreliable) |
+| gpt-oss-120b | 3.64 s | 87% | 1.00 | 0.45 | $0.14 | weak facts (see below); 10× cheaper than Cerebras |
+| gpt-oss-20b | 2.26 s | 77% | 0.80 | 0.40 | $0.13 | weak facts + sub-100% JSON |
+| llama-3.2-3b | 0.54 s | **0%** | 0.00 | 0.00 | $0.22 | too small — can't conform to schema |
+
+**Cross-provider validation:** `gpt-oss-120b` posts **0.45 fact recall here vs 0.40 on
+Cerebras** — the weak relationship extraction is a *model trait*, not a provider artifact,
+so it's disqualified for graph memory regardless of who hosts it. OpenRouter routes it **10×
+cheaper** than Cerebras ($0.14 vs $0.77), erasing Cerebras's only advantage once latency is
+off the table. **`qwen3-next-80b`** is the real find: 0.85 fact recall at $0.22/1k — a
+credible open-weight alternative to `gemini-3.1-flash-lite`. None of these beat `gpt-4.1-nano`
+($0.10/0.80) or `deepseek` ($0.05/0.80) on the value frontier.
+
 ## Pricing (USD per 1M tokens)
 
 The cached-input rate is what makes a repetitive-prefix workload cheap — every extraction
@@ -178,6 +206,7 @@ gated behind enterprise *dedicated endpoints*, not the standard API.
 |--------------|------|-------|
 | **Best value** | `gpt-4.1-nano` | nano-class speed, ~$0.10/1k, reliable json_schema |
 | **Best quality** | `gemini-3.1-flash-lite` | same speed, best fact recall (0.90), but ~2× the cost ($0.20/1k, $1.50 output) |
+| **Best open-weight** | `qwen3-next-80b` (via OpenRouter) | 0.85 fact recall, 100% JSON, $0.22/1k; gemini-3.1 tier without Google |
 | **Lowest cost at scale** | `deepseek-v4-flash` | caching makes it cheapest; slower; needs json_object + schema-in-prompt |
 | **Lowest latency** | Groq `llama-3.3-70b` (paid tier) | ~3× faster; pay-to-scale |
 | **Free / private / offline** | local Qwen ~9B (LM Studio / vLLM / Ollama) | $0, no rate limits, same quality; ~8× slower |
@@ -186,11 +215,16 @@ gated behind enterprise *dedicated endpoints*, not the standard API.
 
 ## Not yet tested (PRs welcome)
 
-Wired or easy to add — drop the provider key and re-run:
+**OpenRouter is now wired** (`OPENROUTER_API_KEY`) — one key reaches dozens of providers, so
+the easiest way to add a model is a paid OpenRouter route (the `:free` tier is too
+upstream-throttled to benchmark). Already covered there: `qwen3-next-80b`, `llama-3.3-70b`,
+`gemma-4-31b`, `gpt-oss-20b/120b`, `llama-3.2-3b`.
 
-- **Groq `gpt-oss-120b`** — the 20B was fast but only ~53% valid-JSON on the full pipeline;
-  the 120B may conform better. Use `json_schema`, not the `json_object` fallback.
-- **Mistral** `ministral-3b/8b`, **Qwen** 2.5/3, **Llama-4 Scout** — small, fast, cheap.
+Still open:
+
+- **Mistral** `ministral-3b/8b`, **Llama-4 Scout**, **Gemma 4** larger variants — small, fast, cheap.
+- **Groq `gpt-oss-120b`** direct — the 20B was fast but sub-100% valid-JSON; the 120B on
+  Groq's LPU may pair conformance with low latency (OpenRouter's route is slow at 3.6 s).
 
 Tested and rejected: **Cerebras `gpt-oss-120b`** (fastest at 0.30 s but 0.40 fact recall,
 $0.77/1k) and **`zai-glm-4.7`** (33% valid JSON) — see finding #7. **Gemini 2.5 Flash-Lite**

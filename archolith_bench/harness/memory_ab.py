@@ -142,6 +142,9 @@ def _run_memory_arm(
             latency_ms=latency_ms,
             correct=correct,
             raw_usage=usage,
+            question=question,
+            recalled=memory_context,
+            gold=str(item.get("answer", "")),
         )
         results.append(tr)
         turn_dicts.append({"input_tokens": inp, "output_tokens": out})

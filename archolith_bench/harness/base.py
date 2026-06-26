@@ -46,6 +46,13 @@ class TaskResult:
     latency_ms: float
     correct: bool
     raw_usage: dict = field(default_factory=dict)
+    # Memory-benchmark transparency: the question asked, the memory recalled for it,
+    # and (for scoring/debug) the gold answer. Lets the dashboard show question ->
+    # retrieval -> response and makes recall failures inspectable (e.g. a temporal
+    # question where one of the two compared events was never recalled).
+    question: str = ""
+    recalled: str = ""
+    gold: str = ""
 
 
 @dataclass

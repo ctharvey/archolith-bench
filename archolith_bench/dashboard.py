@@ -114,6 +114,9 @@ def read_checkpoint(path: Path) -> RunSnapshot:
                 "resp": (res.get("response_text") or "").strip().replace("\n", " "),
                 "out_tok": int(res.get("output_tokens") or 0),
                 "ts": float(ts),
+                "question": (res.get("question") or "").strip(),
+                "recalled": (res.get("recalled") or "").strip(),
+                "gold": (res.get("gold") or "").strip(),
             })
     return snap
 
@@ -239,10 +242,31 @@ def _feed_rows_html(s: RunSnapshot, items_n: int) -> str:
         ts = it.get("ts")
         tstr = time.strftime("%H:%M:%S", time.localtime(ts)) if ts else ""
         full = it["resp"]
+        q = it.get("question", "")
+        recalled = it.get("recalled", "")
+        gold = it.get("gold", "")
+        # If we captured question/retrieval (newer runs), make the answer cell expandable
+        # to show question -> retrieved memory -> gold -> response. Older runs (no capture)
+        # just show the answer text.
+        if q or recalled:
+            recall_html = (
+                "<div class='blk'><span class='lbl'>retrieved memory</span>"
+                f"<pre>{_esc(recalled) or '<em>(none)</em>'}</pre></div>"
+            )
+            detail = (
+                f"<summary>{_esc(full)}</summary>"
+                f"<div class='blk'><span class='lbl'>question</span><div>{_esc(q)}</div></div>"
+                f"{recall_html}"
+                f"<div class='blk'><span class='lbl'>gold</span><div>{_esc(gold)}</div></div>"
+                f"<div class='blk'><span class='lbl'>llm response</span><div>{_esc(full)}</div></div>"
+            )
+            ans_cell = f"<details>{detail}</details>"
+        else:
+            ans_cell = f"<span title='{_esc(full)}'>{_esc(full)}</span>"
         cells += (
             f"<tr><td class='muted'>{tstr}</td><td class='{cls}'>{mark}</td><td>{_esc(it['arm'])}</td>"
             f"<td class='muted'>{_esc(it['task_id'][:24])}</td>"
-            f"<td class='ans' title='{_esc(full)}'>{_esc(full)}</td></tr>"
+            f"<td class='ans'>{ans_cell}</td></tr>"
         )
     return (
         "<table class='feed'><thead><tr><th>time</th><th></th><th>arm</th><th>item</th>"
@@ -324,6 +348,11 @@ def render_html(
  table.feed td{{vertical-align:top}}
  table.feed td.ans{{white-space:normal;overflow-wrap:anywhere;color:#c9d1d9;max-width:0;width:99%}}
  table.feed td:nth-child(1),table.feed td:nth-child(2),table.feed td:nth-child(3),table.feed td:nth-child(4){{white-space:nowrap}}
+ td.ans details summary{{cursor:pointer;color:#c9d1d9}}
+ td.ans details[open] summary{{color:#58a6ff;margin-bottom:6px}}
+ .blk{{margin:5px 0 5px 10px;border-left:2px solid #30363d;padding-left:10px}}
+ .lbl{{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#8b949e}}
+ .blk pre{{margin:2px 0;white-space:pre-wrap;overflow-wrap:anywhere;color:#79c0ff;font-size:12.5px;max-height:220px;overflow:auto}}
  footer{{color:#8b949e;margin-top:18px;max-width:900px}}
 </style></head><body>
 <h1>archolith-bench &mdash; memory benchmark</h1>

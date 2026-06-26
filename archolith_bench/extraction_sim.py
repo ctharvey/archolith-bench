@@ -94,6 +94,7 @@ PRICING: dict[str, tuple[float, float, float]] = {
     # open weights (e.g. gpt-oss-120b: $0.35/$0.75 vs Groq $0.15/$0.60). Free tier = $0,
     # but the list-price estimate is what the $/1k column reports.
     "cerebras/gpt-oss-120b": (0.35, 0.35, 0.75),
+    "cerebras/zai-glm-4.7": (1.20, 1.20, 1.20),  # preview; provisional flat estimate
     "cerebras/qwen-3-32b": (0.40, 0.40, 0.80),
     "cerebras/llama-3.3-70b": (0.85, 0.85, 1.20),
     "cerebras/llama3.1-8b": (0.10, 0.10, 0.10),
@@ -399,11 +400,10 @@ def default_targets() -> list[dict]:
          gemini_key, "gemini-3.1-flash-lite"),
         ("gemini-2.5-flash-lite", "https://generativelanguage.googleapis.com/v1beta/openai/",
          gemini_key, "gemini-2.5-flash-lite"),
-        # Cerebras wafer-scale (OpenAI-compatible): free tier 30 RPM / 1M TPD.
-        # gpt-oss-120b runs ~3000 tk/s; qwen-3-32b has a strong non-thinking mode.
+        # Cerebras wafer-scale (OpenAI-compatible), gpt-oss-120b runs ~3000 tk/s.
+        # This account's key exposes only gpt-oss-120b and zai-glm-4.7 (Llama/Qwen 404).
         ("cerebras-gpt-oss-120b", "https://api.cerebras.ai/v1", cerebras_key, "gpt-oss-120b"),
-        ("cerebras-qwen3-32b", "https://api.cerebras.ai/v1", cerebras_key, "qwen-3-32b"),
-        ("cerebras-llama3.3-70b", "https://api.cerebras.ai/v1", cerebras_key, "llama-3.3-70b"),
+        ("cerebras-glm-4.7", "https://api.cerebras.ai/v1", cerebras_key, "zai-glm-4.7"),
     ]
     return [{"label": lbl, "base_url": url, "api_key": key, "model": m}
             for (lbl, url, key, m) in candidates if key]

@@ -75,6 +75,7 @@ latency, quality, and **cache-aware** cost. Full writeup, pricing, and findings:
 
 | model | provider | call p50 | ent/fact recall | cache hit | $/1k ep |
 |-------|----------|---------:|----------------:|----------:|--------:|
+| gpt-oss-120b | Cerebras (wafer) | 0.30 s | 1.00 / **0.40** | 56% | $0.77 |
 | llama-3.3-70b | Groq (LPU) | 0.35 s | 1.00 / 0.80 | – | $0.53 |
 | **gpt-4.1-nano** | OpenAI | 0.54 s | 0.90 / 0.80 | 0% | **$0.10** |
 | **gemini-3.1-flash-lite** | Google | 0.63 s | 1.00 / **0.90** | 0% | $0.20 |
@@ -83,7 +84,7 @@ latency, quality, and **cache-aware** cost. Full writeup, pricing, and findings:
 
 - **Best value:** `gpt-4.1-nano` (~$0.10/1k). **Best quality:** `gemini-3.1-flash-lite` (best fact recall, but ~2× cost).
 - **Cheapest:** `deepseek-v4-flash` — caching makes it cheapest (50× cache discount).
-- **Fastest:** Groq LPU (paid tier). **Free/private:** local Qwen (slower, $0).
+- **Fastest:** Cerebras `gpt-oss-120b` (0.30 s) — but only 0.40 fact recall, so *not* recommended for graph memory. **Free/private:** local Qwen (slower, $0).
 
 ```bash
 # keys read from env or menhir/.env; fast providers auto-enable when their key is present

@@ -47,7 +47,8 @@ load-dependent; re-run for your own region/tier.
 
 | model | provider | call p50 | ep_avg | ent_rec | fact_rec | cache hit | $/1k ep |
 |-------|----------|---------:|-------:|--------:|---------:|----------:|--------:|
-| **llama-3.3-70b** | Groq (LPU) | **0.35 s** | **1.10 s** | 1.00 | 0.80 | – | $0.53 |
+| gpt-oss-120b | Cerebras (wafer) | **0.30 s** | 0.98 s | 1.00 | **0.40** | 56% | $0.77 |
+| **llama-3.3-70b** | Groq (LPU) | 0.35 s | **1.10 s** | 1.00 | 0.80 | – | $0.53 |
 | **gpt-4.1-nano** | OpenAI | 0.54 s | 1.72 s | 0.90 | 0.80 | 0% | **$0.10** |
 | **gemini-3.1-flash-lite** | Google | 0.63 s | 1.95 s | **1.00** | **0.90** | 0% | $0.20 |
 | gpt-4.1-mini | OpenAI | 0.81 s | 2.55 s | 1.00 | 0.85 | 0% | $0.32 |
@@ -156,10 +157,20 @@ large runs unless you batch across more local GPUs. Point any OpenAI-compatible 
 server (LM Studio, llama.cpp, vLLM, Ollama) at the harness to measure your own box.
 
 ### 6. Speed leaders need a paid tier
-Groq's LPU (`llama-3.3-70b` at 0.35 s/call) and Cerebras are the fastest by far, but Groq's
-**free tier is 30 RPM / 6,000 TPM / 14,400 RPD** — the 6K tokens/minute cap is the real
-ceiling for schema-heavy calls and 429s quickly. A production-scale run (hundreds of
-thousands of calls) needs the paid Developer tier.
+Groq's LPU (`llama-3.3-70b` at 0.35 s/call) and Cerebras's wafer-scale engine are the
+fastest by far, but Groq's **free tier is 30 RPM / 6,000 TPM / 14,400 RPD** — the 6K
+tokens/minute cap is the real ceiling for schema-heavy calls and 429s quickly. A
+production-scale run (hundreds of thousands of calls) needs the paid Developer tier.
+
+### 7. Fastest is not best: Cerebras `gpt-oss-120b`
+Cerebras posts the **lowest call latency we measured (0.30 s p50)** and 100% valid JSON via
+native `json_schema`, but **fact recall sits at 0.40** — half of nano/deepseek/gemini
+(0.80–0.90), stable across 20 episodes. For graph memory, edge/fact extraction *is* the
+job, so a perfect-entity / weak-relationship model is disqualified despite the speed. It's
+also pricey ($0.77/1k, ~8× nano). The preview `zai-glm-4.7` was worse — 33% valid JSON,
+zero recall, $2.26/1k. **Lesson: benchmark on the actual multi-call pipeline, not tokens/sec.**
+Note: Cerebras pay-as-you-go exposes only `gpt-oss-120b` and `zai-glm-4.7`; Llama/Qwen are
+gated behind enterprise *dedicated endpoints*, not the standard API.
 
 ## Recommendation
 
@@ -177,12 +188,17 @@ thousands of calls) needs the paid Developer tier.
 
 Wired or easy to add — drop the provider key and re-run:
 
-- **Cerebras** (`llama-3.3-70b` / `llama-3.1-8b`) — the other wafer-scale speed leader (needs key).
 - **Groq `gpt-oss-120b`** — the 20B was fast but only ~53% valid-JSON on the full pipeline;
   the 120B may conform better. Use `json_schema`, not the `json_object` fallback.
-- **Gemini 2.5 Flash-Lite** — cheap + thinking-off by default; couldn't measure (persistent
-  Google-side 503 "high demand" during testing — retry later).
 - **Mistral** `ministral-3b/8b`, **Qwen** 2.5/3, **Llama-4 Scout** — small, fast, cheap.
+
+Tested and rejected: **Cerebras `gpt-oss-120b`** (fastest at 0.30 s but 0.40 fact recall,
+$0.77/1k) and **`zai-glm-4.7`** (33% valid JSON) — see finding #7. **Gemini 2.5 Flash-Lite**
+now confirmed to accept `reasoning_effort: "none"` (thinking off) on the OpenAI-compat
+endpoint, valid JSON. **gpt-5-nano rejects `reasoning_effort: "none"` (HTTP 400)** — only
+`minimal` works; full `none` exists on GPT-5.1/5.2 only. **Gemini 3.x reasoning cannot be
+disabled** (flag silently ignored), but it isn't thinking heavily anyway, so its cost is the
+output rate, not reasoning overhead.
 
 ## Reproduce it
 

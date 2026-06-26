@@ -188,6 +188,8 @@ def main(argv: list[str] | None = None) -> None:
                         help="Serve an auto-refreshing web dashboard instead of the terminal view")
     dash_p.add_argument("--host", default="127.0.0.1", help="Web dashboard bind host (default: 127.0.0.1)")
     dash_p.add_argument("--port", type=int, default=8200, help="Web dashboard port (default: 8200)")
+    dash_p.add_argument("--items", type=int, default=20,
+                        help="Turn-by-turn feed length: latest N item results per run (default: 20)")
 
     # ---- extraction-bench subcommand ----
     ext_p = subparsers.add_parser("extraction-bench",
@@ -677,6 +679,7 @@ def _run_dashboard(args: argparse.Namespace) -> None:
                 port=args.port,
                 total_items=args.total_items,
                 refresh_s=int(args.interval),
+                items_n=args.items,
             )
         else:
             run_dashboard(

@@ -40,6 +40,7 @@ class RunSnapshot:
     arms: dict[str, ArmAgg] = field(default_factory=dict)
     mtime: float = 0.0
     source: str = ""  # the checkpoint's folder, distinguishes same-named runs (e.g. ext-deepseek)
+    items: list[dict] = field(default_factory=list)  # per-item feed in completion order
 
     @property
     def total_done(self) -> int:
@@ -96,6 +97,13 @@ def read_checkpoint(path: Path) -> RunSnapshot:
             agg.correct += 1 if res.get("correct") else 0
             agg.input_tokens += int(res.get("input_tokens") or 0)
             agg.output_tokens += int(res.get("output_tokens") or 0)
+            snap.items.append({
+                "arm": arm,
+                "task_id": str(res.get("task_id") or rec.get("task_id") or ""),
+                "correct": bool(res.get("correct")),
+                "resp": (res.get("response_text") or "").strip().replace("\n", " "),
+                "out_tok": int(res.get("output_tokens") or 0),
+            })
     return snap
 
 
@@ -204,12 +212,35 @@ def _esc(s: object) -> str:
     return html.escape(str(s))
 
 
+def _feed_rows_html(s: RunSnapshot, items_n: int) -> str:
+    """Newest-first per-item feed (turn-by-turn) for one run."""
+    if not items_n or not s.items:
+        return ""
+    recent = list(reversed(s.items))[:items_n]
+    cells = ""
+    for it in recent:
+        mark = "&#10003;" if it["correct"] else "&#10007;"
+        cls = "ok" if it["correct"] else "no"
+        resp = it["resp"]
+        resp = (resp[:96] + "…") if len(resp) > 96 else resp
+        cells += (
+            f"<tr><td class='{cls}'>{mark}</td><td>{_esc(it['arm'])}</td>"
+            f"<td class='muted'>{_esc(it['task_id'][:24])}</td>"
+            f"<td>{_esc(resp)}</td></tr>"
+        )
+    return (
+        "<table class='feed'><thead><tr><th></th><th>arm</th><th>item</th>"
+        f"<th>answer</th></tr></thead><tbody>{cells}</tbody></table>"
+    )
+
+
 def render_html(
     snaps: list[RunSnapshot],
     menhir: dict | None,
     *,
     total_items: int | None,
     refresh_s: int = 5,
+    items_n: int = 20,
 ) -> str:
     """Self-contained auto-refreshing HTML page for the same data as render()."""
     rows: list[str] = []
@@ -234,12 +265,14 @@ def render_html(
             )
         lift = f"<span class='lift'>memory lift: {s.lift:+.3f}</span>" if s.lift is not None else ""
         src = f" <span class='src'>[{_esc(s.source)}]</span>" if s.source and s.source != "results" else ""
+        feed = _feed_rows_html(s, items_n)
+        feed_block = f"<details open><summary class='muted'>turn-by-turn (latest {items_n})</summary>{feed}</details>" if feed else ""
         rows.append(
             f"<div class='run'><h2>{_esc(s.benchmark)}{src} "
             f"<span class='muted'>variant={_esc(s.variant)} &middot; answer-model={_esc(s.model)}</span></h2>"
             f"<div class='prog'>{bar}</div>"
             f"<table><thead><tr><th>arm</th><th>done</th><th>acc</th><th>in_tok</th><th>out_tok</th></tr></thead>"
-            f"<tbody>{arm_rows}</tbody></table>{lift}</div>"
+            f"<tbody>{arm_rows}</tbody></table>{lift}{feed_block}</div>"
         )
     body = "".join(rows) or "<p class='muted'>No checkpoints yet — start a run with --resume.</p>"
 
@@ -268,8 +301,12 @@ def render_html(
  td.num{{text-align:right;font-variant-numeric:tabular-nums}}
  .bar{{display:inline-block;width:320px;height:12px;background:#21262d;border-radius:6px;overflow:hidden;vertical-align:middle;margin-right:8px}}
  .fill{{height:100%;background:linear-gradient(90deg,#1f6feb,#3fb950)}}
- .run{{border:1px solid #30363d;border-radius:8px;padding:10px 16px;margin:12px 0;max-width:760px}}
- footer{{color:#8b949e;margin-top:18px;max-width:760px}}
+ .run{{border:1px solid #30363d;border-radius:8px;padding:10px 16px;margin:12px 0;max-width:900px}}
+ .ok{{color:#3fb950;font-weight:bold}} .no{{color:#f85149;font-weight:bold}}
+ details{{margin-top:8px}} summary{{cursor:pointer}}
+ table.feed{{width:100%;table-layout:fixed}}
+ table.feed td:nth-child(4){{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#c9d1d9}}
+ footer{{color:#8b949e;margin-top:18px;max-width:900px}}
 </style></head><body>
 <h1>archolith-bench &mdash; memory benchmark</h1>
 <div class="muted">{time.strftime('%Y-%m-%d %H:%M:%S')} &middot; auto-refresh {refresh_s}s</div>
@@ -288,6 +325,7 @@ def serve_dashboard(
     port: int = 8200,
     total_items: int | None = None,
     refresh_s: int = 5,
+    items_n: int = 20,
 ) -> None:
     """Serve the dashboard as an auto-refreshing web page until interrupted."""
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -299,7 +337,7 @@ def serve_dashboard(
         def do_GET(self):  # noqa: N802
             snaps = scan_runs(results_dir)
             menhir = probe_menhir(menhir_url) if menhir_url else None
-            page = render_html(snaps, menhir, total_items=total_items, refresh_s=refresh_s)
+            page = render_html(snaps, menhir, total_items=total_items, refresh_s=refresh_s, items_n=items_n)
             data = page.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")

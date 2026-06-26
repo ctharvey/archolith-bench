@@ -70,6 +70,18 @@ OPENAI_EMBED_MODEL="text-embedding-3-small"
 EXTRACTION_PROVIDER="${EXTRACTION_PROVIDER:-openai}"   # openai | deepseek
 OPENAI_EXTRACTION_MODEL="gpt-4.1-nano"
 
+# Dataset variant (s | m | oracle). Pinned + env-overridable so the run is isolated from
+# the launching shell. Default "s" preserves this script's documented ~115k haystack design;
+# select the smaller evidence-only variant with LONGMEMEVAL_VARIANT=oracle.
+export LONGMEMEVAL_VARIANT="${LONGMEMEVAL_VARIANT:-s}"
+
+# Scorer (containment | llm-judge). containment is free/offline; llm-judge is the
+# LongMemEval-comparable GPT-4-class judge (methodology-aligned with Mem0/Zep numbers).
+# The judge ALWAYS runs on OpenAI, never the deepseek answer upstream.
+SCORER="${SCORER:-containment}"
+JUDGE_MODEL="${JUDGE_MODEL:-gpt-4o}"
+JUDGE_BASE="https://api.openai.com/v1"
+
 # ---- args -------------------------------------------------------------------
 LIMIT=""
 SUBSET=""
@@ -223,6 +235,15 @@ cmd=( "${BENCH_BIN}" harness longmemeval-menhir
 [ -n "${LIMIT}"  ] && cmd+=( --limit "${LIMIT}" )
 [ -n "${SUBSET}" ] && cmd+=( --subset "${SUBSET}" )
 [ -n "${ARMS}"   ] && cmd+=( --arms "${ARMS}" )
+# llm-judge scorer: judge pinned to OpenAI (gpt-4o), NOT the deepseek answer upstream.
+# The judge key is NOT passed on the command line (it would leak into the run log); the
+# CLI falls back to the already-exported OPENAI_API_KEY env var instead.
+if [ "${SCORER}" = "llm-judge" ]; then
+  cmd+=( --scorer llm-judge --judge-model "${JUDGE_MODEL}" --judge-url "${JUDGE_BASE}" )
+  log "scorer = llm-judge (${JUDGE_MODEL} @ OpenAI, key via env), variant=${LONGMEMEVAL_VARIANT}"
+else
+  log "scorer = containment, variant=${LONGMEMEVAL_VARIANT}"
+fi
 # --resume: checkpoint each item so a crash / rate-limit abort is recoverable by
 # rerunning the same command. Required for the full longmemeval_s run (hours, no
 # native resume). The checkpoint lives in results/ on the host, so tearing down the

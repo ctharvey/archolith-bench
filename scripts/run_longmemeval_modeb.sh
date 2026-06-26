@@ -82,6 +82,14 @@ SCORER="${SCORER:-containment}"
 JUDGE_MODEL="${JUDGE_MODEL:-gpt-4o}"
 JUDGE_BASE="https://api.openai.com/v1"
 
+# ANSWER model (reads recalled memory, writes the final answer). Independent of the
+# extraction model. deepseek (brand/cheap) or openai (gpt-4o-mini, the LongMemEval-
+# comparable generator). Keys are read via dotenv below -- never hand-parsed.
+ANSWER_PROVIDER="${ANSWER_PROVIDER:-deepseek}"          # deepseek | openai
+OPENAI_ANSWER_MODEL="${OPENAI_ANSWER_MODEL:-gpt-4o-mini}"
+# Memory snippets recalled per question. Raise for multi-fact temporal-reasoning items.
+RECALL_LIMIT="${RECALL_LIMIT:-10}"
+
 # ---- args -------------------------------------------------------------------
 LIMIT=""
 SUBSET=""
@@ -219,16 +227,27 @@ curl -sf "${MENHIR_URL}/api/health" >/dev/null 2>&1 \
 log "menhir healthy."
 
 # ---- 3. bench: LongMemEval Mode B ------------------------------------------
-# answer model endpoint (deepseek) for the bench send_chat path
-export UPSTREAM_BASE_URL="${DEEPSEEK_BASE}"
-export UPSTREAM_API_KEY="${DEEPSEEK_KEY}"
-export BENCHMARK_MODEL="${DEEPSEEK_MODEL}"
+# answer model endpoint for the bench send_chat path. Keys come from dotenv (above),
+# never hand-parsed, so quoted .env values can't leak quotes into the Authorization header.
+if [ "${ANSWER_PROVIDER}" = "openai" ]; then
+  export UPSTREAM_BASE_URL="https://api.openai.com/v1"
+  export UPSTREAM_API_KEY="${OPENAI_KEY}"
+  export BENCHMARK_MODEL="${OPENAI_ANSWER_MODEL}"
+  ANSWER_MODEL_NAME="${OPENAI_ANSWER_MODEL}"
+else
+  export UPSTREAM_BASE_URL="${DEEPSEEK_BASE}"
+  export UPSTREAM_API_KEY="${DEEPSEEK_KEY}"
+  export BENCHMARK_MODEL="${DEEPSEEK_MODEL}"
+  ANSWER_MODEL_NAME="${DEEPSEEK_MODEL}"
+fi
+log "answer model = ${ANSWER_PROVIDER} (${ANSWER_MODEL_NAME}), recall_limit=${RECALL_LIMIT}"
 
 mkdir -p "${RUN_OUTPUT_DIR}"
 cmd=( "${BENCH_BIN}" harness longmemeval-menhir
       --menhir-url "${MENHIR_URL}"
       --confirm-menhir-reset
-      --model "${DEEPSEEK_MODEL}"
+      --model "${ANSWER_MODEL_NAME}"
+      --recall-limit "${RECALL_LIMIT}"
       --format markdown
       --output-dir "${RUN_OUTPUT_DIR}"
       --out "${RUN_OUTPUT_DIR}/harness_longmemeval_modeb.md" )

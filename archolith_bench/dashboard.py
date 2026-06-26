@@ -249,15 +249,13 @@ def _feed_rows_html(s: RunSnapshot, items_n: int) -> str:
         # to show question -> retrieved memory -> gold -> response. Older runs (no capture)
         # just show the answer text.
         if q or recalled:
-            recall_html = (
-                "<div class='blk'><span class='lbl'>retrieved memory</span>"
-                f"<pre>{_esc(recalled) or '<em>(none)</em>'}</pre></div>"
-            )
+            # Summary shows the QUESTION (visible at a glance); expanding reveals what was
+            # retrieved, the gold answer, and the model's response.
+            recalled_disp = _esc(recalled) if recalled else "<em>(nothing recalled)</em>"
             detail = (
-                f"<summary>{_esc(full)}</summary>"
-                f"<div class='blk'><span class='lbl'>question</span><div>{_esc(q)}</div></div>"
-                f"{recall_html}"
-                f"<div class='blk'><span class='lbl'>gold</span><div>{_esc(gold)}</div></div>"
+                f"<summary>{_esc(q) or _esc(full)}</summary>"
+                f"<div class='blk'><span class='lbl'>retrieved memory</span><pre>{recalled_disp}</pre></div>"
+                f"<div class='blk'><span class='lbl'>gold answer</span><div>{_esc(gold)}</div></div>"
                 f"<div class='blk'><span class='lbl'>llm response</span><div>{_esc(full)}</div></div>"
             )
             ans_cell = f"<details>{detail}</details>"
@@ -270,7 +268,8 @@ def _feed_rows_html(s: RunSnapshot, items_n: int) -> str:
         )
     return (
         "<table class='feed'><thead><tr><th>time</th><th></th><th>arm</th><th>item</th>"
-        f"<th>answer</th></tr></thead><tbody>{cells}</tbody></table>"
+        f"<th>question &middot; click to expand retrieval &rarr; gold &rarr; response</th>"
+        "</tr></thead><tbody>" + cells + "</tbody></table>"
     )
 
 

@@ -258,11 +258,24 @@ def _feed_rows_html(s: RunSnapshot, items_n: int) -> str:
             # Summary shows the QUESTION (visible at a glance); expanding reveals what was
             # retrieved, the gold answer, and the model's response.
             did = _slug_id(runkey, it["arm"], it["task_id"])
-            recalled_disp = _esc(recalled) if recalled else "<em>(nothing recalled)</em>"
+            snips = [ln for ln in recalled.split("\n") if ln.strip()]
+            if snips:
+                snip_html = "".join(
+                    f"<div class='snip'><span class='snum'>{i + 1}</span>{_esc(ln)}</div>"
+                    for i, ln in enumerate(snips)
+                )
+                recalled_block = (
+                    f"<span class='lbl'>retrieved memory ({len(snips)})</span>"
+                    f"<div id='{did}_pre' class='keepscroll snips'>{snip_html}</div>"
+                )
+            else:
+                recalled_block = (
+                    "<span class='lbl'>retrieved memory</span>"
+                    "<div class='muted'><em>(nothing recalled)</em></div>"
+                )
             detail = (
                 f"<summary>{_esc(q) or _esc(full)}</summary>"
-                f"<div class='blk'><span class='lbl'>retrieved memory</span>"
-                f"<pre id='{did}_pre' class='keepscroll'>{recalled_disp}</pre></div>"
+                f"<div class='blk'>{recalled_block}</div>"
                 f"<div class='blk'><span class='lbl'>gold answer</span><div>{_esc(gold)}</div></div>"
                 f"<div class='blk'><span class='lbl'>llm response</span><div>{_esc(full)}</div></div>"
             )
@@ -363,6 +376,11 @@ def render_html(
  .blk{{margin:5px 0 5px 10px;border-left:2px solid #30363d;padding-left:10px}}
  .lbl{{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#8b949e}}
  .blk pre{{margin:2px 0;white-space:pre-wrap;overflow-wrap:anywhere;color:#79c0ff;font-size:12.5px;max-height:220px;overflow:auto}}
+ .snips{{max-height:260px;overflow:auto;margin-top:3px}}
+ .snip{{padding:4px 8px;margin:3px 0;border-left:3px solid #2f5a8f;background:#0f1620;border-radius:3px;
+   font-size:12.5px;color:#adbac7;white-space:pre-wrap;overflow-wrap:anywhere}}
+ .snip:nth-child(even){{background:#131c28}}
+ .snum{{display:inline-block;min-width:22px;color:#d29922;font-weight:bold}}
  footer{{color:#8b949e;margin-top:18px;max-width:900px}}
 </style></head><body>
 <h1>archolith-bench &mdash; memory benchmark</h1>

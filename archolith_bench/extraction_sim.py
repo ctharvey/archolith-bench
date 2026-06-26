@@ -89,14 +89,33 @@ PRICING: dict[str, tuple[float, float, float]] = {
     "llama-3.3-70b": (0.295, 0.59, 0.79),
     "gpt-oss-20b": (0.0375, 0.075, 0.30),
     "gpt-oss-120b": (0.075, 0.15, 0.60),
+    # Cerebras (cerebras.ai/pricing) -- no separate cache rate, so hit == input.
+    # Provider-scoped ("cerebras/") because Cerebras charges more than Groq for the same
+    # open weights (e.g. gpt-oss-120b: $0.35/$0.75 vs Groq $0.15/$0.60). Free tier = $0,
+    # but the list-price estimate is what the $/1k column reports.
+    "cerebras/gpt-oss-120b": (0.35, 0.35, 0.75),
+    "cerebras/qwen-3-32b": (0.40, 0.40, 0.80),
+    "cerebras/llama-3.3-70b": (0.85, 0.85, 1.20),
+    "cerebras/llama3.1-8b": (0.10, 0.10, 0.10),
 }
 
 
-def _pricing_for(model: str) -> tuple[float, float, float] | None:
+def _pricing_for(model: str, base_url: str = "") -> tuple[float, float, float] | None:
     """Match the most specific (longest) pricing key contained in the model name, so
-    'gpt-5-nano' resolves to gpt-5-nano rather than the shorter 'gpt-5'."""
+    'gpt-5-nano' resolves to gpt-5-nano rather than the shorter 'gpt-5'.
+
+    Provider-scoped keys (containing '/') are matched first when the base_url identifies
+    that provider, so a Cerebras-hosted open model is priced at Cerebras rates rather than
+    colliding with the cheaper Groq entry for the same weights."""
     low = model.lower()
-    for key in sorted(PRICING, key=len, reverse=True):
+    keys = sorted(PRICING, key=len, reverse=True)
+    if "cerebras" in base_url.lower():
+        for key in keys:
+            if key.startswith("cerebras/") and key.split("/", 1)[1] in low:
+                return PRICING[key]
+    for key in keys:
+        if "/" in key:  # provider-scoped; only used in the provider pass above
+            continue
         if key in low:
             return PRICING[key]
     return None
@@ -107,6 +126,7 @@ class ModelResult:
     label: str
     model: str
     mode: str  # json_schema | json_object+prompt
+    base_url: str = ""
     episodes: int = 0
     call_latencies: list[float] = field(default_factory=list)
     episode_latencies: list[float] = field(default_factory=list)
@@ -127,7 +147,7 @@ class ModelResult:
 
     def cost_per_1k_episodes(self) -> float | None:
         """Estimated USD per 1,000 episodes, using the measured cache hit/miss split."""
-        p = _pricing_for(self.model)
+        p = _pricing_for(self.model, self.base_url)
         if p is None or self.episodes == 0:
             return None
         hit_in, miss_in, out = p
@@ -200,7 +220,7 @@ def simulate_model(label: str, base_url: str, api_key: str, model: str, *, corpu
     import httpx
 
     corpus = corpus or CORPUS
-    res = ModelResult(label=label, model=model, mode="json_schema")
+    res = ModelResult(label=label, model=model, mode="json_schema", base_url=base_url)
     is_deepseek = "deepseek" in model.lower() or "deepseek" in base_url.lower()
     url = base_url.rstrip("/") + "/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
@@ -379,6 +399,10 @@ def default_targets() -> list[dict]:
          gemini_key, "gemini-3.1-flash-lite"),
         ("gemini-2.5-flash-lite", "https://generativelanguage.googleapis.com/v1beta/openai/",
          gemini_key, "gemini-2.5-flash-lite"),
+        # Cerebras wafer-scale (OpenAI-compatible): free tier 30 RPM / 1M TPD.
+        # gpt-oss-120b runs ~3000 tk/s; qwen-3-32b has a strong non-thinking mode.
+        ("cerebras-gpt-oss-120b", "https://api.cerebras.ai/v1", cerebras_key, "gpt-oss-120b"),
+        ("cerebras-qwen3-32b", "https://api.cerebras.ai/v1", cerebras_key, "qwen-3-32b"),
         ("cerebras-llama3.3-70b", "https://api.cerebras.ai/v1", cerebras_key, "llama-3.3-70b"),
     ]
     return [{"label": lbl, "base_url": url, "api_key": key, "model": m}

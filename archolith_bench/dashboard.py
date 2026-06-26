@@ -18,6 +18,11 @@ from pathlib import Path
 # load. Override with --total-items when running a subset.
 _KNOWN_VARIANT_ITEMS = {"oracle": 500, "s": 500, "m": 500}
 
+# First-seen wall-clock per (checkpoint, arm, task_id). Used when a checkpoint record has
+# no `ts` (older runs predating the timestamped format): the dashboard stamps an item the
+# first refresh it observes it, so a live run still gets per-item times.
+_FIRST_SEEN: dict[tuple[str, str, str], float] = {}
+
 
 @dataclass
 class ArmAgg:
@@ -97,23 +102,33 @@ def read_checkpoint(path: Path) -> RunSnapshot:
             agg.correct += 1 if res.get("correct") else 0
             agg.input_tokens += int(res.get("input_tokens") or 0)
             agg.output_tokens += int(res.get("output_tokens") or 0)
+            task_id = str(res.get("task_id") or rec.get("task_id") or "")
+            ts = rec.get("ts")
+            if ts is None:
+                key = (str(path), arm, task_id)
+                ts = _FIRST_SEEN.setdefault(key, time.time())
             snap.items.append({
                 "arm": arm,
-                "task_id": str(res.get("task_id") or rec.get("task_id") or ""),
+                "task_id": task_id,
                 "correct": bool(res.get("correct")),
                 "resp": (res.get("response_text") or "").strip().replace("\n", " "),
                 "out_tok": int(res.get("output_tokens") or 0),
+                "ts": float(ts),
             })
     return snap
 
 
-def scan_runs(results_dir: Path) -> list[RunSnapshot]:
+def scan_runs(results_dir: Path, *, active_within_s: float | None = None) -> list[RunSnapshot]:
     if not results_dir.exists():
         return []
     # rglob so isolated per-config runs in subfolders (results/ext-deepseek/...) show too.
     paths = {p for p in results_dir.glob(".checkpoint_*.jsonl")}
     paths |= {p for p in results_dir.rglob(".checkpoint_*.jsonl")}
     snaps = [read_checkpoint(p) for p in sorted(paths)]
+    if active_within_s:
+        # "Active" = checkpoint written within the window (a run currently producing items).
+        cutoff = time.time() - active_within_s
+        snaps = [s for s in snaps if s.mtime >= cutoff]
     snaps.sort(key=lambda s: s.mtime, reverse=True)
     return snaps
 
@@ -223,13 +238,15 @@ def _feed_rows_html(s: RunSnapshot, items_n: int) -> str:
         cls = "ok" if it["correct"] else "no"
         resp = it["resp"]
         resp = (resp[:96] + "…") if len(resp) > 96 else resp
+        ts = it.get("ts")
+        tstr = time.strftime("%H:%M:%S", time.localtime(ts)) if ts else ""
         cells += (
-            f"<tr><td class='{cls}'>{mark}</td><td>{_esc(it['arm'])}</td>"
+            f"<tr><td class='muted'>{tstr}</td><td class='{cls}'>{mark}</td><td>{_esc(it['arm'])}</td>"
             f"<td class='muted'>{_esc(it['task_id'][:24])}</td>"
             f"<td>{_esc(resp)}</td></tr>"
         )
     return (
-        "<table class='feed'><thead><tr><th></th><th>arm</th><th>item</th>"
+        "<table class='feed'><thead><tr><th>time</th><th></th><th>arm</th><th>item</th>"
         f"<th>answer</th></tr></thead><tbody>{cells}</tbody></table>"
     )
 
@@ -305,7 +322,7 @@ def render_html(
  .ok{{color:#3fb950;font-weight:bold}} .no{{color:#f85149;font-weight:bold}}
  details{{margin-top:8px}} summary{{cursor:pointer}}
  table.feed{{width:100%;table-layout:fixed}}
- table.feed td:nth-child(4){{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#c9d1d9}}
+ table.feed td:nth-child(5){{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#c9d1d9}}
  footer{{color:#8b949e;margin-top:18px;max-width:900px}}
 </style></head><body>
 <h1>archolith-bench &mdash; memory benchmark</h1>
@@ -326,6 +343,7 @@ def serve_dashboard(
     total_items: int | None = None,
     refresh_s: int = 5,
     items_n: int = 20,
+    active_within_s: float | None = None,
 ) -> None:
     """Serve the dashboard as an auto-refreshing web page until interrupted."""
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -335,7 +353,7 @@ def serve_dashboard(
             pass
 
         def do_GET(self):  # noqa: N802
-            snaps = scan_runs(results_dir)
+            snaps = scan_runs(results_dir, active_within_s=active_within_s)
             menhir = probe_menhir(menhir_url) if menhir_url else None
             page = render_html(snaps, menhir, total_items=total_items, refresh_s=refresh_s, items_n=items_n)
             data = page.encode("utf-8")
@@ -361,13 +379,14 @@ def run_dashboard(
     interval: float = 5.0,
     once: bool = False,
     total_items: int | None = None,
+    active_within_s: float | None = None,
 ) -> None:
     prev_done: int | None = None
     prev_t: float | None = None
     rate_per_min: float | None = None
     eta_min: float | None = None
     while True:
-        snaps = scan_runs(results_dir)
+        snaps = scan_runs(results_dir, active_within_s=active_within_s)
         menhir = probe_menhir(menhir_url) if menhir_url else None
 
         active = snaps[0] if snaps else None

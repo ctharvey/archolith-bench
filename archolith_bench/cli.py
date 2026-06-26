@@ -190,6 +190,9 @@ def main(argv: list[str] | None = None) -> None:
     dash_p.add_argument("--port", type=int, default=8200, help="Web dashboard port (default: 8200)")
     dash_p.add_argument("--items", type=int, default=20,
                         help="Turn-by-turn feed length: latest N item results per run (default: 20)")
+    dash_p.add_argument("--active-within", type=float, default=300.0,
+                        help="Only show runs whose checkpoint was written within N seconds "
+                             "(active sessions). 0 = show all runs including finished ones (default: 300)")
 
     # ---- extraction-bench subcommand ----
     ext_p = subparsers.add_parser("extraction-bench",
@@ -680,6 +683,7 @@ def _run_dashboard(args: argparse.Namespace) -> None:
                 total_items=args.total_items,
                 refresh_s=int(args.interval),
                 items_n=args.items,
+                active_within_s=(args.active_within or None),
             )
         else:
             run_dashboard(
@@ -688,6 +692,7 @@ def _run_dashboard(args: argparse.Namespace) -> None:
                 interval=args.interval,
                 once=args.once,
                 total_items=args.total_items,
+                active_within_s=(args.active_within or None),
             )
     except KeyboardInterrupt:
         print("\n(dashboard stopped)")

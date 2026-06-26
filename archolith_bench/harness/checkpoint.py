@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from dataclasses import asdict
 from pathlib import Path
 
@@ -85,7 +86,8 @@ class MemoryCheckpoint:
         self._done[(arm, task_id)] = result
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.path, "a", encoding="utf-8") as f:
-            f.write(json.dumps({"arm": arm, "task_id": task_id, "result": asdict(result)}, ensure_ascii=False) + "\n")
+            rec = {"arm": arm, "task_id": task_id, "ts": time.time(), "result": asdict(result)}
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
             f.flush()
             os.fsync(f.fileno())
 

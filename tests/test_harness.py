@@ -241,6 +241,49 @@ def test_run_memory_ab_lift_offline():
     assert ab.deltas["menhir_recall"]["score_delta"] > 0
 
 
+def test_parse_query_list_lenient():
+    from archolith_bench.harness.memory_ab import _parse_query_list
+    assert _parse_query_list('["a", "b"]') == ["a", "b"]
+    assert _parse_query_list('sure: ["x","y"] done') == ["x", "y"]
+    assert _parse_query_list("not json at all") == []
+    assert _parse_query_list("") == []
+
+
+def test_agentic_recall_arm_plans_and_runs():
+    """The agentic arm asks the LLM for sub-queries, recalls each, and answers."""
+    from archolith_bench.harness import StubMenhirClient, run_memory_ab
+    from archolith_bench.harness.longmemeval import LongMemEvalMemoryAdapter
+
+    planned: list[str] = []
+
+    def send_fn(client, base_url, api_key, messages, model, **kwargs):  # noqa: ANN001
+        system = messages[0]["content"]
+        user = messages[-1]["content"]
+        if "memory-search queries" in system:
+            # planner call: decompose (echo keeps the stub's token-overlap recall working)
+            planned.append(user)
+            return f'["{user}"]', 1.0, {"prompt_tokens": 5, "completion_tokens": 5}
+        text = "I don't know"
+        if "Biscuit" in user:
+            text = "Biscuit"
+        elif "Denver" in user:
+            text = "Denver"
+        return text, 1.0, {"prompt_tokens": max(1, len(user) // 4), "completion_tokens": 2}
+
+    ab = run_memory_ab(
+        LongMemEvalMemoryAdapter(),
+        arms=("no_memory", "menhir_agentic_recall"),
+        fixture_path=LME_FIXTURE,
+        client=StubMenhirClient(),
+        send_fn=send_fn,
+    )
+    assert "menhir_agentic_recall" in ab.arms
+    assert ab.arms["menhir_agentic_recall"].n == 3  # all fixture items ran
+    assert planned  # the planner was actually invoked
+    # agentic recall surfaces the facts -> beats the no-memory floor
+    assert ab.arms["menhir_agentic_recall"].score > ab.arms["no_memory"].score
+
+
 def test_run_memory_ab_checkpoint_resumes_and_skips_done(tmp_path):
     """A second run with the same checkpoint reuses recorded items and re-issues no calls."""
     from archolith_bench.harness import MemoryCheckpoint, StubMenhirClient, run_memory_ab

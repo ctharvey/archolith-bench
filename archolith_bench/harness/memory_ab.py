@@ -13,6 +13,8 @@ menhir+Neo4j (never production — `assert_not_production` guards the target).
 
 from __future__ import annotations
 
+import json
+import re
 from collections.abc import Sequence
 from contextlib import nullcontext
 from statistics import mean
@@ -30,7 +32,77 @@ from .menhir_client import HttpMenhirClient
 
 # Arms: a no-memory floor vs memory-recall arms.
 NO_MEMORY = "no_memory"
-DEFAULT_MEMORY_ARMS = (NO_MEMORY, "menhir_recall")
+SINGLE_RECALL = "menhir_recall"
+# Agentic recall: the answer LLM first decomposes the question into focused
+# entity/keyword sub-queries and recalls each, instead of embedding the whole
+# question as one query. menhir's recall is semantic vector search, so a verbose
+# multi-entity question yields a blended embedding that often retrieves one event
+# but not the other; per-entity queries retrieve both.
+AGENTIC_RECALL = "menhir_agentic_recall"
+DEFAULT_MEMORY_ARMS = (NO_MEMORY, SINGLE_RECALL)
+
+_PLANNER_SYSTEM = (
+    "You turn a user's question into focused memory-search queries. The memory system is a "
+    "semantic graph that retrieves best from SHORT entity/keyword queries, not full sentences. "
+    "For questions that compare or relate multiple things (e.g. 'which came first, X or Y', "
+    "'how many days between A and B'), output ONE separate query per thing/event so each is "
+    "retrieved independently. Return ONLY a JSON array of 1-5 short query strings, most "
+    "important first. Example: [\"Samsung Galaxy S22 purchase\", \"Dell XPS 13 purchase\"]"
+)
+
+
+def _parse_query_list(text: str) -> list[str]:
+    """Extract a JSON array of query strings from the planner reply (lenient)."""
+    if not text:
+        return []
+    match = re.search(r"\[.*\]", text, re.DOTALL)
+    raw = match.group(0) if match else text
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return []
+    if isinstance(data, list):
+        return [str(q).strip() for q in data if str(q).strip()]
+    return []
+
+
+def _plan_recall_queries(
+    question: str, *, send_fn, chat_client, chat_base_url: str, api_key: str, model: str  # noqa: ANN001
+) -> list[str]:
+    """Ask the answer LLM for focused sub-queries; always keep the raw question as a
+    fallback so agentic recall never does strictly worse than single-query recall."""
+    messages = [
+        {"role": "system", "content": _PLANNER_SYSTEM},
+        {"role": "user", "content": question},
+    ]
+    try:
+        text, _latency, _usage = send_fn(chat_client, chat_base_url, api_key, messages, model)
+        queries = _parse_query_list(text)
+    except Exception:
+        queries = []
+    if question and question not in queries:
+        queries.append(question)
+    return queries[:6]
+
+
+def _agentic_recall(client: "MenhirClient", group_id: str, subqueries: list[str], recall_limit: int) -> str:
+    """Recall each sub-query and union the snippets (dedup, order-preserving), capped at
+    recall_limit total so the answer context stays size-comparable to single-query recall."""
+    per_q = max(3, recall_limit // max(1, len(subqueries)))
+    seen: set[str] = set()
+    merged: list[str] = []
+    for sq in subqueries:
+        try:
+            snippets = client.recall(group_id, sq, limit=per_q)
+        except Exception:
+            snippets = []
+        for snip in snippets:
+            if snip not in seen:
+                seen.add(snip)
+                merged.append(snip)
+                if len(merged) >= recall_limit:
+                    return "\n".join(merged)
+    return "\n".join(merged)
 
 _PROD_MARKERS = ("prod", "production", "menhir.", "staging.", "preprod", "preview", "release")
 
@@ -120,8 +192,15 @@ def _run_memory_arm(
                 for session in adapter.sessions(item):
                     for turn in session:
                         client.ingest(group_id, turn.get("role", "user"), turn.get("content", ""))
-                recalled = client.recall(group_id, question, limit=recall_limit)
-                memory_context = "\n".join(recalled)
+                if arm == AGENTIC_RECALL:
+                    subqueries = _plan_recall_queries(
+                        question, send_fn=send_fn, chat_client=chat_client,
+                        chat_base_url=chat_base_url, api_key=api_key, model=model,
+                    )
+                    memory_context = _agentic_recall(client, group_id, subqueries, recall_limit)
+                else:
+                    recalled = client.recall(group_id, question, limit=recall_limit)
+                    memory_context = "\n".join(recalled)
             finally:
                 if reset_memory:
                     _reset_memory_group(

@@ -98,7 +98,11 @@ def test_render_html_is_valid_autorefreshing_page(tmp_path):
     html = render_html(snaps, {"health": True, "queue_depth": 0, "startup_mode": "full"},
                        total_items=500, refresh_s=5)
     assert html.startswith("<!doctype html>")
-    assert 'http-equiv="refresh"' in html
+    # Auto-refreshes in place (preserves open <details> + scroll) instead of a full
+    # meta-refresh page reload.
+    assert 'http-equiv="refresh"' not in html
+    assert "setInterval" in html and "replaceWith" in html
+    assert 'id="content"' in html
     assert "longmemeval-menhir" in html
     assert "menhir UP" in html
     assert "memory lift" in html

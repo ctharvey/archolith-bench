@@ -230,10 +230,16 @@ def _esc(s: object) -> str:
     return html.escape(str(s))
 
 
+def _slug_id(*parts: str) -> str:
+    raw = "_".join(str(p) for p in parts)
+    return "d_" + "".join(c if c.isalnum() else "_" for c in raw)[:80]
+
+
 def _feed_rows_html(s: RunSnapshot, items_n: int) -> str:
     """Newest-first per-item feed (turn-by-turn) for one run."""
     if not items_n or not s.items:
         return ""
+    runkey = f"{s.model}_{s.variant}_{s.source}"
     recent = list(reversed(s.items))[:items_n]
     cells = ""
     for it in recent:
@@ -258,7 +264,7 @@ def _feed_rows_html(s: RunSnapshot, items_n: int) -> str:
                 f"<div class='blk'><span class='lbl'>gold answer</span><div>{_esc(gold)}</div></div>"
                 f"<div class='blk'><span class='lbl'>llm response</span><div>{_esc(full)}</div></div>"
             )
-            ans_cell = f"<details>{detail}</details>"
+            ans_cell = f"<details id='{_slug_id(runkey, it['arm'], it['task_id'])}'>{detail}</details>"
         else:
             ans_cell = f"<span title='{_esc(full)}'>{_esc(full)}</span>"
         cells += (
@@ -305,7 +311,11 @@ def render_html(
         lift = f"<span class='lift'>memory lift: {s.lift:+.3f}</span>" if s.lift is not None else ""
         src = f" <span class='src'>[{_esc(s.source)}]</span>" if s.source and s.source != "results" else ""
         feed = _feed_rows_html(s, items_n)
-        feed_block = f"<details open><summary class='muted'>turn-by-turn (latest {items_n})</summary>{feed}</details>" if feed else ""
+        feed_wrap_id = _slug_id(s.model, s.variant, s.source, "feedwrap")
+        feed_block = (
+            f"<details open id='{feed_wrap_id}'><summary class='muted'>turn-by-turn (latest {items_n})</summary>{feed}</details>"
+            if feed else ""
+        )
         rows.append(
             f"<div class='run'><h2>{_esc(s.benchmark)}{src} "
             f"<span class='muted'>variant={_esc(s.variant)} &middot; answer-model={_esc(s.model)}</span></h2>"
@@ -328,7 +338,6 @@ def render_html(
         mh = "<span class='down'>&#9679; menhir starting/degraded</span>"
 
     return f"""<!doctype html><html><head><meta charset="utf-8">
-<meta http-equiv="refresh" content="{refresh_s}">
 <title>archolith-bench dashboard</title>
 <style>
  body{{font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:#0d1117;color:#c9d1d9;margin:0;padding:24px}}
@@ -355,11 +364,33 @@ def render_html(
  footer{{color:#8b949e;margin-top:18px;max-width:900px}}
 </style></head><body>
 <h1>archolith-bench &mdash; memory benchmark</h1>
-<div class="muted">{time.strftime('%Y-%m-%d %H:%M:%S')} &middot; auto-refresh {refresh_s}s</div>
+<div id="content">
+<div class="muted">{time.strftime('%Y-%m-%d %H:%M:%S')} &middot; live (every {refresh_s}s, in place)</div>
 <div style="margin:10px 0">{mh}</div>
 {body}
+</div>
 <footer>Token columns are ANSWER-model only; menhir ingestion (OpenAI extraction+embedding)
 spend is not tracked by the bench. Progress is by item-count across arms.</footer>
+<script>
+// In-place refresh: fetch the page, swap only #content, and preserve which <details>
+// are open plus the scroll position -- so expanding a question is NOT reset every tick.
+const RS = {refresh_s} * 1000;
+async function tick() {{
+  try {{
+    const html = await (await fetch(location.href, {{cache: 'no-store'}})).text();
+    const fresh = new DOMParser().parseFromString(html, 'text/html').getElementById('content');
+    if (!fresh) return;
+    const openIds = new Set(
+      Array.from(document.querySelectorAll('details[open]')).map(d => d.id).filter(Boolean)
+    );
+    const sy = window.scrollY;
+    document.getElementById('content').replaceWith(fresh);
+    fresh.querySelectorAll('details[id]').forEach(d => {{ d.open = openIds.has(d.id); }});
+    window.scrollTo(0, sy);
+  }} catch (e) {{ /* transient fetch error; try again next tick */ }}
+}}
+setInterval(tick, RS);
+</script>
 </body></html>"""
 
 

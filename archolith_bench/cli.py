@@ -150,6 +150,9 @@ def main(argv: list[str] | None = None) -> None:
                            help="Run offline against a bundled fixture JSON (no API calls)")
     harness_p.add_argument("--menhir-url", default=None,
                            help="Memory benchmarks: throwaway menhir base URL (refuses prod-looking targets)")
+    harness_p.add_argument("--recall-limit", type=int, default=10,
+                           help="Memory benchmarks: how many memory snippets to recall per question "
+                                "(default 10; raise for multi-fact temporal-reasoning questions)")
     harness_p.add_argument("--resume", action="store_true",
                            help="Memory benchmarks: checkpoint each item and skip already-completed "
                                 "items on rerun (survives crashes/rate-limit aborts). Rerun the same command.")
@@ -606,6 +609,7 @@ def _run_harness(args: argparse.Namespace) -> None:
             model=args.model,
             client=client,
             send_fn=send_fn,
+            recall_limit=args.recall_limit,
             # Mode B answers the question directly from recalled memory; the answer
             # model talks straight to the upstream, NOT the archolith-context proxy
             # (which need not be running for memory benchmarks). Default chat_base_url

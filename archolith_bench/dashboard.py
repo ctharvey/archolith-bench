@@ -236,14 +236,13 @@ def _feed_rows_html(s: RunSnapshot, items_n: int) -> str:
     for it in recent:
         mark = "&#10003;" if it["correct"] else "&#10007;"
         cls = "ok" if it["correct"] else "no"
-        resp = it["resp"]
-        resp = (resp[:96] + "…") if len(resp) > 96 else resp
         ts = it.get("ts")
         tstr = time.strftime("%H:%M:%S", time.localtime(ts)) if ts else ""
+        full = it["resp"]
         cells += (
             f"<tr><td class='muted'>{tstr}</td><td class='{cls}'>{mark}</td><td>{_esc(it['arm'])}</td>"
             f"<td class='muted'>{_esc(it['task_id'][:24])}</td>"
-            f"<td>{_esc(resp)}</td></tr>"
+            f"<td class='ans' title='{_esc(full)}'>{_esc(full)}</td></tr>"
         )
     return (
         "<table class='feed'><thead><tr><th>time</th><th></th><th>arm</th><th>item</th>"
@@ -321,8 +320,10 @@ def render_html(
  .run{{border:1px solid #30363d;border-radius:8px;padding:10px 16px;margin:12px 0;max-width:900px}}
  .ok{{color:#3fb950;font-weight:bold}} .no{{color:#f85149;font-weight:bold}}
  details{{margin-top:8px}} summary{{cursor:pointer}}
- table.feed{{width:100%;table-layout:fixed}}
- table.feed td:nth-child(5){{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#c9d1d9}}
+ table.feed{{width:100%}}
+ table.feed td{{vertical-align:top}}
+ table.feed td.ans{{white-space:normal;overflow-wrap:anywhere;color:#c9d1d9;max-width:0;width:99%}}
+ table.feed td:nth-child(1),table.feed td:nth-child(2),table.feed td:nth-child(3),table.feed td:nth-child(4){{white-space:nowrap}}
  footer{{color:#8b949e;margin-top:18px;max-width:900px}}
 </style></head><body>
 <h1>archolith-bench &mdash; memory benchmark</h1>

@@ -87,10 +87,15 @@ latency, quality, and **cache-aware** cost. Full writeup, pricing, and findings:
 - **Cheapest:** `deepseek-v4-flash` — caching makes it cheapest (50× cache discount).
 - **Fastest:** Cerebras `gpt-oss-120b` (0.30 s) — but only 0.40 fact recall, so *not* recommended for graph memory. **Free/private:** local Qwen (slower, $0).
 
+By default the bench runs only the two **blessed keepers** — `gpt-4.1-nano` (default) and
+`qwen3-next-80b` (open-weight alternative, via OpenRouter). Pass `--all` for the full
+candidate sweep.
+
 ```bash
 # keys read from env or menhir/.env; fast providers auto-enable when their key is present
-archolith-bench extraction-bench --repeats 2
-archolith-bench extraction-bench --repeats 2 --exclude gpt-5   # skip slow reasoning models
+archolith-bench extraction-bench --repeats 2            # just nano + qwen3-next-80b
+archolith-bench extraction-bench --repeats 2 --all      # full candidate sweep
+archolith-bench extraction-bench --repeats 2 --all --exclude gpt-5   # sweep minus slow reasoning models
 ```
 
 ## Quick Start

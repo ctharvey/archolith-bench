@@ -199,6 +199,9 @@ def main(argv: list[str] | None = None) -> None:
     ext_p.add_argument("--exclude", default=None,
                        help="Comma-separated substrings; skip any target whose label/model matches "
                             "(e.g. 'gpt-5' to drop slow reasoning models)")
+    ext_p.add_argument("--all", action="store_true",
+                       help="Benchmark the full candidate sweep instead of just the blessed "
+                            "keepers (gpt-4.1-nano + qwen3-next-80b)")
     ext_p.add_argument("--out", type=Path, default=None, help="Optional evidence output file")
 
     # ---- ports subcommand ----
@@ -690,7 +693,7 @@ def _run_dashboard(args: argparse.Namespace) -> None:
 def _run_extraction_bench(args: argparse.Namespace) -> None:
     from .extraction_sim import default_targets, render_results, simulate_model
 
-    targets = default_targets()
+    targets = default_targets(full=args.all)
     if args.targets_file:
         extra = json.loads(Path(args.targets_file).read_text(encoding="utf-8"))
         for t in extra:

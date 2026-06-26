@@ -414,11 +414,19 @@ def _read_env_file(path: str, key: str) -> str:
     return ""
 
 
-def default_targets() -> list[dict]:
+# Blessed extraction models (decision 2026-06): gpt-4.1-nano is the default (best value);
+# qwen3-next-80b via OpenRouter is the open-weight alternative. default_targets() returns
+# just these two; pass full=True (CLI --all) to benchmark the entire candidate sweep.
+_KEEPER_LABELS = ("gpt-4.1-nano", "or-qwen3-next-80b")
+
+
+def default_targets(full: bool = False) -> list[dict]:
     """Build the target list from available keys (workspace .env files + env vars).
 
-    Fast-provider entries (Groq/Gemini/Cerebras) are included only if their key env var
-    is set, so adding a key auto-enables that target -- no code change.
+    By default returns only the blessed keepers (gpt-4.1-nano + qwen3-next-80b); set
+    full=True for the whole candidate sweep. Provider entries (Groq/Gemini/Cerebras/
+    OpenRouter) are included only if their key is present, so adding a key auto-enables
+    that target -- no code change.
     """
     import os
 
@@ -475,8 +483,13 @@ def default_targets() -> list[dict]:
         ("or-gpt-oss-20b", _or, openrouter_key, "openai/gpt-oss-20b"),
         ("or-gpt-oss-120b", _or, openrouter_key, "openai/gpt-oss-120b"),
     ]
-    return [{"label": lbl, "base_url": url, "api_key": key, "model": m}
-            for (lbl, url, key, m) in candidates if key]
+    built = [{"label": lbl, "base_url": url, "api_key": key, "model": m}
+             for (lbl, url, key, m) in candidates if key]
+    if full:
+        return built
+    by_label = {t["label"]: t for t in built}
+    keepers = [by_label[lbl] for lbl in _KEEPER_LABELS if lbl in by_label]
+    return keepers or built  # fall back to whatever has keys if neither keeper is available
 
 
 def render_results(results: list[ModelResult]) -> str:

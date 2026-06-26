@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Extraction Model Benchmark — archolith-bench</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --line:#2d3543;
+    --txt:#e6edf3; --muted:#8b949e; --accent:#58a6ff; --good:#3fb950;
+    --warn:#d29922; --bad:#f85149; --gateway:#bc8cff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:32px 20px 80px}
+  header h1{margin:0 0 6px;font-size:26px;letter-spacing:-.02em}
+  header p{margin:0;color:var(--muted)}
+  .sub{font-size:13px;color:var(--muted);margin-top:10px}
+  .badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;
+    font-weight:600;vertical-align:middle}
+  .b-direct{background:#1f6feb33;color:var(--accent);border:1px solid #1f6feb55}
+  .b-gateway{background:#bc8cff22;color:var(--gateway);border:1px solid #bc8cff55}
+  .b-local{background:#3fb95022;color:var(--good);border:1px solid #3fb95055}
+  .grid{display:grid;gap:18px;margin-top:24px}
+  @media(min-width:820px){.grid.two{grid-template-columns:1fr 1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .card h2{margin:0 0 4px;font-size:16px}
+  .card .hint{color:var(--muted);font-size:12.5px;margin:0 0 14px}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+  select,button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);
+    border-radius:7px;padding:6px 10px;font-size:13px;cursor:pointer}
+  button.active{background:#1f6feb33;border-color:#1f6feb;color:var(--accent)}
+  canvas{max-height:340px}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+  th,td{padding:7px 9px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--muted);font-weight:600;cursor:pointer;user-select:none;position:relative}
+  th:hover{color:var(--txt)}
+  th.sorted::after{content:" \25BC";font-size:9px;color:var(--accent)}
+  th.sorted.asc::after{content:" \25B2"}
+  tbody tr:hover{background:#ffffff08}
+  td.model{font-weight:600}
+  .bar{display:inline-block;height:8px;border-radius:4px;vertical-align:middle;margin-right:6px}
+  .v-good{color:var(--good)} .v-warn{color:var(--warn)} .v-bad{color:var(--bad)}
+  .recs{display:grid;gap:12px;margin-top:8px}
+  @media(min-width:640px){.recs{grid-template-columns:repeat(3,1fr)}}
+  .rec{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:13px}
+  .rec .k{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .rec .m{font-size:15px;font-weight:700;margin:3px 0}
+  .rec .d{font-size:12.5px;color:var(--muted)}
+  .note{background:#d2992216;border:1px solid #d2992244;border-radius:9px;
+    padding:11px 14px;font-size:13px;color:#e3c281;margin-top:18px}
+  footer{margin-top:34px;color:var(--muted);font-size:12px;text-align:center}
+  a{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Extraction Model Benchmark</h1>
+  <p>Picking a graph-memory extraction model on the <b>real backend pipeline</b> &mdash;
+     3 calls per episode (entities &rarr; resolve &rarr; edges), not a toy single call.</p>
+  <div class="sub">
+    Measured June 2026 via <code>archolith-bench extraction-bench</code>.
+    <span class="badge b-direct">direct</span> = native provider API &middot;
+    <span class="badge b-gateway">gateway</span> = via OpenRouter &middot;
+    <span class="badge b-local">local</span> = self-hosted.
+    Quality = entity &amp; fact recall vs a gold set. Cost = USD per 1,000 episodes at the measured cache split.
+  </div>
+</header>
+
+<div class="recs">
+  <div class="rec"><div class="k">Best value</div><div class="m">gpt-4.1-nano</div>
+    <div class="d">~$0.10/1k, nano-class speed, reliable JSON. The default pick.</div></div>
+  <div class="rec"><div class="k">Best quality</div><div class="m">gemini-3.1-flash-lite</div>
+    <div class="d">0.90 fact recall, same speed &mdash; but ~2&times; the cost.</div></div>
+  <div class="rec"><div class="k">Cheapest</div><div class="m">deepseek-v4-flash</div>
+    <div class="d">$0.05/1k &mdash; a 50&times; cache discount hits the dominant cost. Slower.</div></div>
+  <div class="rec"><div class="k">Best open-weight</div><div class="m">qwen3-next-80b</div>
+    <div class="d">0.85 fact, 100% JSON, $0.22/1k via OpenRouter. Gemini-3.1 tier, no Google.</div></div>
+  <div class="rec"><div class="k">Fastest</div><div class="m">gpt-oss-120b (Cerebras)</div>
+    <div class="d">0.30s/call &mdash; but only 0.40 fact recall. <b>Not</b> for graph memory.</div></div>
+  <div class="rec"><div class="k">Free / private</div><div class="m">local qwen ~9B</div>
+    <div class="d">$0, no rate limits, same quality &mdash; ~8&times; slower.</div></div>
+</div>
+
+<div class="card" style="margin-top:24px">
+  <h2>Ranked by metric</h2>
+  <p class="hint">Pick a metric; bars re-sort best-first. Cost and latency are best when low; recall &amp; valid-JSON when high.</p>
+  <div class="controls">
+    <label for="metric" style="color:var(--muted);font-size:13px">Rank by:</label>
+    <select id="metric">
+      <option value="fact">Fact recall (relationships)</option>
+      <option value="ent">Entity recall</option>
+      <option value="cost">Cost $/1k episodes</option>
+      <option value="p50">Latency (call p50)</option>
+      <option value="json">Valid-JSON rate</option>
+    </select>
+    <span style="flex:1"></span>
+    <button data-f="all" class="active">All</button>
+    <button data-f="direct">Direct</button>
+    <button data-f="gateway">Gateway</button>
+    <button data-f="usable">Hide broken</button>
+  </div>
+  <canvas id="rankChart"></canvas>
+</div>
+
+<div class="grid two">
+  <div class="card">
+    <h2>Value frontier &mdash; quality vs cost</h2>
+    <p class="hint">Top-left is the sweet spot: high fact recall, low cost. Bubble size = entity recall.</p>
+    <canvas id="costChart"></canvas>
+  </div>
+  <div class="card">
+    <h2>Quality vs speed</h2>
+    <p class="hint">Top-left = accurate &amp; fast. Direct and gateway latencies are <i>not</i> comparable (see note).</p>
+    <canvas id="speedChart"></canvas>
+  </div>
+</div>
+
+<div class="card" style="margin-top:18px">
+  <h2>Full results</h2>
+  <p class="hint">Click any column header to sort.</p>
+  <table id="tbl">
+    <thead><tr>
+      <th data-k="name">Model</th>
+      <th data-k="prov">Provider</th>
+      <th data-k="p50">p50 (s)</th>
+      <th data-k="ent">Entity</th>
+      <th data-k="fact">Fact</th>
+      <th data-k="json">JSON %</th>
+      <th data-k="cache">Cache %</th>
+      <th data-k="cost">$/1k</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div class="note">
+  <b>Read the latency numbers carefully.</b> <span class="badge b-gateway">gateway</span>
+  results include OpenRouter routing overhead and are <b>not</b> comparable to
+  <span class="badge b-direct">direct</span> provider latency &mdash; e.g. <code>llama-3.3-70b</code>
+  is 0.35&nbsp;s direct on Groq vs 1.30&nbsp;s routed. Use the gateway for quality/cost
+  screening, the direct table for speed ranking. <code>gpt-oss-120b</code>'s weak fact recall
+  (0.40 Cerebras / 0.45 OpenRouter) is a confirmed <i>model trait</i>, not a provider artifact.
+</div>
+
+<footer>
+  archolith&trade; extraction benchmark &middot; data from
+  <a href="EXTRACTION_MODELS.md">EXTRACTION_MODELS.md</a> &middot;
+  reproduce: <code>archolith-bench extraction-bench --repeats 2</code>
+</footer>
+</div>
+
+<script>
+// Measured data. fact/ent in [0,1]; json/cache in %; cost USD/1k episodes; p50 seconds.
+// null = not applicable / not measured.
+const DATA = [
+  {name:"gpt-oss-120b",          prov:"Cerebras",  src:"direct",  p50:0.30, ent:1.00, fact:0.40, json:100, cache:56,  cost:0.77},
+  {name:"llama-3.3-70b",         prov:"Groq LPU",  src:"direct",  p50:0.35, ent:1.00, fact:0.80, json:100, cache:null,cost:0.53},
+  {name:"gpt-4.1-nano",          prov:"OpenAI",    src:"direct",  p50:0.54, ent:0.90, fact:0.80, json:100, cache:0,   cost:0.10},
+  {name:"gemini-3.1-flash-lite", prov:"Google",    src:"direct",  p50:0.63, ent:1.00, fact:0.90, json:100, cache:0,   cost:0.20},
+  {name:"gpt-4.1-mini",          prov:"OpenAI",    src:"direct",  p50:0.81, ent:1.00, fact:0.85, json:100, cache:0,   cost:0.32},
+  {name:"gpt-4o-mini",           prov:"OpenAI",    src:"direct",  p50:0.89, ent:1.00, fact:0.80, json:100, cache:0,   cost:0.12},
+  {name:"deepseek-v4-flash",     prov:"DeepSeek",  src:"direct",  p50:1.19, ent:1.00, fact:0.80, json:100, cache:74,  cost:0.05},
+  {name:"gpt-5-nano",            prov:"OpenAI",    src:"direct",  p50:1.20, ent:0.80, fact:0.90, json:100, cache:0,   cost:0.11},
+  {name:"gpt-5-mini",            prov:"OpenAI",    src:"direct",  p50:1.39, ent:1.00, fact:0.85, json:100, cache:0,   cost:0.46},
+  {name:"gemini-2.5-flash",      prov:"Google",    src:"direct",  p50:1.52, ent:1.00, fact:0.40, json:100, cache:0,   cost:0.27},
+  {name:"gemini-3.5-flash",      prov:"Google",    src:"direct",  p50:3.41, ent:0.05, fact:0.20, json:50,  cache:0,   cost:null},
+  {name:"qwen3.5-9b (local)",    prov:"LM Studio", src:"local",   p50:4.56, ent:1.00, fact:0.80, json:100, cache:null,cost:0.00},
+  {name:"qwen3-next-80b",        prov:"OpenRouter",src:"gateway", p50:0.85, ent:1.00, fact:0.85, json:100, cache:0,   cost:0.22},
+  {name:"llama-3.3-70b",         prov:"OpenRouter",src:"gateway", p50:1.30, ent:1.00, fact:0.75, json:100, cache:14,  cost:0.08},
+  {name:"gemma-4-31b",           prov:"OpenRouter",src:"gateway", p50:1.72, ent:1.00, fact:0.70, json:93,  cache:5,   cost:0.10},
+  {name:"gpt-oss-20b",           prov:"OpenRouter",src:"gateway", p50:2.26, ent:0.80, fact:0.40, json:77,  cache:11,  cost:0.13},
+  {name:"gpt-oss-120b",          prov:"OpenRouter",src:"gateway", p50:3.64, ent:1.00, fact:0.45, json:87,  cache:11,  cost:0.14},
+  {name:"llama-3.2-3b",          prov:"OpenRouter",src:"gateway", p50:0.54, ent:0.00, fact:0.00, json:0,   cache:0,   cost:0.22},
+];
+
+const SRC_COLOR = {direct:"#58a6ff", gateway:"#bc8cff", local:"#3fb950"};
+const LOWER_BETTER = new Set(["cost","p50"]);
+const METRIC_LABEL = {fact:"Fact recall", ent:"Entity recall", cost:"Cost $/1k episodes",
+                      p50:"Call p50 latency (s)", json:"Valid-JSON %"};
+const fmt = (v,k)=> v==null ? "—"
+  : k==="cost" ? "$"+v.toFixed(2)
+  : (k==="json"||k==="cache") ? v+"%"
+  : k==="p50" ? v.toFixed(2)+"s"
+  : v.toFixed(2);
+
+let filter = "all";
+const passFilter = d =>
+  (filter==="all") ||
+  (filter==="direct"  && d.src==="direct") ||
+  (filter==="gateway" && d.src==="gateway") ||
+  (filter==="usable"  && d.json!==0 && d.fact>0);
+
+Chart.defaults.color = "#8b949e";
+Chart.defaults.font.family = "-apple-system,Segoe UI,Roboto,sans-serif";
+const grid = {color:"#2d354366"};
+
+// ---- Ranked bar chart ----
+let rankChart;
+function drawRank(){
+  const metric = document.getElementById("metric").value;
+  const rows = DATA.filter(passFilter).filter(d=>d[metric]!=null)
+    .slice().sort((a,b)=> LOWER_BETTER.has(metric) ? a[metric]-b[metric] : b[metric]-a[metric]);
+  const labels = rows.map(d=>d.name+"  ("+d.prov+")");
+  const vals = rows.map(d=>d[metric]);
+  const colors = rows.map(d=>SRC_COLOR[d.src]);
+  const data = {labels, datasets:[{label:METRIC_LABEL[metric], data:vals,
+    backgroundColor:colors, borderRadius:4, barThickness:14}]};
+  const opts = {indexAxis:"y", responsive:true, plugins:{legend:{display:false},
+    tooltip:{callbacks:{label:c=>" "+fmt(c.parsed.x,metric)}}},
+    scales:{x:{grid, ticks:{callback:v=>metric==="cost"?"$"+v:(metric==="json"?v+"%":v)}},
+            y:{grid:{display:false}, ticks:{font:{size:11}}}}};
+  if(rankChart){rankChart.data=data; rankChart.options=opts; rankChart.update();}
+  else rankChart = new Chart(document.getElementById("rankChart"), {type:"bar", data, options:opts});
+  document.getElementById("rankChart").style.height = Math.max(220, rows.length*26)+"px";
+}
+
+// ---- Scatter helper ----
+function scatter(canvasId, xKey, yKey, xTitle, yTitle, xRev){
+  const pts = DATA.filter(d=>d[xKey]!=null && d[yKey]!=null);
+  const ds = ["direct","gateway","local"].map(src=>({
+    label:src,
+    data:pts.filter(d=>d.src===src).map(d=>({x:d[xKey], y:d[yKey], r:6+d.ent*7, name:d.name})),
+    backgroundColor:SRC_COLOR[src]+"cc", borderColor:SRC_COLOR[src]
+  }));
+  return new Chart(document.getElementById(canvasId), {type:"bubble", data:{datasets:ds},
+    options:{responsive:true, plugins:{legend:{labels:{usePointStyle:true,boxWidth:8}},
+      tooltip:{callbacks:{label:c=>` ${c.raw.name}: ${xTitle} ${fmt(c.raw.x,xKey)}, ${yTitle} ${c.raw.y.toFixed(2)}`}}},
+      scales:{
+        x:{reverse:!!xRev, title:{display:true,text:xTitle,color:"#8b949e"}, grid,
+           ticks:{callback:v=>xKey==="cost"?"$"+v:v}},
+        y:{title:{display:true,text:yTitle,color:"#8b949e"}, grid, min:0, max:1.05}}}});
+}
+
+// ---- Sortable table ----
+let sortK="fact", sortAsc=false;
+function drawTable(){
+  const tb = document.querySelector("#tbl tbody");
+  const rows = DATA.slice().sort((a,b)=>{
+    let x=a[sortK], y=b[sortK];
+    if(typeof x==="string") return sortAsc? x.localeCompare(y): y.localeCompare(x);
+    x=x==null?-1:x; y=y==null?-1:y;
+    return sortAsc? x-y : y-x;
+  });
+  const cls = (k,v)=> v==null?"":
+    (k==="fact"? (v>=0.8?"v-good":v>=0.6?"v-warn":"v-bad"):
+     k==="json"? (v>=100?"v-good":v>=80?"v-warn":"v-bad"):"");
+  tb.innerHTML = rows.map(d=>`<tr>
+    <td class="model">${d.name} <span class="badge b-${d.src}">${d.src}</span></td>
+    <td>${d.prov}</td>
+    <td>${fmt(d.p50,"p50")}</td>
+    <td>${fmt(d.ent,"ent")}</td>
+    <td class="${cls("fact",d.fact)}">${fmt(d.fact,"fact")}</td>
+    <td class="${cls("json",d.json)}">${fmt(d.json,"json")}</td>
+    <td>${fmt(d.cache,"cache")}</td>
+    <td>${fmt(d.cost,"cost")}</td></tr>`).join("");
+  document.querySelectorAll("#tbl th").forEach(th=>{
+    th.classList.toggle("sorted", th.dataset.k===sortK);
+    th.classList.toggle("asc", th.dataset.k===sortK && sortAsc);
+  });
+}
+
+// ---- Wire up ----
+document.getElementById("metric").addEventListener("change", drawRank);
+document.querySelectorAll(".controls button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".controls button").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active"); filter=b.dataset.f; drawRank();
+}));
+document.querySelectorAll("#tbl th").forEach(th=>th.addEventListener("click",()=>{
+  const k=th.dataset.k;
+  if(k===sortK) sortAsc=!sortAsc; else {sortK=k; sortAsc=(k==="cost"||k==="p50");}
+  drawTable();
+}));
+
+drawRank();
+scatter("costChart","cost","fact","Cost $/1k","Fact recall", true);
+scatter("speedChart","p50","fact","Call p50 (s)","Fact recall", true);
+drawTable();
+</script>
+</body>
+</html>

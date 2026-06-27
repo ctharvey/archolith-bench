@@ -67,8 +67,8 @@ def test_draft_fixture_passes_and_has_required_families() -> None:
     report = validate_fixture(FacetFixture.from_file(DRAFT))
     assert report.ok, report.errors
     stats = report.stats
-    assert stats["memories"] == 50
-    assert stats["queries"] == 20
+    assert stats["memories"] >= 50  # grows as distractors are added during hardening
+    assert stats["queries"] >= 20
     assert stats["stale_memories"] >= 1
     assert set(stats["repos"]) == {"menhir", "archolith-bench"}
     assert stats["vague_queries"], "draft must include the embedding-should-win vague case"

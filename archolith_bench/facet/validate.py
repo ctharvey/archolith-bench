@@ -257,9 +257,13 @@ def _is_vague(query: Query) -> bool:
 
 
 def _labeled_vague(query: Query) -> bool:
-    """A query the author intends as a vague / embedding-should-win control."""
+    """A query the author intends as a vague / embedding-should-win control.
+
+    Match the deliberate phrasing, not the bare word 'embedding' — otherwise a note
+    that merely mentions a symbol like EmbeddingCache would trip the check.
+    """
     note = query.note.lower()
-    return "vague" in note or "embedding" in note
+    return "vague" in note or "embedding should win" in note or "embedding-should-win" in note
 
 
 def _content_tokens(text: str) -> set[str]:

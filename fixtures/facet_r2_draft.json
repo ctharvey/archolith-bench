@@ -101,7 +101,11 @@
     { "id": "m49", "text": "menhir exposes 23 MCP tools across ingest, recall, conflict, and ops, plus read-only resources for Claude Code.",
       "facets": { "repo": "menhir", "project": "menhir", "namespace": "mcp", "operation": ["add"], "object": ["mcp tools"], "belief_bucket": "current", "valid_time": "2026-03-09" } },
     { "id": "m50", "text": "menhir telemetry persists to a SQLite sidecar at <workspace_root>/.agent/mcp_telemetry.db resolved by infrastructure/paths.py, recording operation timings and structured failures.",
-      "facets": { "repo": "menhir", "project": "menhir", "namespace": "ops", "file": ["src/menhir/infrastructure/paths.py", "src/menhir/infrastructure/telemetry/store.py"], "symbol": ["mcp_telemetry"], "operation": ["configure"], "object": ["telemetry sidecar"], "belief_bucket": "current", "valid_time": "2026-04-02" } }
+      "facets": { "repo": "menhir", "project": "menhir", "namespace": "ops", "file": ["src/menhir/infrastructure/paths.py", "src/menhir/infrastructure/telemetry/store.py"], "symbol": ["mcp_telemetry"], "operation": ["configure"], "object": ["telemetry sidecar"], "belief_bucket": "current", "valid_time": "2026-04-02" } },
+    { "id": "m51", "text": "archolith-bench procindex.py builds a structural index of the repository — modules, imports, and a call graph — used to scope benchmark runs. Wrong-repo distractor: same 'structural graph of a repository' topic, different project.",
+      "facets": { "repo": "archolith-bench", "project": "archolith-bench", "namespace": "procindex", "file": ["archolith_bench/procindex.py"], "symbol": ["procindex"], "operation": ["add"], "object": ["structural graph"], "belief_bucket": "current", "valid_time": "2026-06-10" } },
+    { "id": "m52", "text": "menhir's scheduler lease originally had no forced takeover; a stuck or stale lease required a full process restart to recover. This predates the force_acquire path and is no longer how recovery works.",
+      "facets": { "repo": "menhir", "project": "menhir", "namespace": "scheduler", "file": ["src/menhir/services/scheduler_lease.py"], "symbol": ["scheduler_lease"], "operation": ["configure"], "object": ["scheduler lease"], "belief_bucket": "historical", "valid_time": "2026-02-15", "source_id": "note:pre-force-acquire" }, "superseded": true }
   ],
   "queries": [
     { "id": "q01", "text": "how was the cosine similarity floor fixed in menhir recall so it stops cutting BM25 candidates?",
@@ -145,7 +149,8 @@
       "note": "historical intent: the former belief m18 is exactly what we want; current m20 is the wrong answer here." },
     { "id": "q11", "text": "what does the AnergicBeliefGate do in menhir's belief layer?",
       "facets": { "repo": "menhir", "project": "menhir", "namespace": "belief", "file": ["src/menhir/domain/belief.py"], "symbol": ["AnergicBeliefGate"], "object": ["anergic gate"], "valid_time": "2026-06-27" },
-      "support_ids": ["m21"], "intent": "current" },
+      "support_ids": ["m21"], "intent": "current",
+      "note": "ACCEPTED-EASY (uncontested): AnergicBeliefGate is a unique topic in this corpus; a forced same-topic distractor would be contrived. Kept as a deliberately easy query; the validator's uncontested warning here is acknowledged, not a defect." },
     { "id": "q12", "text": "which candidate sources are exempt from menhir's similarity floor?",
       "facets": { "repo": "menhir", "project": "menhir", "namespace": "retrieval", "file": ["src/menhir/services/scoring_service.py"], "symbol": ["source_aware_floor", "FLOOR_EXEMPT_SOURCES"], "object": ["candidate prior"], "valid_time": "2026-06-27" },
       "support_ids": ["m03", "m07"], "intent": "current", "note": "multi-support: the floor exemption + the source-prior taxonomy together." },
@@ -154,7 +159,8 @@
       "support_ids": ["m29"], "intent": "current", "note": "evidence_type issue/bug case." },
     { "id": "q14", "text": "how does menhir avoid re-embedding identical text?",
       "facets": { "repo": "menhir", "project": "menhir", "namespace": "ops", "symbol": ["EmbeddingCache"], "object": ["embedding cache"], "valid_time": "2026-06-27" },
-      "support_ids": ["m31"], "intent": "current" },
+      "support_ids": ["m31"], "intent": "current",
+      "note": "ACCEPTED-EASY (uncontested): EmbeddingCache is a unique topic; no natural same-topic distractor exists. Deliberately easy; uncontested warning acknowledged." },
     { "id": "q15", "text": "how does menhir build a structural graph from a repository and link it to memories?",
       "facets": { "repo": "menhir", "project": "menhir", "namespace": "ingest", "symbol": ["ingest_project", "ANCHORED_TO"], "object": ["structural graph", "structural anchoring"], "valid_time": "2026-06-27" },
       "support_ids": ["m36", "m37"], "intent": "current", "note": "multi-support: scan + anchoring." },

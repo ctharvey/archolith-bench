@@ -1,5 +1,9 @@
 # archolith-bench — Project Context
 
+> **menhir R2 facet work lives here** (`archolith_bench/facet/`). For the cross-repo picture — how this
+> ties into menhir's research ladder, what's owed, what not to re-litigate — read the menhir handoff:
+> `menhir/.agent/plans/chain-handoff.md`. Local R2 results + caveats: `.agent/benchmark-notes/facet-r2-demo-run.md`.
+
 ## Purpose
 Unified benchmark suite for the archolith product family. Measures token savings, continuity, compression, and cross-product metrics across proxy, filter, audit, and stack scenarios.
 

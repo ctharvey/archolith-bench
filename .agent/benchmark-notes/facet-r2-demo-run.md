@@ -81,3 +81,38 @@ only the basename (`recall_service.py`), so file-overlap candidate generation un
 2. Inject a real `EmbeddingScorer` (B/C/E) and, if available, the live menhir graph retriever (D).
 3. Re-run; report all metrics together; apply the promotion gate. Only if F graduates on the *real*
    fixture does the menhir production-integration rung (wiring `CandidateSource.FACET`) open.
+
+---
+
+## Update 2026-06-27 — fixture validator + real-grounded 50/20 DRAFT
+
+Public datasets (LongMemEval etc.) are the wrong source (wrong domain, no scope/stale/rename
+distractors), so the real fixture is authored from **our own history**. Two additions landed:
+
+- **`archolith_bench/facet/validate.py`** — a fixture validator (errors vs quality warnings). It
+  separates "malformed, can't run" (missing support IDs, dup IDs, bad buckets) from "probably too
+  clean" (no stale/rename/wrong-repo/vague distractor, uncontested current queries, under-spec
+  counts). Run it on every fixture before trusting a ladder result. 6 unit tests; 52 facet tests total.
+
+- **`fixtures/facet_r2_draft.json`** — a **DRAFT** 50-memory / 20-query fixture grounded in *real*
+  menhir + archolith-bench history: the R1 source-aware-floor change superseding the old cosine
+  floor; the `cth.mcp.memory → yawn_memory → menhir` rename chain (great knowledge-update / historical
+  cases); the documented CE-willow belief drift (E1–E5, with the anergic "patch fixed it" distractor);
+  real files/symbols/bugs; and genuine cross-repo collisions (both repos talk about BM25/floor/RRF/
+  meet-point). **Still needs adversarial hardening with ctharvey** (R2 Risk #1).
+
+DRAFT run (still the lexical-embedding stand-in, not a real embedder):
+
+| mode | A bm25 R@5 | F facet+meet R@5 | F stale | F wrong-scope | gate |
+|---|---|---|---|---|---|
+| gold      | 0.88 | 0.85 | 0.13 (vs 0.23 best baseline) | 0.08 (vs 0.40) | **graduates** (recall loss 0.025) |
+| extracted | 0.88 | 0.28 | — | 0.73 | fails (recall loss 0.60) |
+
+Notably more discriminating than the demo: BM25 is a *strong* baseline (R@5 0.88), F barely beats it
+on recall but slashes wrong-scope (0.40→0.08) and stale (0.23→0.13) — the win is exactly on the
+targeted metrics. Extracted-mode F collapses, honestly exposing that the cheap extractor can't recover
+facets from real prose (full file paths in gold vs basenames in text). Validator flags 4/20 queries as
+"uncontested" (no competing distractor) — acceptable (real corpora have easy queries too) but a place
+ctharvey can harden. **These DRAFT numbers still use a stand-in embedder; not a promotion decision.**
+
+Run: `python scripts/run_facet_bench.py fixtures/facet_r2_draft.json`

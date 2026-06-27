@@ -1,0 +1,83 @@
+# Facet retrieval (menhir R2) — benchmark-local implementation + DEMO run
+
+**Date:** 2026-06-27
+**Status:** bench-first scaffold landed. **DEMO-fixture numbers only — NOT headline numbers, NOT the
+benchmark fixture.** Per `HEADLINE-NUMBERS.md` policy, fixture data demonstrates the harness, it does
+not verify a claim.
+**Owner doc (menhir):** `menhir/.agent/plans/r2-facet-candidate-generation.md`.
+
+## What landed
+
+The benchmark-local facet mechanism from menhir R2, entirely inside archolith-bench (R2 is bench-first;
+nothing here touches menhir production recall):
+
+- `archolith_bench/facet/models.py` — `MemoryFacetSet`, `Memory`, `Query`, `FacetFixture`; the R2 facet
+  vocabulary (`actor, object, operation, file, symbol, test, valid_time, learned_time, evidence_type,
+  source_id, repo, project, namespace, belief_bucket`).
+- `archolith_bench/facet/extractor.py` — `FacetExtractor`: deterministic regex/vocab rules (no LLM).
+- `archolith_bench/facet/index.py` — `MemoryFacetIndex`: candidates by compatible facet **overlap**.
+- `archolith_bench/facet/reranker.py` — `MeetPointReranker`: `meet_score` + per-candidate explanation
+  trace (matched facets, convergence, penalties, rank).
+- `archolith_bench/facet/baselines.py` — BM25, a deterministic embedding stand-in, RRF fusion, file-context.
+- `archolith_bench/facet/metrics.py` — recall@5 / precision@5 / MRR / NDCG / stale-hit / wrong-scope /
+  support-sufficiency / false-neighbor / paraphrase-stability.
+- `archolith_bench/facet/runner.py` — ladder A–F × {gold, extracted} + the promotion gate.
+- `fixtures/facet_demo.json` — 10 memories / 6 queries DEMO fixture.
+- `scripts/run_facet_bench.py` — runs the ladder, writes `results/facet_run.json`.
+- `tests/test_facet_*.py` — 46 unit tests (pure stdlib, deterministic).
+
+Run it: `python scripts/run_facet_bench.py`
+
+## Conditions
+
+`A` BM25 · `B` embedding top-k (lexical stand-in) · `C` BM25+embedding (RRF) ·
+`D` graph/file-context (stand-in: file/symbol overlap) · `E` facet index + embedding rerank ·
+`F` facet index + meet-point rerank.
+
+## DEMO results (gold facet mode)
+
+| cond | recall@5 | prec@5 | MRR | NDCG | stale_hit | wrong_scope | support_suff | paraphrase |
+|------|---------:|-------:|----:|-----:|----------:|------------:|-------------:|-----------:|
+| A bm25            | 1.000 | 0.267 | 1.000 | 0.966 | 0.200 | 0.533 | 1.000 | 0.667 |
+| B embedding\*     | 1.000 | 0.267 | 1.000 | 0.959 | 0.200 | 0.500 | 1.000 | 0.667 |
+| C hybrid          | 1.000 | 0.267 | 1.000 | 0.959 | 0.200 | 0.500 | 1.000 | 0.667 |
+| D file-context\*  | 0.833 | 0.694 | 0.750 | 0.758 | 0.056 | 0.000 | 0.833 | 0.667 |
+| E facet+embed\*   | 1.000 | 0.267 | 1.000 | 0.973 | 0.233 | 0.433 | 1.000 | 0.667 |
+| **F facet+meet**  | 1.000 | 0.267 | 0.917 | 0.939 | **0.100** | **0.400** | 1.000 | **1.000** |
+
+`*` = deterministic stand-in, not a real embedding / not the live menhir graph retriever.
+
+**Gold-mode gate: GRADUATES (on the demo).** F halves stale-hit (0.20→0.10) and cuts wrong-scope
+(0.50→0.40) versus the best of A/B/C, with **zero recall@5 loss** and the best paraphrase stability
+(1.00). The honest cost: F trades a little first-rank precision (MRR 0.917 vs 1.000, NDCG 0.939 vs
+0.966) — meet-point reorders *within* the support set in exchange for suppressing stale/wrong-scope
+neighbors. Reported together, not cherry-picked.
+
+## DEMO results (extracted facet mode) — gate FAILS, and that is the point
+
+With facets recovered by the cheap deterministic extractor instead of gold labels, F **does not
+graduate**: recall@5 drops to 0.833 (loss 0.167, over the 0.10 tolerance) and stale/wrong-scope no
+longer improve. This is the gold-vs-extracted separation R2 Risk #2 demands — the extractor gap is
+*measured*, not hidden behind hand-authored facets. The biggest extractor miss on this fixture: query
+gold `file` facets use full paths (`src/menhir/services/recall_service.py`) while memory text mentions
+only the basename (`recall_service.py`), so file-overlap candidate generation under-fires.
+
+## Honest limits of this run
+
+- **DEMO fixture, hand-authored by one agent.** It is small and likely "too clean" (R2 Risk #1). The
+  real fixture (50 memories / 20 queries / gold facets, with stale/wrong-repo/symbol-rename distractors
+  and ≥1 vague query where embedding should win) is a **pair-authoring task with ctharvey** and is not
+  done here.
+- **Embedding conditions (B/C/E) use a lexical stand-in**, not a real embedding model. Until a real
+  `EmbeddingScorer` is injected, B/C/E are not an embedding comparison.
+- **Condition D is a file/symbol-overlap stand-in**, not menhir's live graph/file-context retriever.
+- Therefore: the gold-mode "graduates" verdict is a *harness sanity check*, **not** evidence that R2
+  should promote into menhir production. The promotion decision stays gated on a real fixture + real
+  baselines, per the R2 plan.
+
+## Next (at home)
+
+1. Pair-author the real 50/20 gold fixture with ctharvey.
+2. Inject a real `EmbeddingScorer` (B/C/E) and, if available, the live menhir graph retriever (D).
+3. Re-run; report all metrics together; apply the promotion gate. Only if F graduates on the *real*
+   fixture does the menhir production-integration rung (wiring `CandidateSource.FACET`) open.

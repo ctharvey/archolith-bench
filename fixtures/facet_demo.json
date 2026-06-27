@@ -1,0 +1,171 @@
+{
+  "name": "facet_demo",
+  "description": "DEMO fixture for the R2 facet ladder — NOT the benchmark fixture. Small, hand-authored corpus that exercises every mechanism (stale distractor, wrong-repo distractor, symbol rename, paraphrase pair, a vague query where embedding should win). The real 50-memory / 20-query gold fixture is a pair-authoring task with ctharvey (R2 plan Risk #1: 'fixture too clean'); this only proves the pieces run end-to-end.",
+  "memories": [
+    {
+      "id": "m1",
+      "text": "Fixed the menhir recall floor so BM25-found candidates are no longer cut by the cosine similarity threshold. The source-aware floor now gates only VECTOR candidates in recall_service.py. As of 2026-06-20 this is the current behavior.",
+      "facets": {
+        "repo": "menhir", "project": "menhir", "namespace": "retrieval",
+        "file": ["src/menhir/services/recall_service.py"], "symbol": ["recall", "source_aware_floor"],
+        "operation": ["fix"], "object": ["cosine similarity threshold"],
+        "evidence_type": ["commit"], "belief_bucket": "current",
+        "valid_time": "2026-06-20", "source_id": "commit:e8da67d"
+      }
+    },
+    {
+      "id": "m2",
+      "text": "Previously the menhir recall floor in recall_service.py applied a single cosine similarity threshold to every candidate, which cut BM25 matches. This was the old approach before the source-aware floor.",
+      "facets": {
+        "repo": "menhir", "project": "menhir", "namespace": "retrieval",
+        "file": ["src/menhir/services/recall_service.py"], "symbol": ["recall"],
+        "operation": ["configure"], "object": ["cosine similarity threshold"],
+        "belief_bucket": "historical", "valid_time": "2026-01-10", "source_id": "commit:old111"
+      },
+      "superseded": true
+    },
+    {
+      "id": "m3",
+      "text": "archolith-bench applies a score floor to filter weak candidates before scoring in the benchmark harness. Unrelated to menhir recall, but also talks about a floor and candidates.",
+      "facets": {
+        "repo": "archolith-bench", "project": "archolith-bench", "namespace": "harness",
+        "file": ["archolith_bench/harness/scoring.py"], "symbol": ["score_floor"],
+        "operation": ["configure"], "object": ["score floor"], "belief_bucket": "current"
+      }
+    },
+    {
+      "id": "m4",
+      "text": "Added weighted_rrf in hybrid_retrieval.py to blend the vector and BM25 passes on rank instead of raw score, avoiding the BM25/cosine scale mismatch.",
+      "facets": {
+        "repo": "menhir", "project": "menhir", "namespace": "retrieval",
+        "file": ["src/menhir/services/hybrid_retrieval.py"], "symbol": ["weighted_rrf"],
+        "operation": ["add"], "object": ["rank fusion"],
+        "evidence_type": ["commit"], "belief_bucket": "current",
+        "valid_time": "2026-06-20", "source_id": "commit:e8da67d"
+      }
+    },
+    {
+      "id": "m5",
+      "text": "Renamed the graphiti search entry point: search_scored is now exposed alongside search_ranked_by_method for per-method ranked passes in graphiti_client.py.",
+      "facets": {
+        "repo": "menhir", "project": "menhir", "namespace": "infrastructure",
+        "file": ["src/menhir/infrastructure/graphiti_client.py"],
+        "symbol": ["search_scored", "search_ranked_by_method"],
+        "operation": ["rename", "add"], "belief_bucket": "current",
+        "valid_time": "2026-06-20", "source_id": "commit:e8da67d"
+      }
+    },
+    {
+      "id": "m6",
+      "text": "The menhir ingest pipeline stamps each episode with a request id and namespace during enrichment.",
+      "facets": {
+        "repo": "menhir", "project": "menhir", "namespace": "ingest",
+        "file": ["src/menhir/services/ingest_service.py"], "symbol": ["ingest"],
+        "operation": ["configure"], "belief_bucket": "current"
+      }
+    },
+    {
+      "id": "m7",
+      "text": "archolith-bench BM25 baseline uses Okapi BM25 with k1=1.5 and b=0.75 over scenario text for the retrieval ladder.",
+      "facets": {
+        "repo": "archolith-bench", "project": "archolith-bench", "namespace": "facet",
+        "symbol": ["BM25"], "operation": ["add"], "object": ["bm25 baseline"], "belief_bucket": "current"
+      }
+    },
+    {
+      "id": "m8",
+      "text": "The menhir scoring_service floor is now source-aware: it gates only VECTOR candidates and exempts BM25, pending, and file-linked sources in scoring_service.py.",
+      "facets": {
+        "repo": "menhir", "project": "menhir", "namespace": "retrieval",
+        "file": ["src/menhir/services/scoring_service.py"], "symbol": ["scoring", "source_aware_floor"],
+        "operation": ["fix"], "object": ["cosine similarity threshold"],
+        "evidence_type": ["commit"], "belief_bucket": "current",
+        "valid_time": "2026-06-20", "source_id": "commit:e8da67d"
+      }
+    },
+    {
+      "id": "m9",
+      "text": "Honestly the whole recall experience felt sluggish and frustrating today, like it was grinding through too much before returning anything useful.",
+      "facets": {
+        "repo": "menhir", "project": "menhir", "namespace": "reflection",
+        "object": ["latency frustration"], "belief_bucket": "current"
+      }
+    },
+    {
+      "id": "m10",
+      "text": "Note: the menhir belief layer used to keep stale assertions in the same bucket as current ones, which leaked historical context into current-truth queries.",
+      "facets": {
+        "repo": "menhir", "project": "menhir", "namespace": "belief",
+        "file": ["src/menhir/domain/belief.py"], "symbol": ["BeliefCircuit"],
+        "operation": ["configure"], "belief_bucket": "historical",
+        "valid_time": "2026-02-01", "source_id": "commit:old222"
+      },
+      "superseded": true
+    }
+  ],
+  "queries": [
+    {
+      "id": "q1",
+      "text": "how was the cosine similarity floor fixed in menhir recall so it stops cutting BM25 candidates?",
+      "facets": {
+        "repo": "menhir", "project": "menhir", "namespace": "retrieval",
+        "file": ["src/menhir/services/recall_service.py"], "symbol": ["recall", "source_aware_floor"],
+        "operation": ["fix"], "object": ["cosine similarity threshold"], "valid_time": "2026-06-27"
+      },
+      "support_ids": ["m1", "m8"], "intent": "current", "paraphrase_group": "g1",
+      "note": "stale distractor m2 + wrong-repo distractor m3 should be suppressed by meet-point."
+    },
+    {
+      "id": "q2",
+      "text": "what changed in menhir so candidates stop getting dropped by the similarity floor?",
+      "facets": {
+        "repo": "menhir", "project": "menhir", "namespace": "retrieval",
+        "symbol": ["source_aware_floor"], "operation": ["fix"], "object": ["cosine similarity threshold"],
+        "valid_time": "2026-06-27"
+      },
+      "support_ids": ["m1", "m8"], "intent": "current", "paraphrase_group": "g1",
+      "note": "paraphrase of q1; facet/meet-point should be more stable than lexical."
+    },
+    {
+      "id": "q3",
+      "text": "where is weighted rrf used to blend vector and bm25 in menhir?",
+      "facets": {
+        "repo": "menhir", "project": "menhir", "namespace": "retrieval",
+        "symbol": ["weighted_rrf"], "operation": ["add"], "valid_time": "2026-06-27"
+      },
+      "support_ids": ["m4"], "intent": "current",
+      "note": "wrong-repo distractor m7 (BM25 in archolith-bench) should be demoted."
+    },
+    {
+      "id": "q4",
+      "text": "what was the old menhir recall floor behavior before the source-aware change?",
+      "facets": {
+        "repo": "menhir", "project": "menhir", "namespace": "retrieval",
+        "file": ["src/menhir/services/recall_service.py"], "symbol": ["recall"],
+        "object": ["cosine similarity threshold"], "valid_time": "2026-06-27"
+      },
+      "support_ids": ["m2"], "intent": "historical",
+      "note": "historical intent: m2 must NOT be stale-penalized here."
+    },
+    {
+      "id": "q5",
+      "text": "what is search_scored called now in graphiti_client?",
+      "facets": {
+        "repo": "menhir", "project": "menhir", "namespace": "infrastructure",
+        "file": ["src/menhir/infrastructure/graphiti_client.py"],
+        "symbol": ["search_scored", "search_ranked_by_method"], "operation": ["rename"],
+        "valid_time": "2026-06-27"
+      },
+      "support_ids": ["m5"], "intent": "current", "note": "symbol-rename case."
+    },
+    {
+      "id": "q6",
+      "text": "recall felt slow and frustrating, grinding before returning anything",
+      "facets": {
+        "repo": "menhir", "project": "menhir", "namespace": "reflection"
+      },
+      "support_ids": ["m9"], "intent": "current",
+      "note": "deliberately vague, sparse facets — embedding/lexical is expected to beat facets here."
+    }
+  ]
+}

@@ -17,6 +17,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from .baselines import tokenize
 from .models import STALE_BUCKETS, FacetFixture, Query
 
 _KNOWN_BUCKETS = STALE_BUCKETS | {"current", None}
@@ -26,6 +27,20 @@ _ISO_RE = re.compile(r"^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?)?$")
 # R2 spec target (facet-retrieval.md "First archolith-bench fixture").
 SPEC_MIN_MEMORIES = 50
 SPEC_MIN_QUERIES = 20
+
+# Heuristic thresholds (deliberately loose — the validator flags, it does not design).
+# Paraphrase overlap is high on purpose: a real retrieval query naturally shares
+# answer vocabulary with its support, so only a near-verbatim copy (a fake
+# paraphrase that defeats the point of the test) should trip the warning.
+PARAPHRASE_OVERLAP_WARN = 0.85
+SUPPORT_REDUNDANCY_JACCARD = 0.7
+
+_STOPWORDS = frozenset({
+    "the", "a", "an", "is", "are", "was", "were", "be", "to", "of", "in", "on", "for", "and", "or",
+    "it", "this", "that", "what", "which", "how", "does", "do", "did", "so", "before", "after",
+    "with", "as", "by", "at", "not", "no", "its", "we", "i", "my", "our", "you", "your", "they",
+    "from", "into", "but", "if", "then", "than", "there", "here", "now", "still", "only", "any",
+})
 
 
 @dataclass
@@ -97,6 +112,7 @@ def _check_coverage(report: ValidationReport, fixture: FacetFixture) -> None:
     """Quality warnings: the distractor families R2 requires, and 'too clean' guards."""
     memories = fixture.memories
     queries = fixture.queries
+    by_qid = {q.id: q for q in queries}
 
     if len(memories) < SPEC_MIN_MEMORIES:
         report.warnings.append(f"only {len(memories)} memories (R2 spec target is {SPEC_MIN_MEMORIES})")
@@ -137,14 +153,76 @@ def _check_coverage(report: ValidationReport, fixture: FacetFixture) -> None:
     if not any(len(q.support_ids) >= 2 for q in queries):
         report.warnings.append("no query needs ≥2 support memories — support_sufficiency is trivial")
 
-    # 'too clean' heuristic: a current-intent query whose support faces no competing
-    # distractor (a non-support memory sharing a topic facet) is uncontested.
-    uncontested = [q.id for q in queries if q.intent == "current" and q.support_ids and not _has_distractor(q, fixture)]
-    if uncontested:
+    # (1) 'too clean' heuristic, with detail: a current query whose support faces no
+    # competing same-topic distractor is uncontested. Report which queries, and what
+    # distractor family would make each contestable.
+    for q in queries:
+        if q.intent != "current" or not q.support_ids or _has_distractor(q, fixture):
+            continue
+        topic = sorted(_topic_values(q.facets))
+        if not topic:
+            continue  # vague query: contestation isn't judged by topic
         report.warnings.append(
-            "uncontested current queries (support has no competing same-topic distractor) "
-            f"— likely too clean: {uncontested}"
+            f"uncontested current query {q.id} (topic: {', '.join(topic)}) — no non-support memory "
+            f"shares its topic; add a stale (superseded same-topic) or wrong-repo (same-topic, "
+            f"different repo) distractor to make it contestable"
         )
+
+    # (2) paraphrase hardness: a paraphrase-group query that is a near-verbatim copy of
+    # its gold support text is a fake paraphrase (lexical retrieval wins trivially).
+    for ids in groups.values():
+        for qid in ids:
+            q = by_qid[qid]
+            q_tok = _content_tokens(q.text)
+            if not q_tok:
+                continue
+            for sid in q.support_ids:
+                mem = fixture.memories_by_id.get(sid)
+                if not mem:
+                    continue
+                overlap = len(q_tok & _content_tokens(mem.text)) / len(q_tok)
+                if overlap >= PARAPHRASE_OVERLAP_WARN:
+                    report.warnings.append(
+                        f"paraphrase query {qid} shares {overlap:.0%} of its content tokens with "
+                        f"support {sid} — likely a near-copy, not a real paraphrase; reword it"
+                    )
+
+    # (3) facet-less vague check (stricter): a query meant as 'embedding should win'
+    # must not carry repo/file/symbol/valid_time facets, or facet retrieval can grip it.
+    for q in queries:
+        if not _labeled_vague(q):
+            continue
+        gripping = [name for name in ("repo", "file", "symbol", "valid_time") if q.facets.values(name)]
+        if gripping:
+            report.warnings.append(
+                f"query {q.id} is labelled vague (embedding-should-win) but still carries "
+                f"{'/'.join(gripping)} facet(s) — strip them so facet retrieval genuinely can't grip it"
+            )
+
+    # (4) multi-support dependency: a query claiming >=2 support but where one support
+    # already covers all the query facets the support set matches (or two supports are
+    # near-duplicate text) may be satisfiable by one alone — weak for oracle/context tests.
+    for q in queries:
+        sup = [fixture.memories_by_id[s] for s in q.support_ids if s in fixture.memories_by_id]
+        if len(sup) < 2:
+            continue
+        q_pairs = q.facets.discrete_pairs()
+        covered = [(m, q_pairs & m.facets.discrete_pairs()) for m in sup]
+        union = set().union(*[c for _, c in covered])
+        if union and any(c == union for _, c in covered):
+            report.warnings.append(
+                f"multi-support query {q.id}: one support already covers every query facet the "
+                f"support set matches — it may be answerable from a single support; differentiate "
+                f"what each support uniquely contributes"
+            )
+            continue
+        for i in range(len(sup)):
+            for j in range(i + 1, len(sup)):
+                if _jaccard(_content_tokens(sup[i].text), _content_tokens(sup[j].text)) >= SUPPORT_REDUNDANCY_JACCARD:
+                    report.warnings.append(
+                        f"multi-support query {q.id}: supports {sup[i].id} and {sup[j].id} are "
+                        f"near-duplicate text — one may suffice"
+                    )
 
 
 def _fill_stats(report: ValidationReport, fixture: FacetFixture) -> None:
@@ -168,9 +246,30 @@ def _is_abstention(query: Query) -> bool:
     return "abstention" in query.note.lower() or "no answer" in query.note.lower()
 
 
-def _is_vague(query: Query, max_pairs: int = 1) -> bool:
-    """A query is 'vague' if it carries almost no discrete facet constraints."""
-    return len(query.facets.discrete_pairs()) <= max_pairs
+def _is_vague(query: Query) -> bool:
+    """A query is 'vague' only if it has NO discrete facet and no valid_time.
+
+    Stricter than before: any repo/file/symbol/scope facet, or a valid_time, gives
+    facet retrieval something to grip — so the query no longer isolates the case
+    where embedding should win.
+    """
+    return not query.facets.discrete_pairs() and not query.facets.valid_time
+
+
+def _labeled_vague(query: Query) -> bool:
+    """A query the author intends as a vague / embedding-should-win control."""
+    note = query.note.lower()
+    return "vague" in note or "embedding" in note
+
+
+def _content_tokens(text: str) -> set[str]:
+    """Lowercased content tokens (stopwords removed) for lexical-overlap checks."""
+    return set(tokenize(text)) - _STOPWORDS
+
+
+def _jaccard(a: set[str], b: set[str]) -> float:
+    union = a | b
+    return len(a & b) / len(union) if union else 0.0
 
 
 def _topic_values(facets) -> set[str]:

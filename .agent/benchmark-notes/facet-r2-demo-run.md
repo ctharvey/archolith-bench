@@ -91,8 +91,16 @@ distractors), so the real fixture is authored from **our own history**. Two addi
 
 - **`archolith_bench/facet/validate.py`** — a fixture validator (errors vs quality warnings). It
   separates "malformed, can't run" (missing support IDs, dup IDs, bad buckets) from "probably too
-  clean" (no stale/rename/wrong-repo/vague distractor, uncontested current queries, under-spec
-  counts). Run it on every fixture before trusting a ladder result. 6 unit tests; 52 facet tests total.
+  clean" (no stale/rename/wrong-repo/vague distractor, under-spec counts). Expanded with four
+  modest heuristics that flag (not fix) hardening opportunities: (1) **uncontested** current queries,
+  named with their topic + the missing distractor family; (2) **fake-paraphrase** detection (a
+  paraphrase-group query that is a near-verbatim copy of its support text, ≥85% content-token overlap);
+  (3) a stricter **facet-less vague** check (a query labelled embedding-should-win must carry no
+  repo/file/symbol/valid_time facet); (4) **multi-support dependency** (a query claiming ≥2 support
+  where one support facet-dominates, or two supports are near-duplicate text — i.e. one may suffice).
+  On the DRAFT it correctly flags q01/q02/q07 as facet-dominated multi-support but passes the genuinely
+  differentiated q12/q15, and the real paraphrases q01/q02 do not trip the near-copy check. The
+  validator flags; it does not design the benchmark. 11 unit tests; 57 facet tests total.
 
 - **`fixtures/facet_r2_draft.json`** — a **DRAFT** 50-memory / 20-query fixture grounded in *real*
   menhir + archolith-bench history: the R1 source-aware-floor change superseding the old cosine

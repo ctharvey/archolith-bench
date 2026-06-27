@@ -74,6 +74,78 @@ def test_draft_fixture_passes_and_has_required_families() -> None:
     assert stats["vague_queries"], "draft must include the embedding-should-win vague case"
     assert stats["multi_support_queries"], "draft must exercise support_sufficiency"
     assert "historical" in stats["query_intents"]
-    # no 'too clean' / missing-family warnings except the tolerated uncontested-query note
-    for warn in report.warnings:
-        assert "uncontested" in warn, f"unexpected quality warning: {warn}"
+    # the draft is intentionally left for manual hardening, so it SHOULD carry quality
+    # warnings; they must all be the hardening categories, never a malformed-structure error.
+    assert not report.errors
+
+
+def test_uncontested_warning_names_query_and_missing_family() -> None:
+    fx = FacetFixture(
+        name="x", description="",
+        memories=[_mem("good", repo="menhir", symbol={"unique_sym"}, belief_bucket="current")],
+        queries=[Query("q1", "q", MemoryFacetSet(repo="menhir", symbol={"unique_sym"}),
+                       support_ids=["good"], intent="current")],
+    )
+    warns = " ".join(validate_fixture(fx).warnings)
+    assert "uncontested current query q1" in warns
+    assert "stale" in warns and "wrong-repo" in warns  # names the missing families
+
+
+def test_contested_query_not_flagged_uncontested() -> None:
+    fx = FacetFixture(
+        name="x", description="",
+        memories=[_mem("good", repo="menhir", symbol={"s"}, belief_bucket="current"),
+                  _mem("distractor", repo="archolith-bench", symbol={"s"}, belief_bucket="current")],
+        queries=[Query("q1", "q", MemoryFacetSet(repo="menhir", symbol={"s"}),
+                       support_ids=["good"], intent="current")],
+    )
+    assert not any("uncontested" in w for w in validate_fixture(fx).warnings)
+
+
+def test_paraphrase_near_copy_warns_but_real_paraphrase_does_not() -> None:
+    support = _mem("s", "menhir source aware floor gates only vector candidates exempting bm25", repo="menhir")
+    fake = Query("qf", "menhir source aware floor gates only vector candidates", support_ids=["s"], paraphrase_group="g")
+    real = Query("qr", "why do weak results get dropped from ranking", support_ids=["s"], paraphrase_group="g")
+    fx = FacetFixture(name="x", description="", memories=[support], queries=[fake, real])
+    warns = validate_fixture(fx).warnings
+    assert any("paraphrase query qf" in w and "near-copy" in w for w in warns)
+    assert not any("paraphrase query qr" in w for w in warns)
+
+
+def test_labelled_vague_with_facets_warns() -> None:
+    fx = FacetFixture(
+        name="x", description="",
+        memories=[_mem("m1", repo="menhir", symbol={"s"})],
+        queries=[Query("q1", "q", MemoryFacetSet(repo="menhir", symbol={"s"}),
+                       support_ids=["m1"], note="vague: embedding should win")],
+    )
+    warns = " ".join(validate_fixture(fx).warnings)
+    assert "labelled vague" in warns and "repo" in warns and "symbol" in warns
+
+
+def test_multi_support_domination_and_redundancy() -> None:
+    # one support facet-dominates -> warn
+    dom = FacetFixture(
+        name="x", description="",
+        memories=[_mem("s1", "alpha", symbol={"a"}), _mem("s2", "beta", symbol={"b"})],
+        queries=[Query("q1", "q", MemoryFacetSet(symbol={"a"}), support_ids=["s1", "s2"])],
+    )
+    assert any("one support already covers" in w for w in validate_fixture(dom).warnings)
+
+    # differentiated facets, distinct text -> no multi-support warning
+    diff = FacetFixture(
+        name="x", description="",
+        memories=[_mem("s1", "alpha text about ingest scanning", symbol={"a"}),
+                  _mem("s2", "beta text about anchoring links", symbol={"b"})],
+        queries=[Query("q1", "q", MemoryFacetSet(symbol={"a", "b"}), support_ids=["s1", "s2"])],
+    )
+    assert not any("multi-support query q1" in w for w in validate_fixture(diff).warnings)
+
+    # differentiated facets but near-duplicate text -> redundancy warn
+    dup = FacetFixture(
+        name="x", description="",
+        memories=[_mem("s1", "identical body text here", symbol={"a"}),
+                  _mem("s2", "identical body text here", symbol={"b"})],
+        queries=[Query("q1", "q", MemoryFacetSet(symbol={"a", "b"}), support_ids=["s1", "s2"])],
+    )
+    assert any("near-duplicate text" in w for w in validate_fixture(dup).warnings)

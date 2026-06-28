@@ -18,6 +18,7 @@ from .models import (
     Source,
     Status,
 )
+from .memory_oracle import ArtifactMatch, MemoryOracle
 from .mutator import ArtifactMutator, MutatorError
 
 __all__ = [
@@ -25,9 +26,11 @@ __all__ = [
     "STRUCTURAL_EVIDENCE",
     "Artifact",
     "ArtifactFixture",
+    "ArtifactMatch",
     "ArtifactMutator",
     "ArtifactType",
     "Evidence",
+    "MemoryOracle",
     "MutatorError",
     "Source",
     "Status",

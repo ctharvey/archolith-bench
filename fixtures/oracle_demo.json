@@ -1,0 +1,118 @@
+{
+  "name": "oracle_demo",
+  "description": "SMOKE/illustration fixture for the R4-R7 oracle ladder (NOT the benchmark). 10 memories / 6 queries grounded in real menhir history, covering the failure cases the oracle layer targets: stale semantic neighbor, wrong-repo same-topic, historical-only-vs-current, buried-by-embedding-recovered-by-structure, and a contradiction/anergic distractor. The semantic signal is a lexical stand-in; treat results as a harness sanity check, not a promotion decision.",
+  "memories": [
+    {
+      "id": "m01",
+      "text": "Recall now applies a source-aware similarity floor so BM25 and facet candidates survive instead of being dropped.",
+      "repo": "menhir", "files": ["scoring_service.py"], "symbols": ["source_aware_floor"],
+      "valid_at": "2026-03-12", "created_at": "2026-03-12", "belief_bucket": "current",
+      "evidence_kinds": ["git", "test"]
+    },
+    {
+      "id": "m02",
+      "text": "The recall similarity floor is a fixed 0.15 cosine threshold that gates every candidate.",
+      "repo": "menhir", "files": ["scoring_service.py"], "symbols": ["MIN_SIMILARITY_THRESHOLD"],
+      "invalid_at": "2026-03-12", "created_at": "2025-12-01", "superseded": true,
+      "belief_bucket": "historical", "evidence_kinds": ["git"]
+    },
+    {
+      "id": "m03",
+      "text": "Hybrid retrieval fuses vector and BM25 results on rank using weighted RRF, not raw scores.",
+      "repo": "menhir", "files": ["hybrid_retrieval.py"], "symbols": ["weighted_rrf"],
+      "valid_at": "2026-03-14", "created_at": "2026-03-14", "belief_bucket": "current",
+      "evidence_kinds": ["git", "test"]
+    },
+    {
+      "id": "m04",
+      "text": "The facet baselines fuse BM25 and embedding rankings with reciprocal rank fusion.",
+      "repo": "archolith-bench", "files": ["baselines.py"], "symbols": ["rrf_fuse"],
+      "valid_at": "2026-05-01", "created_at": "2026-05-01", "belief_bucket": "current",
+      "evidence_kinds": ["git"]
+    },
+    {
+      "id": "m05",
+      "text": "The project was renamed from cth.mcp.memory to yawn_memory.",
+      "repo": "menhir", "invalid_at": "2026-02-01", "created_at": "2025-11-01", "superseded": true,
+      "belief_bucket": "historical", "evidence_kinds": ["git"]
+    },
+    {
+      "id": "m06",
+      "text": "The package is menhir: src/menhir, console script menhir serve, env vars MENHIR_ prefixed.",
+      "repo": "menhir", "valid_at": "2026-03-01", "created_at": "2026-03-01", "belief_bucket": "current",
+      "evidence_kinds": ["git"]
+    },
+    {
+      "id": "m07",
+      "text": "The CE willow leafless-immature bug was resolved by the load-order fix.",
+      "repo": "menhir", "symbols": ["TreeWillowLeaflessImmature"], "tests": ["test_willow_growth"],
+      "valid_at": "2026-04-01", "created_at": "2026-04-01", "belief_bucket": "current",
+      "evidence_kinds": ["user", "test"], "conflict_group": "willow"
+    },
+    {
+      "id": "m08",
+      "text": "The patch fully fixed the CE willow leafless issue.",
+      "repo": "menhir", "symbols": ["TreeWillowLeaflessImmature"], "superseded": true,
+      "created_at": "2026-02-15", "belief_bucket": "anergic",
+      "evidence_kinds": ["agent_inference"], "conflict_group": "willow"
+    },
+    {
+      "id": "m09",
+      "text": "Combat Extended config tweak adjusting immature tree growth limits.",
+      "repo": "menhir", "symbols": ["TreeWillowLeaflessImmature"], "tests": ["test_plant_bounds"],
+      "valid_at": "2026-04-05", "created_at": "2026-04-05", "belief_bucket": "current",
+      "evidence_kinds": ["git"]
+    },
+    {
+      "id": "m10",
+      "text": "An agent guessed the similarity floor might be around 0.2.",
+      "repo": "menhir", "symbols": ["source_aware_floor"], "created_at": "2026-05-20",
+      "belief_bucket": "current", "evidence_kinds": ["agent_inference"]
+    }
+  ],
+  "queries": [
+    {
+      "id": "q01",
+      "text": "What similarity floor does recall apply now?",
+      "intent": "current", "as_of_time": "2026-06-01", "repo": "menhir",
+      "support_ids": ["m01"],
+      "note": "stale semantic neighbor m02 (old 0.15 cosine floor) is lexically close; m10 is an agent guess with weak evidence."
+    },
+    {
+      "id": "q02",
+      "text": "How does menhir fuse vector and BM25 candidates?",
+      "intent": "current", "as_of_time": "2026-06-01", "repo": "menhir", "files": ["hybrid_retrieval.py"],
+      "support_ids": ["m03"],
+      "note": "wrong-repo same-topic distractor m04 (archolith-bench rrf_fuse)."
+    },
+    {
+      "id": "q03",
+      "text": "What is the current project and package name?",
+      "intent": "current", "as_of_time": "2026-06-01", "repo": "menhir",
+      "support_ids": ["m06"],
+      "note": "historical rename m05 is stale under current intent."
+    },
+    {
+      "id": "q04",
+      "text": "What was the project called before it became menhir?",
+      "intent": "historical", "as_of_time": "2026-06-01", "repo": "menhir",
+      "support_ids": ["m05"],
+      "note": "historical intent: the historical memory m05 must be PRESERVED, not suppressed."
+    },
+    {
+      "id": "q05",
+      "text": "Is the CE willow leafless-immature bug fixed?",
+      "intent": "current", "as_of_time": "2026-06-01", "repo": "menhir", "symbols": ["TreeWillowLeaflessImmature"],
+      "support_ids": ["m07"],
+      "note": "anergic contradiction m08 ('patch fully fixed it') is stale and inference-only."
+    },
+    {
+      "id": "q06",
+      "text": "Which memory covers the willow plant-bounds regression test?",
+      "intent": "current", "as_of_time": "2026-06-01", "repo": "menhir",
+      "symbols": ["TreeWillowLeaflessImmature"], "tests": ["test_plant_bounds"],
+      "support_ids": ["m09"],
+      "note": "buried-by-embedding: m09 shares the symbol+test but has near-zero lexical overlap; structure recovers it."
+    }
+  ]
+}

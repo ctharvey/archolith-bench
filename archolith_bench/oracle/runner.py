@@ -141,6 +141,32 @@ class OracleBenchmarkRunner:
         return artifact
 
 
+# R7.5 — Oracle ablation. Subset rows hold the combiner fixed (linear E) to isolate
+# each oracle's MARGINAL contribution; the final two rows hold the oracle set fixed
+# (all) to isolate the COMBINER contribution (E vs F). This separates "where the gains
+# come from" — oracle layer vs combiner — instead of treating the pipeline as opaque.
+ABLATION_SUBSETS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("semantic", ("semantic",)),
+    ("semantic+temporal", ("semantic", "temporal")),
+    ("semantic+scope", ("semantic", "scope")),
+    ("semantic+evidence", ("semantic", "evidence")),
+    ("semantic+structure", ("semantic", "structure")),
+)
+
+
+def run_ablation(fixture: OracleFixture, k: int = DEFAULT_K) -> list[tuple[str, dict[str, float]]]:
+    """Contribution matrix: per-oracle marginal value (combiner held = E), then E vs F (oracles held = all)."""
+    rows: list[tuple[str, dict[str, float]]] = []
+    for label, names in ABLATION_SUBSETS:
+        oracles = [o for o in default_oracles() if o.name in names]
+        metrics = OracleBenchmarkRunner(fixture, oracles=oracles, k=k).run_condition("E_weighted").metrics
+        rows.append((f"{label} [E]", metrics))
+    full = OracleBenchmarkRunner(fixture, k=k)
+    rows.append(("all [E]", full.run_condition("E_weighted").metrics))
+    rows.append(("all [F]", full.run_condition("F_logspace").metrics))
+    return rows
+
+
 def evaluate_promotion_gate(results: dict[str, ConditionResult], recall_tolerance: float = 0.10) -> dict:
     """Decide whether F (log-space role logits) graduates against the baselines.
 

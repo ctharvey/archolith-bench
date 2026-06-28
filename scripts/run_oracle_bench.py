@@ -26,9 +26,26 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from archolith_bench.oracle.models import OracleFixture  # noqa: E402
-from archolith_bench.oracle.runner import BASELINE_CONDITIONS, OracleBenchmarkRunner  # noqa: E402
+from archolith_bench.oracle.runner import (  # noqa: E402
+    BASELINE_CONDITIONS,
+    OracleBenchmarkRunner,
+    run_ablation,
+)
 
 DEFAULT_FIXTURE = REPO_ROOT / "fixtures" / "oracle_demo.json"
+
+ABLATION_KEYS = ("recall_at_5", "stale_hit_rate", "wrong_scope_injection_rate",
+                 "current_truth_suppression_accuracy", "historical_context_preservation")
+
+
+def _print_ablation(fixture: OracleFixture) -> None:
+    rows = run_ablation(fixture)
+    print(f"\n=== oracle ablation (contribution matrix): {fixture.name} ===")
+    print("subset rows hold combiner=E (oracle marginal value); last two hold oracles=all (combiner value)")
+    header = f"{'condition':22s} " + " ".join(f"{k[:11]:>11s}" for k in ABLATION_KEYS)
+    print(header)
+    for label, m in rows:
+        print(f"{label:22s} " + " ".join(f"{m[k]:>11.3f}" for k in ABLATION_KEYS))
 
 
 def _print_table(artifact: dict) -> None:
@@ -53,6 +70,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("fixture", nargs="?", default=str(DEFAULT_FIXTURE), help="path to an oracle fixture JSON")
     parser.add_argument("--out", default="results/oracle_run.json", help="where to write the full JSON artifact")
     parser.add_argument("--no-traces", action="store_true", help="omit per-candidate packet traces from the artifact")
+    parser.add_argument("--ablate", action="store_true", help="also print the R7.5 oracle-ablation contribution matrix")
     args = parser.parse_args(argv)
 
     fixture_path = Path(args.fixture)
@@ -63,6 +81,8 @@ def main(argv: list[str] | None = None) -> int:
     fixture = OracleFixture.from_file(fixture_path)
     artifact = OracleBenchmarkRunner(fixture).run(include_traces=not args.no_traces)
     _print_table(artifact)
+    if args.ablate:
+        _print_ablation(fixture)
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)

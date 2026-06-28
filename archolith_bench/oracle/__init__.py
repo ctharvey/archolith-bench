@@ -41,7 +41,7 @@ from .oracles import (
     TemporalOracle,
     default_oracles,
 )
-from .runner import OracleBenchmarkRunner, evaluate_promotion_gate
+from .runner import OracleBenchmarkRunner, evaluate_promotion_gate, run_ablation
 
 __all__ = [
     "CandidateMemory",
@@ -66,4 +66,5 @@ __all__ = [
     "WeightedOracleCombiner",
     "default_oracles",
     "evaluate_promotion_gate",
+    "run_ablation",
 ]

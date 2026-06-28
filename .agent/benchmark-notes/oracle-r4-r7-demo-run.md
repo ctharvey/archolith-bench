@@ -21,13 +21,57 @@ staleness.
 Not production, not headline, not a general benchmark win — but worth continuing. **R11 (iterative
 amplification) remains blocked** (must beat F first).
 
-**Mechanism precision (corrected by the temporal-oracle restructure):** F ranks current-intent queries
-by `z_relevant + z_current`, which for a stale item equals E's `relevance − penalty` — *identical* —
-unless something bounds relevance. The thing that actually stops relevance from buying back currentness
-is F's **per-family contribution cap** (relevance support per source family is clamped, so a fixed
-currentness penalty stays proportionally large), working *together with* role routing. Role separation
-alone is not the lever; the cap is. This matters because it means **F's edge is calibration-sensitive**
-(see next section).
+**Mechanism (precisely bounded — this is a hypothesis, not a demonstrated result):** F ranks
+current-intent queries by `z_relevant + z_current`, which for a stale item equals E's
+`relevance − penalty` — *identical* — unless something bounds relevance. The remaining evidence is
+**consistent with** F's **per-family contribution cap** (relevance support per source family is clamped,
+so a fixed currentness penalty stays proportionally large) being the distinguishing mechanism, working
+*together with* role routing — but **current fixtures do not yet isolate it** (a cap-isolating fixture is
+owed). So treat "the cap is the lever" as a precisely-stated hypothesis, and note F's edge is
+**calibration-sensitive**.
+
+## The deeper finding: oracle quality and combiner quality are NOT independent
+
+The original hypothesis was `better combiner → better rankings`. The evidence now says:
+
+```text
+better temporal oracle
+        ↓
+raises EVERY downstream combiner
+        ↓
+shrinks the architectural difference between combiners
+```
+
+That is the more interesting systems result, and it reframes the contribution. The retrieval stack is a
+**decomposition** — `semantic → specialized oracles → combiner → ranking` — and improving the oracle
+layer changes the *value proposition* of the combiner. The defensible claim is not "we invented a better
+retrieval algorithm" but **"we decompose retrieval into explicit semantic / structural / temporal / scope
+/ evidence reasoning, each benchmarkable independently."** Corollary: if a neural combiner later beats F,
+the architecture survives — swap the combiner, keep the oracle decomposition and the eval framework.
+
+## R7.5 — Oracle ablation (contribution matrix)
+
+`run_ablation()` (CLI: `--ablate`) attributes gains to layers. Subset rows hold the combiner fixed
+(linear E) to isolate each oracle's marginal value; the last two hold the oracle set fixed (all) to
+isolate the combiner. On `oracle_hard.json` (k=5):
+
+| condition | recall@5 | stale_hit | wrong_scope | curr_truth_suppr |
+|-----------|---------:|----------:|------------:|-----------------:|
+| semantic [E] | 0.778 | 0.222 | 0.289 | 0.778 |
+| semantic+temporal [E] | 0.889 | **0.000** | 0.422 | **1.000** |
+| semantic+scope [E] | 0.778 | 0.311 | **0.044** | 0.689 |
+| semantic+evidence [E] | 0.778 | 0.178 | 0.400 | 0.822 |
+| semantic+structure [E] | **1.000** | 0.222 | 0.267 | 0.778 |
+| all [E] | 1.000 | 0.000 | 0.067 | 1.000 |
+| all [F] | 1.000 | 0.022 | 0.044 | 0.978 |
+
+**Reading:** each oracle owns the metric it is responsible for — **Temporal** owns stale/current-truth,
+**Scope** owns wrong-scope, **Structure** owns recall (buried recovery); **Evidence** is a weak
+contributor on these metrics. The **combiner choice (all[E] → all[F]) is a smaller move than any single
+strong oracle** — it trades a hair of stale (0.000→0.022) for better wrong-scope (0.067→0.044). i.e. on
+this fixture the gains are overwhelmingly in the **oracle layer**, not the combiner. (A subset oracle can
+*hurt* a non-owned metric — e.g. +temporal worsens wrong-scope by surfacing more current-but-out-of-scope
+items — which is exactly why the full set + a combiner is needed.)
 
 ## Temporal oracle restructure — and what it revealed
 
@@ -73,12 +117,12 @@ nothing here touches menhir production recall):
   missing-evidence → uncertainty (not suppression).
 - `archolith_bench/oracle/metrics.py` — recall/precision/MRR/NDCG + stale-hit / wrong-scope /
   current-truth-suppression / historical-preservation / ranking-determinism.
-- `archolith_bench/oracle/runner.py` — ladder A_semantic / E_weighted / F_logspace + promotion gate.
+- `archolith_bench/oracle/runner.py` — ladder A_semantic / E_weighted / F_logspace + promotion gate + `run_ablation` (R7.5 contribution matrix).
 - `fixtures/oracle_demo.json` — 10 memories / 6 queries DEMO fixture (real menhir history: the R1 floor
   change vs the old cosine floor, the cth.mcp.memory→menhir rename, CE-willow drift, a cross-repo
   collision, a buried-by-embedding structural case).
 - `scripts/run_oracle_bench.py` — runs the ladder, writes `results/oracle_run.json`.
-- `tests/test_oracle_*.py` — 47 unit tests (pure stdlib, deterministic, ruff clean).
+- `tests/test_oracle_*.py` — 48 unit tests (pure stdlib, deterministic, ruff clean).
 
 Run it: `python scripts/run_oracle_bench.py`
 

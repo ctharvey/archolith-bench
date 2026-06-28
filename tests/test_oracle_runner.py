@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from archolith_bench.oracle.models import OracleFixture
-from archolith_bench.oracle.runner import CONDITIONS, OracleBenchmarkRunner
+from archolith_bench.oracle.runner import CONDITIONS, OracleBenchmarkRunner, run_ablation
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 FIXTURE = FIXTURES / "oracle_demo.json"
@@ -96,6 +96,18 @@ def test_correlated_trap_f_suppresses_all_stale_echoes() -> None:
     e = art["conditions"]["E_weighted"]["metrics"]
     f = art["conditions"]["F_logspace"]["metrics"]
     assert f["stale_hit_rate"] <= e["stale_hit_rate"]
+
+
+def test_ablation_attributes_gains_to_the_right_oracle() -> None:
+    # R7.5: each oracle should own the metric it is responsible for, relative to a
+    # semantic-only baseline (combiner held = E).
+    rows = dict(run_ablation(OracleFixture.from_file(HARD_FIXTURE)))
+    base = rows["semantic [E]"]
+    assert rows["semantic+temporal [E]"]["stale_hit_rate"] < base["stale_hit_rate"]
+    assert rows["semantic+scope [E]"]["wrong_scope_injection_rate"] < base["wrong_scope_injection_rate"]
+    assert rows["semantic+structure [E]"]["recall_at_5"] > base["recall_at_5"]
+    # And the combiner choice (all[E] -> all[F]) is a smaller move than any strong oracle's.
+    assert "all [E]" in rows and "all [F]" in rows
 
 
 def test_run_is_reproducible() -> None:

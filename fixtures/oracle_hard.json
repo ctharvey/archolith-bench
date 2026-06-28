@@ -1,0 +1,247 @@
+{
+  "name": "oracle_hard",
+  "description": "HARDER oracle fixture (R4-R7), authored from real archolith/menhir history to stress the cases the easy demo could not: (1) high-support-but-stale items a linear sum keeps but role-separation suppresses; (2) cross-repo scope collisions where a wrong-repo memory shares heavy topic/structure overlap with the query (menhir/archolith-bench/subgraph-code/archolith-context/archolith-maintenance); (3) multiple real rename trails plus the yawn.scheduler trap (a real component, NOT the old project name); (4) buried-by-embedding recovered by structure. Still a DRAFT smoke fixture, not headline numbers; semantic signal is a lexical stand-in.",
+  "memories": [
+    {
+      "id": "floor_new",
+      "text": "Recall applies a source-aware similarity floor so BM25 and facet candidates survive; hybrid fuses on rank with weighted_rrf.",
+      "repo": "menhir", "files": ["scoring_service.py"], "symbols": ["source_aware_floor", "weighted_rrf"],
+      "valid_at": "2026-03-12", "created_at": "2026-03-12", "belief_bucket": "current",
+      "evidence_kinds": ["git", "test"]
+    },
+    {
+      "id": "floor_old",
+      "text": "The recall similarity floor is a fixed 0.15 cosine MIN_SIMILARITY_THRESHOLD that gates every candidate in the scoring service.",
+      "repo": "menhir", "files": ["scoring_service.py"], "symbols": ["MIN_SIMILARITY_THRESHOLD"],
+      "invalid_at": "2026-03-12", "created_at": "2025-12-01", "superseded": true,
+      "belief_bucket": "historical", "evidence_kinds": ["git", "test"]
+    },
+    {
+      "id": "floor_guess",
+      "text": "An agent guessed the similarity floor threshold might be around 0.2 in the scoring service.",
+      "repo": "menhir", "files": ["scoring_service.py"], "symbols": ["MIN_SIMILARITY_THRESHOLD"],
+      "created_at": "2026-05-20", "belief_bucket": "current", "evidence_kinds": ["agent_inference"]
+    },
+    {
+      "id": "mh_lease_cur",
+      "text": "menhir scheduler_lease force_acquire overwrites the single-leader scheduler lease even when the previous lease is still active.",
+      "repo": "menhir", "files": ["scheduler_lease.py"], "symbols": ["force_acquire", "SchedulerLease"],
+      "valid_at": "2026-04-02", "created_at": "2026-04-02", "belief_bucket": "current",
+      "evidence_kinds": ["git", "test"]
+    },
+    {
+      "id": "am_lease",
+      "text": "The single-leader SchedulerLeaseStore scheduler lease lives in archolith-maintenance (Phase 0.5).",
+      "repo": "archolith-maintenance", "files": ["scheduler_lease_store.py"], "symbols": ["SchedulerLeaseStore"],
+      "valid_at": "2026-05-10", "created_at": "2026-05-10", "belief_bucket": "current",
+      "evidence_kinds": ["git"]
+    },
+    {
+      "id": "name_cur",
+      "text": "The package is menhir: src/menhir, console script menhir serve, env vars MENHIR_ prefixed.",
+      "repo": "menhir", "valid_at": "2026-03-01", "created_at": "2026-03-01", "belief_bucket": "current",
+      "evidence_kinds": ["git"]
+    },
+    {
+      "id": "name_old1",
+      "text": "The project was renamed from cth.mcp.memory to yawn_memory.",
+      "repo": "menhir", "invalid_at": "2026-02-01", "created_at": "2025-11-01", "superseded": true,
+      "belief_bucket": "historical", "evidence_kinds": ["git"]
+    },
+    {
+      "id": "name_old2",
+      "text": "archolith-memory references were updated to menhir across the context proxy.",
+      "repo": "archolith-context", "invalid_at": "2026-03-01", "created_at": "2026-01-15", "superseded": true,
+      "belief_bucket": "historical", "evidence_kinds": ["git"]
+    },
+    {
+      "id": "yawn_sched_trap",
+      "text": "yawn.scheduler manages the local llama.cpp OpenAI-compatible endpoint lifecycle for single-flight ingestion.",
+      "repo": "menhir", "files": ["scheduler_lease.py"], "symbols": ["yawn_scheduler"],
+      "valid_at": "2026-04-01", "created_at": "2026-04-01", "belief_bucket": "current",
+      "evidence_kinds": ["git", "test"]
+    },
+    {
+      "id": "sg_proj",
+      "text": "In subgraph-code a file is a one-way projection rendered on demand from the content-addressed function graph; the graph is the only source of truth.",
+      "repo": "subgraph-code", "files": ["projection.ts"], "symbols": ["projection"],
+      "valid_at": "2026-05-01", "created_at": "2026-05-01", "belief_bucket": "current",
+      "evidence_kinds": ["git", "test"]
+    },
+    {
+      "id": "mh_graph",
+      "text": "menhir stores long-lived memory in a Neo4j plus Graphiti graph with deferred enrichment.",
+      "repo": "menhir", "symbols": ["graphiti_client"], "valid_at": "2026-03-01", "created_at": "2026-03-01",
+      "belief_bucket": "current", "evidence_kinds": ["git"]
+    },
+    {
+      "id": "ac_proxy",
+      "text": "The archolith-context proxy ships as python package archolith_proxy and rebuilds a smaller graph-assembled context window per upstream call.",
+      "repo": "archolith-context", "files": ["archolith_proxy/app.py"], "symbols": ["archolith_proxy"],
+      "valid_at": "2026-05-15", "created_at": "2026-05-15", "belief_bucket": "current",
+      "evidence_kinds": ["git"]
+    },
+    {
+      "id": "bench_rrf",
+      "text": "The archolith-bench facet baselines fuse BM25 and embedding rankings with reciprocal rank fusion.",
+      "repo": "archolith-bench", "files": ["baselines.py"], "symbols": ["rrf_fuse"],
+      "valid_at": "2026-05-01", "created_at": "2026-05-01", "belief_bucket": "current",
+      "evidence_kinds": ["git"]
+    },
+    {
+      "id": "neo_finding",
+      "text": "menhir Neo4j defaults bolt://localhost:7687 and password 'password' are unsafe for anything beyond localhost.",
+      "repo": "menhir", "files": ["settings.py"], "symbols": ["neo4j_password"],
+      "valid_at": "2026-04-02", "created_at": "2026-04-02", "belief_bucket": "current",
+      "evidence_kinds": ["git"]
+    },
+    {
+      "id": "neo_stale",
+      "text": "The menhir Neo4j default password posture was remediated and is now safe by default.",
+      "repo": "menhir", "files": ["settings.py"], "symbols": ["neo4j_password"],
+      "invalid_at": "2026-04-02", "created_at": "2026-02-20", "superseded": true,
+      "belief_bucket": "anergic", "evidence_kinds": ["agent_inference"]
+    },
+    {
+      "id": "willow_cur",
+      "text": "The CE willow leafless-immature bug was resolved by the load-order fix.",
+      "repo": "menhir", "symbols": ["TreeWillowLeaflessImmature"], "tests": ["test_willow_growth"],
+      "valid_at": "2026-04-01", "created_at": "2026-04-01", "belief_bucket": "current",
+      "evidence_kinds": ["user", "test"], "conflict_group": "willow"
+    },
+    {
+      "id": "willow_anergic",
+      "text": "The patch fully fixed the CE willow leafless issue.",
+      "repo": "menhir", "symbols": ["TreeWillowLeaflessImmature"], "superseded": true,
+      "created_at": "2026-02-15", "belief_bucket": "anergic",
+      "evidence_kinds": ["agent_inference"], "conflict_group": "willow"
+    },
+    {
+      "id": "willow_buried",
+      "text": "Combat Extended config tweak adjusting immature tree growth limits.",
+      "repo": "menhir", "symbols": ["TreeWillowLeaflessImmature"], "tests": ["test_plant_bounds"],
+      "valid_at": "2026-04-05", "created_at": "2026-04-05", "belief_bucket": "current",
+      "evidence_kinds": ["git"]
+    },
+    {
+      "id": "am_phase",
+      "text": "archolith-maintenance Phase 0.5 adds single-leader election for the scheduler.",
+      "repo": "archolith-maintenance", "files": ["election.py"], "symbols": ["elect_leader"],
+      "valid_at": "2026-05-10", "created_at": "2026-05-10", "belief_bucket": "current", "evidence_kinds": ["git"]
+    },
+    {
+      "id": "am_renew",
+      "text": "archolith-maintenance renews the scheduler lease with a heartbeat before expiry.",
+      "repo": "archolith-maintenance", "files": ["scheduler_lease_store.py"], "symbols": ["renew_lease"],
+      "valid_at": "2026-05-12", "created_at": "2026-05-12", "belief_bucket": "current", "evidence_kinds": ["git", "test"]
+    },
+    {
+      "id": "am_ttl",
+      "text": "archolith-maintenance lease rows carry a TTL so a dead leader's lease expires.",
+      "repo": "archolith-maintenance", "files": ["scheduler_lease_store.py"], "symbols": ["lease_ttl"],
+      "valid_at": "2026-05-13", "created_at": "2026-05-13", "belief_bucket": "current", "evidence_kinds": ["git"]
+    },
+    {
+      "id": "sg_mint",
+      "text": "subgraph-code mints a new function node directly into the content-addressed graph.",
+      "repo": "subgraph-code", "files": ["mint.ts"], "symbols": ["mint"],
+      "valid_at": "2026-05-01", "created_at": "2026-05-01", "belief_bucket": "current", "evidence_kinds": ["git", "test"]
+    },
+    {
+      "id": "sg_orphan",
+      "text": "subgraph-code flags a function node as orphaned when it loses all callers.",
+      "repo": "subgraph-code", "files": ["orphan.ts"], "symbols": ["detectOrphans"],
+      "valid_at": "2026-05-02", "created_at": "2026-05-02", "belief_bucket": "current", "evidence_kinds": ["git", "test"]
+    },
+    {
+      "id": "sg_addr",
+      "text": "subgraph-code identifies each function node by a content-addressed hash of its body.",
+      "repo": "subgraph-code", "files": ["address.ts"], "symbols": ["contentAddress"],
+      "valid_at": "2026-05-03", "created_at": "2026-05-03", "belief_bucket": "current", "evidence_kinds": ["git"]
+    },
+    {
+      "id": "ac_filter",
+      "text": "The archolith-context proxy ships an archolith-filter extra for token reduction.",
+      "repo": "archolith-context", "files": ["archolith_proxy/filter.py"], "symbols": ["TokenFilter"],
+      "valid_at": "2026-05-16", "created_at": "2026-05-16", "belief_bucket": "current", "evidence_kinds": ["git"]
+    },
+    {
+      "id": "ac_audit",
+      "text": "The archolith-context proxy ships an archolith-audit extra for waste monitoring.",
+      "repo": "archolith-context", "files": ["archolith_proxy/audit.py"], "symbols": ["WasteMonitor"],
+      "valid_at": "2026-05-17", "created_at": "2026-05-17", "belief_bucket": "current", "evidence_kinds": ["git"]
+    },
+    {
+      "id": "ac_trace",
+      "text": "The archolith-context proxy extracts session facts and traces upstream calls.",
+      "repo": "archolith-context", "files": ["archolith_proxy/trace.py"], "symbols": ["SessionTracer"],
+      "valid_at": "2026-05-18", "created_at": "2026-05-18", "belief_bucket": "current", "evidence_kinds": ["git"]
+    }
+  ],
+  "queries": [
+    {
+      "id": "q01_floor_current",
+      "text": "What similarity floor does recall apply now in the scoring service?",
+      "intent": "current", "as_of_time": "2026-06-01", "repo": "menhir", "files": ["scoring_service.py"],
+      "support_ids": ["floor_new"],
+      "note": "high-support-but-stale: floor_old shares file+strong evidence and is lexically very close; floor_guess is inference-only."
+    },
+    {
+      "id": "q02_lease_menhir",
+      "text": "In menhir, what guards the single-leader scheduler lease against overlapping takeover?",
+      "intent": "current", "as_of_time": "2026-06-01", "repo": "menhir", "files": ["scheduler_lease.py"],
+      "support_ids": ["mh_lease_cur"],
+      "note": "cross-repo collision: am_lease (archolith-maintenance SchedulerLeaseStore) is heavy topic overlap, wrong repo; yawn_sched_trap shares the file but is a different concern."
+    },
+    {
+      "id": "q03_lease_maint",
+      "text": "Which repo holds the single-leader SchedulerLeaseStore scheduler lease?",
+      "intent": "current", "as_of_time": "2026-06-01", "repo": "archolith-maintenance", "symbols": ["SchedulerLeaseStore"],
+      "support_ids": ["am_lease"],
+      "note": "mirror collision: mh_lease_cur is heavy overlap but wrong repo for an archolith-maintenance-scoped query."
+    },
+    {
+      "id": "q04_name_current",
+      "text": "What is the current project and package name?",
+      "intent": "current", "as_of_time": "2026-06-01", "repo": "menhir",
+      "support_ids": ["name_cur"],
+      "note": "rename trails name_old1/name_old2 are stale; yawn_sched_trap is the trap (yawn != old project name)."
+    },
+    {
+      "id": "q05_name_history",
+      "text": "What was the project called before it became menhir?",
+      "intent": "historical", "as_of_time": "2026-06-01", "repo": "menhir",
+      "support_ids": ["name_old1"],
+      "note": "historical intent must PRESERVE name_old1; yawn_sched_trap must not be surfaced as a name."
+    },
+    {
+      "id": "q06_subgraph_file",
+      "text": "In subgraph-code, what is a file relative to the function graph?",
+      "intent": "current", "as_of_time": "2026-06-01", "repo": "subgraph-code", "symbols": ["projection"],
+      "support_ids": ["sg_proj"],
+      "note": "mh_graph shares the graph topic but is wrong repo."
+    },
+    {
+      "id": "q07_context_pkg",
+      "text": "What python package name does the archolith context proxy ship as?",
+      "intent": "current", "as_of_time": "2026-06-01", "repo": "archolith-context", "symbols": ["archolith_proxy"],
+      "support_ids": ["ac_proxy"],
+      "note": "naming triple (archolith-context / archolith_proxy / archolith-proxy); name_old2 is the stale archolith-memory rename in the same repo."
+    },
+    {
+      "id": "q08_neo_security",
+      "text": "Is the menhir Neo4j default credential posture safe right now?",
+      "intent": "current", "as_of_time": "2026-06-01", "repo": "menhir", "files": ["settings.py"],
+      "support_ids": ["neo_finding"],
+      "note": "neo_stale ('was remediated') is an anergic inference-only over-claim sharing file+symbol."
+    },
+    {
+      "id": "q09_willow_buried",
+      "text": "Which memory covers the willow plant-bounds regression test?",
+      "intent": "current", "as_of_time": "2026-06-01", "repo": "menhir",
+      "symbols": ["TreeWillowLeaflessImmature"], "tests": ["test_plant_bounds"],
+      "support_ids": ["willow_buried"],
+      "note": "buried-by-embedding: near-zero lexical overlap, recovered by symbol+test structure; willow_anergic is stale."
+    }
+  ]
+}

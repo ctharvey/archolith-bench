@@ -70,6 +70,42 @@ penalty (wrong-scope items leaked into F). Fixed: `scope_match` downweights *oth
 not the scope oracle's own verdict; the conflict strength is carried by `probability`. (Captured as a
 regression test.)
 
+## Harder fixture (`fixtures/oracle_hard.json`) — F now separates from E
+
+Authored from real archolith/menhir history to stress the cases the easy demo could not:
+high-support-but-stale (the old `MIN_SIMILARITY_THRESHOLD` 0.15 cosine floor, same file + git/test
+evidence as the current `source_aware_floor`); cross-repo scope collisions (menhir `scheduler_lease`/
+`force_acquire` vs archolith-maintenance `SchedulerLeaseStore`; subgraph-code `projection` vs menhir
+graph; archolith-context `archolith_proxy`); real rename trails (cth.mcp.memory→yawn_memory→menhir,
+archolith-memory→menhir) plus the **yawn.scheduler trap** (a real component, not a rename); and the
+buried-by-embedding willow case. 27 memories / 9 queries.
+
+| condition | recall@5 | stale_hit | wrong_scope | current_truth_suppression |
+|-----------|---------:|----------:|------------:|--------------------------:|
+| A_semantic | 0.778 | 0.222 | 0.289 | 0.778 |
+| E_weighted | 1.000 | 0.044 | 0.044 | 0.956 |
+| F_logspace | 1.000 | **0.022** | 0.044 | **0.978** |
+
+Promotion gate (F vs best of {A, E}): **GRADUATES** — F improves stale_hit (0.044→0.022) and
+current-truth suppression (0.956→0.978) with **no recall loss**.
+
+**Where the win comes from (q01, the high-support-but-stale case):** E keeps the stale `floor_old`
+(old 0.15 cosine floor — same file, git+test evidence) at **rank 3**, in the top-5; F's role-separated
+currentness routes the temporal contradiction to `z_current` and pushes `floor_old` **out of the top-5**
+entirely. A linear sum lets strong relevance support buy back currentness; the log-space role logits
+do not. That is the designed advantage, demonstrated.
+
+**A fixture-design lesson worth keeping:** `wrong_scope_injection_rate@k` is **uninformative when a
+scoped query has fewer than k in-scope candidates** — top-k is then forced to contain out-of-scope
+items for *every* condition (a corpus-depth artifact, not a combiner result). The first draft of this
+fixture had repos with a single in-scope memory and `wrong_scope` was pinned at 0.244 for both E and F;
+deepening each scoped repo to ≥4 plausible in-scope memories dropped it to 0.044 and made the metric
+meaningful. (Captured as `test_logspace_beats_weighted_on_hard_fixture`.)
+
+**Still honest caveats:** semantic is a lexical stand-in; weights are placeholders; `wrong_scope` no
+longer separates E from F here (both handle it once the corpus is deep enough) — the separation that
+survives is on stale / current-truth, which is exactly the role-separation claim.
+
 ## Owed before any promotion decision (R4-R7)
 
 1. **A real semantic scorer** in place of the lexical stand-in (conditions A/E/F all use it).

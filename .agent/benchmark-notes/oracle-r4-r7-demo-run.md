@@ -21,6 +21,40 @@ staleness.
 Not production, not headline, not a general benchmark win — but worth continuing. **R11 (iterative
 amplification) remains blocked** (must beat F first).
 
+**Mechanism precision (corrected by the temporal-oracle restructure):** F ranks current-intent queries
+by `z_relevant + z_current`, which for a stale item equals E's `relevance − penalty` — *identical* —
+unless something bounds relevance. The thing that actually stops relevance from buying back currentness
+is F's **per-family contribution cap** (relevance support per source family is clamped, so a fixed
+currentness penalty stays proportionally large), working *together with* role routing. Role separation
+alone is not the lever; the cap is. This matters because it means **F's edge is calibration-sensitive**
+(see next section).
+
+## Temporal oracle restructure — and what it revealed
+
+The `TemporalOracle` was a stale/not-stale boolean; it is now a structured classifier over the
+validity window + learned-time, returning a `TemporalStatus`:
+
+```text
+CURRENT        valid at as_of, not superseded            -> SUPPORT currentness (or NEUTRAL if historical intent)
+SUPERSEDED     expired/superseded on/before as_of        -> CONTRADICT currentness | SUPPORT historicality
+NOT_YET_VALID  validity window starts after as_of         -> CONTRADICT currentness
+NOT_YET_KNOWN  learned AFTER as_of (anachronism/leakage)  -> CONTRADICT currentness (always)
+UNKNOWN        no temporal anchors                        -> MISSING (raise uncertainty, do not fabricate)
+```
+
+New, independently valuable: the **anachronism guard** (a memory learned after the query's as-of point
+is temporal leakage and must not inform it) and **not-yet-valid**, plus **graded directness** (an
+explicit timestamp/flag is direct=1.0; a belief-bucket-only inference is softer=0.6, so inferred-stale
+is penalised less hard than provably-expired).
+
+**What it revealed (the honest finding):** structuring the oracle gave *live* items stronger currentness
+support, which **lifted the weighted baseline E**. On the correlated trap E now matches F (both keep all
+stale echoes out); on `oracle_hard` E's stale-hit dropped to 0.000 and F's edge moved to wrong-scope.
+So **part of the earlier "F beats E" gap was a crude temporal signal, not combiner architecture** — with
+a better oracle the linear baseline catches up on these fixtures. The durable, architecture-level
+difference that remains is the per-family cap above; demonstrating it cleanly needs a fixture where a
+stale item's relevance is high enough to overflow E's *uncapped* sum after a fair temporal penalty.
+
 ## What landed
 
 The benchmark-local oracle pipeline, entirely inside archolith-bench (R4-R7 are build-first rungs but
@@ -30,8 +64,8 @@ nothing here touches menhir production recall):
   (the R4 interface, immutable for thread-safety) + the fixture model (`OracleMemory`/`OracleQuery`/
   `OracleFixture`).
 - `archolith_bench/oracle/oracles.py` — cheap `RetrievalOracle`s (R6): Semantic (lexical stand-in),
-  Structure (file/symbol/test overlap), Scope (repo/branch/project/namespace), Temporal
-  (valid/invalid/as-of × intent), Evidence (provenance strength).
+  Structure (file/symbol/test overlap), Scope (repo/branch/project/namespace), **Temporal (structured —
+  see below)**, Evidence (provenance strength).
 - `archolith_bench/oracle/executor.py` — bounded, deterministic `OracleExecutor` (R4).
 - `archolith_bench/oracle/combiner.py` — `WeightedOracleCombiner` (ladder E) and
   `LogSpaceOracleCombiner` (ladder F, R7): role-specific log-space logits, contradiction as negative
@@ -44,7 +78,7 @@ nothing here touches menhir production recall):
   change vs the old cosine floor, the cth.mcp.memory→menhir rename, CE-willow drift, a cross-repo
   collision, a buried-by-embedding structural case).
 - `scripts/run_oracle_bench.py` — runs the ladder, writes `results/oracle_run.json`.
-- `tests/test_oracle_*.py` — 38 unit tests (pure stdlib, deterministic, ruff clean).
+- `tests/test_oracle_*.py` — 47 unit tests (pure stdlib, deterministic, ruff clean).
 
 Run it: `python scripts/run_oracle_bench.py`
 
@@ -97,17 +131,20 @@ buried-by-embedding willow case. 27 memories / 9 queries.
 | condition | recall@5 | stale_hit | wrong_scope | current_truth_suppression |
 |-----------|---------:|----------:|------------:|--------------------------:|
 | A_semantic | 0.778 | 0.222 | 0.289 | 0.778 |
-| E_weighted | 1.000 | 0.044 | 0.044 | 0.956 |
-| F_logspace | 1.000 | **0.022** | 0.044 | **0.978** |
+| E_weighted | 1.000 | 0.000 | 0.067 | 1.000 |
+| F_logspace | 1.000 | 0.022 | **0.044** | 0.978 |
 
-Promotion gate (F vs best of {A, E}): **GRADUATES** — F improves stale_hit (0.044→0.022) and
-current-truth suppression (0.956→0.978) with **no recall loss**.
+Promotion gate (F vs best of {A, E}): **GRADUATES** — but now only on `wrong_scope_injection`
+(0.067→0.044, F's scope double-hit), with **no recall loss**. (Numbers post temporal-oracle restructure;
+see below.)
 
-**Where the win comes from (q01, the high-support-but-stale case):** E keeps the stale `floor_old`
-(old 0.15 cosine floor — same file, git+test evidence) at **rank 3**, in the top-5; F's role-separated
-currentness routes the temporal contradiction to `z_current` and pushes `floor_old` **out of the top-5**
-entirely. A linear sum lets strong relevance support buy back currentness; the log-space role logits
-do not. That is the designed advantage, demonstrated.
+**Where the edge comes from — and how it shifted.** *Before* the temporal restructure, E kept the stale
+`floor_old` (old 0.15 cosine floor, same file + git/test evidence) at rank 3 and F dropped it — a clean
+stale-hit win. *After* the restructure, the structured Temporal oracle gives the live `floor_new`
+stronger currentness support, so **E now also drops `floor_old`** (E stale-hit 0.044→0.000). The
+stale-hit separation evaporated; F's remaining gate edge on this fixture is wrong-scope (the
+`z_blocked` + `z_relevant` double-hit E can't replicate). Honest read: a better temporal oracle closed
+the stale gap for the linear baseline too.
 
 **A fixture-design lesson worth keeping:** `wrong_scope_injection_rate@k` is **uninformative when a
 scoped query has fewer than k in-scope candidates** — top-k is then forced to contain out-of-scope
@@ -131,27 +168,27 @@ must preserve the echoes).
 | condition | recall@5 | stale_hit | current_truth_suppression |
 |-----------|---------:|----------:|--------------------------:|
 | A_semantic | 1.000 | 0.400 | 0.600 |
-| E_weighted | 0.900 | 0.200 | 0.800 |
-| F_logspace | 0.900 | **0.000** | **1.000** |
+| E_weighted | 0.900 | 0.000 | 1.000 |
+| F_logspace | 0.900 | 0.000 | 1.000 |
 
 ```
-q_trap_current top-5:
-  E: [ct_truth, fill_name, echo_commit, echo_testcomment, fill_lease]   <- 2 stale echoes leak in
-  F: [ct_truth, fill_name, fill_lease, fill_floor, fill_graph]          <- all 5 echoes suppressed
+q_trap_current top-5 (post temporal restructure — E and F now identical):
+  E: [ct_truth, fill_name, fill_lease, fill_floor, fill_graph]   <- all 5 echoes suppressed
+  F: [ct_truth, fill_name, fill_lease, fill_floor, fill_graph]   <- all 5 echoes suppressed
 ```
 
-Gate: **GRADUATES** (F cuts stale_hit 0.2→0.0 and lifts suppression 0.8→1.0; recall_loss 0.1 vs the
-A baseline, at the tolerance boundary).
+Gate: **does not graduate** — E now ties F (both suppress every stale echo). Before the temporal
+restructure E leaked 2 echoes into the top-5 and F graduated; the structured oracle's stronger
+currentness support fixed E here too. The trap no longer separates E from F.
 
 **Two honest corrections this trap forced:**
 
-1. **The "five echoes overpower one truth" hypothesis was partially falsified.** A *well-evidenced*
-   current truth (user+test evidence + currentness swing) is **not** buried by the chorus even under the
-   linear sum E — E ranked `ct_truth` #1. So a chorus does not automatically win; the truth's evidence
-   carried it. What E *does* do is admit 2 of the 5 stale echoes into the top-5 as noise; F admits none.
-   The sharper, true claim: **F keeps stale out of top-k; E admits it.** Whether stale then *displaces*
-   the truth (recall failure — `oracle_hard` q01) or only adds top-k noise (this trap) depends on the
-   evidence balance.
+1. **The "five echoes overpower one truth" hypothesis was falsified.** A *well-evidenced* current truth
+   (user+test evidence + currentness swing) is **not** buried by the chorus even under the linear sum E —
+   E ranked `ct_truth` #1. Before the temporal restructure E at least leaked 2 echoes into the top-5 as
+   noise (F admitted none); *after* the restructure E suppresses all five too, so on this fixture E and F
+   are identical. A chorus does not automatically win, and a well-structured temporal oracle lets even
+   the linear combiner handle it.
 2. **This trap exercises temporal role-separation, NOT the source-family cap.** Five separate echoes are
    five candidates; the within-candidate independence cap (`1/√n` over one candidate's own oracle
    results) never fires. Each echo is suppressed individually by its temporal contradiction. A genuine

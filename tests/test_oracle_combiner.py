@@ -68,6 +68,18 @@ def test_structure_recovers_buried_memory() -> None:
     assert "buried" in ranked[:2]
 
 
+def test_logspace_suppresses_anachronistic_memory() -> None:
+    # A memory learned AFTER the query's as-of point must not outrank a contemporaneous
+    # one, even with identical text (temporal leakage guard).
+    q = QueryContext(text="source aware similarity floor", intent="current", as_of_time="2026-06-01", repo="menhir")
+    contemporaneous = OracleMemory("now", text="source aware similarity floor", repo="menhir",
+                                   created_at="2026-03-01", belief_bucket="current", evidence_kinds={"git"})
+    future = OracleMemory("future", text="source aware similarity floor", repo="menhir",
+                          created_at="2026-09-01", belief_bucket="current", evidence_kinds={"git"})
+    ranked, _ = LogSpaceOracleCombiner().rank(q, _grouped(q, [contemporaneous, future]))
+    assert _rank_index(ranked, "now") < _rank_index(ranked, "future")
+
+
 def test_combined_probabilities_form_distribution() -> None:
     q = QueryContext(text="similarity floor", intent="current", as_of_time="2026-06-01", repo="menhir")
     mems = [OracleMemory(f"m{i}", text="similarity floor", repo="menhir", evidence_kinds={"git"}) for i in range(4)]

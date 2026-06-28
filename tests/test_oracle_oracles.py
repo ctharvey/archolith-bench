@@ -89,6 +89,45 @@ def test_temporal_live_supports_currentness() -> None:
     assert r.target == OracleTarget.CURRENTNESS
 
 
+def test_temporal_anachronism_learned_after_as_of() -> None:
+    # A memory created AFTER the query's as-of point is temporal leakage -> contradict.
+    q = QueryContext(text="x", intent="current", as_of_time="2026-06-01")
+    r = TemporalOracle().evaluate(q, _cand(created_at="2026-09-01", belief_bucket="current"))
+    assert r.polarity == OraclePolarity.CONTRADICT
+    assert r.target == OracleTarget.CURRENTNESS
+    assert "anachronism" in r.note
+    assert r.directness == 1.0
+
+
+def test_temporal_not_yet_valid() -> None:
+    q = QueryContext(text="x", intent="current", as_of_time="2026-06-01")
+    r = TemporalOracle().evaluate(q, _cand(valid_at="2026-09-01"))
+    assert r.polarity == OraclePolarity.CONTRADICT
+    assert "not_yet_valid" in r.note
+
+
+def test_temporal_unknown_is_missing_not_fabricated() -> None:
+    q = QueryContext(text="x", intent="current", as_of_time="2026-06-01")
+    r = TemporalOracle().evaluate(q, _cand())  # no temporal anchors at all
+    assert r.polarity == OraclePolarity.MISSING
+
+
+def test_temporal_directness_graded_explicit_vs_bucket() -> None:
+    q = QueryContext(text="x", intent="current", as_of_time="2026-06-01")
+    explicit = TemporalOracle().evaluate(q, _cand(superseded=True))
+    bucket_only = TemporalOracle().evaluate(q, _cand(belief_bucket="historical"))
+    assert explicit.directness == 1.0
+    assert bucket_only.directness < explicit.directness  # inferred-stale penalised less hard
+
+
+def test_temporal_current_via_validity_window() -> None:
+    q = QueryContext(text="x", intent="current", as_of_time="2026-06-01")
+    r = TemporalOracle().evaluate(q, _cand(valid_at="2026-01-01", invalid_at="2027-01-01"))
+    assert r.polarity == OraclePolarity.SUPPORT
+    assert r.target == OracleTarget.CURRENTNESS
+    assert r.directness == 1.0
+
+
 def test_evidence_strong_beats_inferred_directness() -> None:
     q = QueryContext(text="x")
     strong = EvidenceOracle().evaluate(q, _cand(evidence_kinds={"git", "test"}))

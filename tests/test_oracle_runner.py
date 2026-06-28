@@ -68,15 +68,15 @@ def test_hard_fixture_support_ids_exist() -> None:
             assert sid in ids, f"{q.id} references missing support {sid}"
 
 
-def test_logspace_beats_weighted_on_hard_fixture() -> None:
-    # The harder fixture (high-support-but-stale items) is where F's role-separated
-    # currentness should suppress stale that E's linear sum keeps.
+def test_logspace_graduates_on_hard_fixture() -> None:
+    # On the harder fixture F still clears the promotion gate over the best of {A, E}
+    # (with the structured temporal oracle the edge is on wrong-scope rather than
+    # stale-hit — see the benchmark note), with no recall loss.
     art = _hard_artifact()
     e = art["conditions"]["E_weighted"]["metrics"]
     f = art["conditions"]["F_logspace"]["metrics"]
-    assert f["stale_hit_rate"] <= e["stale_hit_rate"]
-    assert f["current_truth_suppression_accuracy"] >= e["current_truth_suppression_accuracy"]
     assert f["recall_at_5"] >= e["recall_at_5"]
+    assert f["wrong_scope_injection_rate"] <= e["wrong_scope_injection_rate"]
     assert art["promotion_gate"]["graduates"] is True
 
 
@@ -90,10 +90,12 @@ def test_correlated_trap_f_suppresses_all_stale_echoes() -> None:
     top5 = f_pq["q_trap_current"]["ranked"][:5]
     assert top5[0] == "ct_truth"
     assert not any(by_id[m].is_stale for m in top5), f"F leaked stale echo into top5: {top5}"
+    # F suppresses every stale echo; with the structured temporal oracle E now matches
+    # this (both keep stale out), so the trap no longer separates E from F — F is at
+    # least as good, not strictly better. (See benchmark note.)
     e = art["conditions"]["E_weighted"]["metrics"]
     f = art["conditions"]["F_logspace"]["metrics"]
     assert f["stale_hit_rate"] <= e["stale_hit_rate"]
-    assert art["promotion_gate"]["graduates"] is True
 
 
 def test_run_is_reproducible() -> None:

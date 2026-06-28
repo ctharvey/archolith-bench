@@ -18,6 +18,7 @@ budgets/snapshots and, for pairwise, the R11 amplification loop.
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Protocol
 
 from .models import (
@@ -155,57 +156,116 @@ class ScopeOracle:
         )
 
 
+class TemporalStatus(str, Enum):
+    """A candidate's temporal standing relative to the query's as-of point."""
+
+    CURRENT = "current"              # valid at as_of, not superseded
+    SUPERSEDED = "superseded"        # was valid, expired/superseded on or before as_of
+    NOT_YET_VALID = "not_yet_valid"  # validity window starts after as_of
+    NOT_YET_KNOWN = "not_yet_known"  # learned after as_of — anachronism / temporal leakage
+    UNKNOWN = "unknown"              # no temporal anchors to reason from
+
+
 class TemporalOracle:
-    """Currentness vs historicality keyed on valid/invalid/as-of and query intent.
+    """Structured currentness/historicality over a validity window + learned-time.
 
-    - current intent + stale candidate  -> CONTRADICT on CURRENTNESS (suppress).
-    - historical intent + stale candidate -> SUPPORT on HISTORICALITY (keep it).
-    - otherwise (live candidate)         -> mild SUPPORT on CURRENTNESS.
+    Classifies the candidate into a `TemporalStatus` relative to the query's as-of
+    point, then routes to a role-targeted result by intent. Beyond plain stale/live
+    it handles two failure modes a boolean stale check misses:
 
-    "stale" = explicitly superseded / non-current belief bucket, or invalid_at is
-    set and on/before the query's as_of_time (lexical ISO compare).
+    - NOT_YET_KNOWN: the memory was learned *after* the as-of point (created_at >
+      as_of) — using it is anachronistic temporal leakage; always CONTRADICT.
+    - NOT_YET_VALID: the fact's validity window has not started at as_of.
+
+    Directness is graded: an explicit timestamp / superseded flag is direct (1.0);
+    a belief-bucket-only inference is softer (0.6), so the combiner penalises an
+    inferred-stale memory less hard than a provably-expired one.
     """
 
     name = "temporal"
     source_family = "temporal"
 
     def evaluate(self, query: QueryContext, candidate: CandidateMemory) -> OracleResult:
-        stale = self._is_stale(query, candidate)
-        if query.intent == "historical":
-            if stale:
+        status, directness = self._classify(query, candidate)
+        intent = query.intent
+        meta = self.source_family
+
+        if status is TemporalStatus.NOT_YET_KNOWN:
+            return OracleResult(
+                oracle=self.name, probability=1.0, confidence=1.0,
+                polarity=OraclePolarity.CONTRADICT, target=OracleTarget.CURRENTNESS,
+                directness=directness, source_family=meta, note="learned_after_as_of (anachronism)",
+            )
+        if status is TemporalStatus.NOT_YET_VALID:
+            return OracleResult(
+                oracle=self.name, probability=0.9, confidence=0.9,
+                polarity=OraclePolarity.CONTRADICT, target=OracleTarget.CURRENTNESS,
+                directness=directness, source_family=meta, note="not_yet_valid_at_as_of",
+            )
+        if status is TemporalStatus.SUPERSEDED:
+            if intent == "historical":
                 return OracleResult(
                     oracle=self.name, probability=1.0, confidence=0.9,
                     polarity=OraclePolarity.SUPPORT, target=OracleTarget.HISTORICALITY,
-                    source_family=self.source_family, note="historical_query_historical_memory",
+                    directness=directness, source_family=meta, note="superseded_answers_historical",
                 )
-            return OracleResult(
-                oracle=self.name, probability=0.3, confidence=0.6,
-                polarity=OraclePolarity.NEUTRAL, target=OracleTarget.HISTORICALITY,
-                source_family=self.source_family, note="historical_query_current_memory",
-            )
-        # current / any intent
-        if stale:
             return OracleResult(
                 oracle=self.name, probability=1.0, confidence=0.9,
                 polarity=OraclePolarity.CONTRADICT, target=OracleTarget.CURRENTNESS,
-                source_family=self.source_family, note="stale_under_current_intent",
+                directness=directness, source_family=meta, note="superseded_under_current_intent",
             )
+        if status is TemporalStatus.CURRENT:
+            if intent == "historical":
+                return OracleResult(
+                    oracle=self.name, probability=0.3, confidence=0.6,
+                    polarity=OraclePolarity.NEUTRAL, target=OracleTarget.HISTORICALITY,
+                    directness=directness, source_family=meta, note="current_under_historical_intent",
+                )
+            return OracleResult(
+                oracle=self.name, probability=0.8, confidence=0.8,
+                polarity=OraclePolarity.SUPPORT, target=OracleTarget.CURRENTNESS,
+                directness=directness, source_family=meta, note="valid_at_as_of",
+            )
+        # UNKNOWN — no temporal evidence: raise uncertainty, do not fabricate currentness.
         return OracleResult(
-            oracle=self.name, probability=0.6, confidence=0.7,
-            polarity=OraclePolarity.SUPPORT, target=OracleTarget.CURRENTNESS,
-            source_family=self.source_family, note="live_at_as_of",
+            oracle=self.name, probability=0.0, confidence=0.4,
+            polarity=OraclePolarity.MISSING, target=OracleTarget.CURRENTNESS,
+            directness=directness, source_family=meta, note="no_temporal_anchor",
         )
 
     @staticmethod
-    def _is_stale(query: QueryContext, candidate: CandidateMemory) -> bool:
-        if candidate.metadata.get("superseded"):
-            return True
-        if candidate.metadata.get("belief_bucket") in STALE_BUCKETS:
-            return True
+    def _classify(query: QueryContext, candidate: CandidateMemory) -> tuple[TemporalStatus, float]:
+        as_of = query.as_of_time
+        created_at = candidate.metadata.get("created_at")
+        valid_at = candidate.metadata.get("valid_at")
         invalid_at = candidate.metadata.get("invalid_at")
-        if invalid_at and query.as_of_time and str(invalid_at) <= str(query.as_of_time):
-            return True
-        return False
+        superseded = bool(candidate.metadata.get("superseded"))
+        bucket = candidate.metadata.get("belief_bucket")
+
+        def leq(a: object, b: object) -> bool:
+            return bool(a) and bool(b) and str(a) <= str(b)
+
+        def gt(a: object, b: object) -> bool:
+            return bool(a) and bool(b) and str(a) > str(b)
+
+        # 1. Anachronism: learned strictly after the as-of point (explicit, direct).
+        if gt(created_at, as_of):
+            return TemporalStatus.NOT_YET_KNOWN, 1.0
+        # 2. Explicit supersession (flag or expired validity window) — direct.
+        if superseded or leq(invalid_at, as_of):
+            return TemporalStatus.SUPERSEDED, 1.0
+        # 3. Bucket-inferred supersession — softer evidence.
+        if bucket in STALE_BUCKETS:
+            return TemporalStatus.SUPERSEDED, 0.6
+        # 4. Validity window has not started yet — direct.
+        if gt(valid_at, as_of):
+            return TemporalStatus.NOT_YET_VALID, 1.0
+        # 5. Provably current: an explicit anchor places it live at as_of.
+        if leq(valid_at, as_of) or gt(invalid_at, as_of) or bucket == "current":
+            directness = 1.0 if (valid_at or invalid_at) else 0.6
+            return TemporalStatus.CURRENT, directness
+        # 6. No anchors at all.
+        return TemporalStatus.UNKNOWN, 0.5
 
 
 class EvidenceOracle:

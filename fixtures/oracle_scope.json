@@ -1,0 +1,61 @@
+{
+  "name": "oracle_scope",
+  "description": "Scope-lever isolation (R4-R7). Controlled: a query scoped to repo=menhir, a high-relevance WRONG-REPO distractor (subgraph-code's graph store — heavy topical overlap), an in-scope STALE distractor, and weak in-scope fillers so depth is not the artifact (>= k in-scope). A linear sum (E) lets the high-relevance wrong-repo item crack top-5; F routes the scope conflict to a double-hit (z_blocked + z_relevant penalty) and blocks it. This isolates SCOPE routing as the real F-vs-E lever — distinct from the per-family contribution cap, which is dormant with one oracle per family. DRAFT smoke fixture; lexical semantic stand-in.",
+  "memories": [
+    {
+      "id": "mh_graph",
+      "text": "menhir keeps its long-lived memory in a Neo4j and Graphiti content graph store.",
+      "repo": "menhir", "files": ["graphiti_client.py"], "symbols": ["graphiti_client"],
+      "valid_at": "2026-03-01", "created_at": "2026-03-01", "belief_bucket": "current", "evidence_kinds": ["git", "test"]
+    },
+    {
+      "id": "sg_graph",
+      "text": "subgraph-code is a graph-primary content graph store where the graph is the only source of truth.",
+      "repo": "subgraph-code", "files": ["store.ts"], "symbols": ["graph_store"],
+      "valid_at": "2026-05-01", "created_at": "2026-05-01", "belief_bucket": "current", "evidence_kinds": ["git", "test"]
+    },
+    {
+      "id": "mh_graph_old",
+      "text": "menhir previously kept memory in an in-process dict store before the graph store existed.",
+      "repo": "menhir", "files": ["graphiti_client.py"], "symbols": ["dict_store"],
+      "invalid_at": "2026-03-01", "created_at": "2025-12-01", "superseded": true, "belief_bucket": "historical", "evidence_kinds": ["git"]
+    },
+    {
+      "id": "mh_lease",
+      "text": "menhir scheduler_lease force_acquire guards the single-leader lease.",
+      "repo": "menhir", "files": ["scheduler_lease.py"], "symbols": ["force_acquire"],
+      "valid_at": "2026-04-02", "created_at": "2026-04-02", "belief_bucket": "current", "evidence_kinds": ["git"]
+    },
+    {
+      "id": "mh_floor",
+      "text": "menhir recall uses a source-aware similarity floor for candidate survival.",
+      "repo": "menhir", "files": ["scoring_service.py"], "symbols": ["source_aware_floor"],
+      "valid_at": "2026-03-12", "created_at": "2026-03-12", "belief_bucket": "current", "evidence_kinds": ["git"]
+    },
+    {
+      "id": "mh_name",
+      "text": "The package is menhir with MENHIR_ prefixed environment variables.",
+      "repo": "menhir", "valid_at": "2026-03-01", "created_at": "2026-03-01", "belief_bucket": "current", "evidence_kinds": ["git"]
+    },
+    {
+      "id": "mh_neo",
+      "text": "menhir Neo4j connection defaults are unsafe beyond localhost.",
+      "repo": "menhir", "files": ["settings.py"], "symbols": ["neo4j_password"],
+      "valid_at": "2026-04-02", "created_at": "2026-04-02", "belief_bucket": "current", "evidence_kinds": ["git"]
+    },
+    {
+      "id": "mh_enrich",
+      "text": "menhir defers episode enrichment through a background worker queue.",
+      "repo": "menhir", "symbols": ["episode"], "valid_at": "2026-03-05", "created_at": "2026-03-05", "belief_bucket": "current", "evidence_kinds": ["git"]
+    }
+  ],
+  "queries": [
+    {
+      "id": "q_graph_menhir",
+      "text": "Where does menhir store its memory graph?",
+      "intent": "current", "as_of_time": "2026-06-01", "repo": "menhir", "symbols": ["graphiti_client"],
+      "support_ids": ["mh_graph"],
+      "note": "sg_graph (subgraph-code) is a high-relevance wrong-repo distractor; mh_graph_old is an in-scope stale distractor. E should admit sg_graph to top-5 on relevance; F should block it on scope."
+    }
+  ]
+}

@@ -31,6 +31,7 @@ from archolith_bench.oracle.runner import (  # noqa: E402
     OracleBenchmarkRunner,
     run_ablation,
 )
+from archolith_bench.oracle.validate import has_errors, validate_oracle_fixture  # noqa: E402
 
 DEFAULT_FIXTURE = REPO_ROOT / "fixtures" / "oracle_demo.json"
 
@@ -79,6 +80,16 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     fixture = OracleFixture.from_file(fixture_path)
+
+    findings = validate_oracle_fixture(fixture)
+    if findings:
+        print(f"\n=== fixture validation: {len(findings)} finding(s) ===")
+        for f in findings:
+            print(" ", f)
+        if has_errors(findings):
+            print("\nerror: fixture has validation errors — results are not trustworthy", file=sys.stderr)
+            return 1
+
     artifact = OracleBenchmarkRunner(fixture).run(include_traces=not args.no_traces)
     _print_table(artifact)
     if args.ablate:

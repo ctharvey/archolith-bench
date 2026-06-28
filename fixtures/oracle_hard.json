@@ -142,6 +142,12 @@
       "valid_at": "2026-05-13", "created_at": "2026-05-13", "belief_bucket": "current", "evidence_kinds": ["git"]
     },
     {
+      "id": "am_fence",
+      "text": "archolith-maintenance stamps a fencing token on each acquired scheduler lease.",
+      "repo": "archolith-maintenance", "files": ["scheduler_lease_store.py"], "symbols": ["fencing_token"],
+      "valid_at": "2026-05-14", "created_at": "2026-05-14", "belief_bucket": "current", "evidence_kinds": ["git", "test"]
+    },
+    {
       "id": "sg_mint",
       "text": "subgraph-code mints a new function node directly into the content-addressed graph.",
       "repo": "subgraph-code", "files": ["mint.ts"], "symbols": ["mint"],
@@ -158,6 +164,12 @@
       "text": "subgraph-code identifies each function node by a content-addressed hash of its body.",
       "repo": "subgraph-code", "files": ["address.ts"], "symbols": ["contentAddress"],
       "valid_at": "2026-05-03", "created_at": "2026-05-03", "belief_bucket": "current", "evidence_kinds": ["git"]
+    },
+    {
+      "id": "sg_render",
+      "text": "subgraph-code renders the file projection on demand by walking the function graph.",
+      "repo": "subgraph-code", "files": ["render.ts"], "symbols": ["renderProjection"],
+      "valid_at": "2026-05-04", "created_at": "2026-05-04", "belief_bucket": "current", "evidence_kinds": ["git", "test"]
     },
     {
       "id": "ac_filter",

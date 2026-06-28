@@ -73,6 +73,43 @@ this fixture the gains are overwhelmingly in the **oracle layer**, not the combi
 *hurt* a non-owned metric — e.g. +temporal worsens wrong-scope by surfacing more current-but-out-of-scope
 items — which is exactly why the full set + a combiner is needed.)
 
+## Guardrail: the fixture validator — and the sharp thing it implies
+
+`validate_oracle_fixture` (CLI `--validate`, and auto-run before every ladder run) flags two classes of
+problem so a bad fixture can't quietly produce a misleading result:
+
+- **errors** (untrustworthy): dangling/duplicate support, **stale gold under a current-intent query**,
+  **anachronistic gold** (created after as_of), bad belief bucket, broken date order.
+- **silliness warnings** (too-clean / rigged): uncontested query (no real distractor), fake paraphrase,
+  **thin-scope** (a scoped query with fewer than k in-scope candidates), no-stale, no-scope-variation.
+
+It immediately caught real issues in our own fixtures (thin-scope on two `oracle_hard` queries; a
+missing scope-variation in `oracle_correlated`), which we fixed. **The sharp consequence:** the only
+fixtures where F beat E on `wrong_scope` were the ones the validator now flags as **thin-scope
+artifacts**. On a validator-clean, deep scope fixture (`oracle_scope.json`) **E and F converge** — both
+keep the high-relevance wrong-repo distractor out of top-5 (E's linear scope penalty + in-scope
+scope-support is already a ~1.2 swing). So F's wrong-scope "edge" is largely a thin-corpus artifact, not
+a robust architectural advantage.
+
+## Cap dormancy
+
+The per-family contribution cap **never binds with the current oracle set**: each cheap oracle is a
+distinct source family and emits one signal per candidate, so a family's accumulated contribution
+(≤ ~1.2) never reaches the cap (3.0). The cap is *dormant defensive machinery* for a future with
+multiple same-family oracles (e.g. semantic + facet both in the "semantic" family). It is therefore
+**not** the current E-vs-F lever — falsifying the earlier hypothesis. What little separates F from E on
+clean fixtures is scope role-routing at the margins; on fair, deep fixtures the two largely converge.
+
+## Sharpened verdict (this pass)
+
+The honest, narrowed claim: **on validator-clean fixtures with a well-structured oracle layer, F (the
+log-space role-logit combiner) and E (the weighted sum) largely converge** — F's measurable edges are
+small and boundary/thin-corpus driven, and the per-family cap is dormant. The robust, defensible
+contribution is **not the combiner formula** but the **decomposition + instruments**: independently
+benchmarkable oracles, an ablation that attributes gains to layers, and a validator that makes silly
+fixtures hard to ship. R7 stays *bench-justified but narrow*; **R11 remains blocked**; and a neural
+combiner could later replace F without disturbing any of the above.
+
 ## Temporal oracle restructure — and what it revealed
 
 The `TemporalOracle` was a stale/not-stale boolean; it is now a structured classifier over the
@@ -118,11 +155,13 @@ nothing here touches menhir production recall):
 - `archolith_bench/oracle/metrics.py` — recall/precision/MRR/NDCG + stale-hit / wrong-scope /
   current-truth-suppression / historical-preservation / ranking-determinism.
 - `archolith_bench/oracle/runner.py` — ladder A_semantic / E_weighted / F_logspace + promotion gate + `run_ablation` (R7.5 contribution matrix).
-- `fixtures/oracle_demo.json` — 10 memories / 6 queries DEMO fixture (real menhir history: the R1 floor
-  change vs the old cosine floor, the cth.mcp.memory→menhir rename, CE-willow drift, a cross-repo
-  collision, a buried-by-embedding structural case).
-- `scripts/run_oracle_bench.py` — runs the ladder, writes `results/oracle_run.json`.
-- `tests/test_oracle_*.py` — 48 unit tests (pure stdlib, deterministic, ruff clean).
+- `archolith_bench/oracle/validate.py` — the **fixture validator / silliness guardrail** (errors +
+  too-clean/rigged warnings; CLI `--validate`, auto-run before every ladder run).
+- `fixtures/` — `oracle_demo.json` (smoke), `oracle_hard.json` (cross-repo/rename/stale),
+  `oracle_correlated.json` (five stale echoes), `oracle_scope.json` (scope convergence control). All
+  validate clean.
+- `scripts/run_oracle_bench.py` — runs the ladder (validates first), `--ablate`, `--validate`.
+- `tests/test_oracle_*.py` — 58 unit tests (pure stdlib, deterministic, ruff clean).
 
 Run it: `python scripts/run_oracle_bench.py`
 

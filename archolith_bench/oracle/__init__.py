@@ -42,6 +42,7 @@ from .oracles import (
     default_oracles,
 )
 from .runner import OracleBenchmarkRunner, evaluate_promotion_gate, run_ablation
+from .validate import Finding, has_errors, validate_oracle_fixture
 
 __all__ = [
     "CandidateMemory",
@@ -67,4 +68,7 @@ __all__ = [
     "default_oracles",
     "evaluate_promotion_gate",
     "run_ablation",
+    "Finding",
+    "has_errors",
+    "validate_oracle_fixture",
 ]

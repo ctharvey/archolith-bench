@@ -11,6 +11,7 @@ FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 FIXTURE = FIXTURES / "oracle_demo.json"
 HARD_FIXTURE = FIXTURES / "oracle_hard.json"
 CORRELATED_FIXTURE = FIXTURES / "oracle_correlated.json"
+SCOPE_FIXTURE = FIXTURES / "oracle_scope.json"
 
 
 def _artifact() -> dict:
@@ -108,6 +109,19 @@ def test_ablation_attributes_gains_to_the_right_oracle() -> None:
     assert rows["semantic+structure [E]"]["recall_at_5"] > base["recall_at_5"]
     # And the combiner choice (all[E] -> all[F]) is a smaller move than any strong oracle's.
     assert "all [E]" in rows and "all [F]" in rows
+
+
+def test_scope_fixture_is_a_convergence_control() -> None:
+    # Negative control: on a validator-clean, deep scope fixture E and F converge —
+    # both keep the high-relevance wrong-repo distractor (and the in-scope stale one)
+    # out of top-5. F's wrong-scope edge only appears on thin-scope (flagged) fixtures.
+    art = OracleBenchmarkRunner(OracleFixture.from_file(SCOPE_FIXTURE)).run(include_traces=False)
+    by_cond = {c: r["per_query"][0]["ranked"][:5] for c, r in art["conditions"].items()}
+    assert "sg_graph" not in by_cond["E_weighted"]
+    assert "sg_graph" not in by_cond["F_logspace"]
+    e = art["conditions"]["E_weighted"]["metrics"]
+    f = art["conditions"]["F_logspace"]["metrics"]
+    assert f["wrong_scope_injection_rate"] == e["wrong_scope_injection_rate"] == 0.0
 
 
 def test_run_is_reproducible() -> None:

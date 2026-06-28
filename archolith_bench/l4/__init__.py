@@ -18,6 +18,7 @@ from .models import (
     Source,
     Status,
 )
+from .brief import BriefItem, ColdStartBriefV0, Epistemic, build_brief
 from .memory_oracle import ArtifactMatch, MemoryOracle
 from .mutator import ArtifactMutator, MutatorError
 
@@ -29,9 +30,13 @@ __all__ = [
     "ArtifactMatch",
     "ArtifactMutator",
     "ArtifactType",
+    "BriefItem",
+    "ColdStartBriefV0",
+    "Epistemic",
     "Evidence",
     "MemoryOracle",
     "MutatorError",
     "Source",
     "Status",
+    "build_brief",
 ]

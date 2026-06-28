@@ -25,7 +25,7 @@ from . import metrics as M
 from .combiner import LogSpaceOracleCombiner, WeightedOracleCombiner
 from .executor import OracleExecutor
 from .models import OracleFixture, OracleQuery
-from .oracles import RetrievalOracle, SemanticOracle, default_oracles
+from .oracles import RetrievalOracle, SemanticOracle, SemanticScorer, default_oracles
 
 CONDITIONS: tuple[str, ...] = ("A_semantic", "E_weighted", "F_logspace")
 BASELINE_CONDITIONS: tuple[str, ...] = ("A_semantic", "E_weighted")
@@ -55,9 +55,11 @@ class OracleBenchmarkRunner:
         fixture: OracleFixture,
         oracles: list[RetrievalOracle] | None = None,
         k: int = DEFAULT_K,
+        semantic_scorer: SemanticScorer | None = None,
     ) -> None:
         self.fixture = fixture
-        self.oracles = oracles or default_oracles()
+        self.semantic_scorer = semantic_scorer
+        self.oracles = oracles or default_oracles(semantic_scorer)
         self.executor = OracleExecutor(self.oracles)
         self.weighted = WeightedOracleCombiner()
         self.logspace = LogSpaceOracleCombiner()
@@ -68,7 +70,7 @@ class OracleBenchmarkRunner:
     def _rank(self, condition: str, query: OracleQuery) -> tuple[list[str], list[dict]]:
         ctx = query.to_context()
         if condition == "A_semantic":
-            sem = SemanticOracle()
+            sem = SemanticOracle(self.semantic_scorer)
             scored = [(c.id, sem.evaluate(ctx, c).probability) for c in self.candidates]
             ranked = [cid for cid, _ in sorted(scored, key=lambda kv: (-kv[1], kv[0]))]
             return ranked, []

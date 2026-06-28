@@ -34,9 +34,11 @@ from .models import (
 )
 from .oracles import (
     EvidenceOracle,
+    LexicalSemanticScorer,
     RetrievalOracle,
     ScopeOracle,
     SemanticOracle,
+    SemanticScorer,
     StructureOracle,
     TemporalOracle,
     default_oracles,
@@ -47,6 +49,7 @@ from .validate import Finding, has_errors, validate_oracle_fixture
 __all__ = [
     "CandidateMemory",
     "EvidenceOracle",
+    "LexicalSemanticScorer",
     "LogSpaceOracleCombiner",
     "OracleBenchmarkRunner",
     "OracleExecutor",
@@ -62,6 +65,7 @@ __all__ = [
     "RetrievalOracle",
     "ScopeOracle",
     "SemanticOracle",
+    "SemanticScorer",
     "StructureOracle",
     "TemporalOracle",
     "WeightedOracleCombiner",

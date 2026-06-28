@@ -142,6 +142,33 @@ def test_evidence_missing_is_not_contradiction() -> None:
     assert r.polarity == OraclePolarity.MISSING
 
 
+def test_semantic_scorer_is_injectable() -> None:
+    # The real-embedder seam: a custom scorer overrides the lexical stand-in.
+    class ConstantScorer:
+        name = "constant"
+
+        def similarity(self, query_text: str, candidate_text: str) -> float:
+            return 0.5
+
+    q = QueryContext(text="anything")
+    default = SemanticOracle().evaluate(q, _cand(text="totally unrelated"))
+    injected = SemanticOracle(ConstantScorer()).evaluate(q, _cand(text="totally unrelated"))
+    assert default.probability == 0.0
+    assert injected.probability == 0.5
+
+
+def test_default_oracles_accepts_semantic_scorer() -> None:
+    class ConstantScorer:
+        name = "constant"
+
+        def similarity(self, query_text: str, candidate_text: str) -> float:
+            return 0.9
+
+    oracles = default_oracles(ConstantScorer())
+    semantic = next(o for o in oracles if o.name == "semantic")
+    assert semantic.scorer.name == "constant"
+
+
 def test_default_oracles_are_named_uniquely() -> None:
     names = [o.name for o in default_oracles()]
     assert names == ["semantic", "structure", "scope", "temporal", "evidence"]

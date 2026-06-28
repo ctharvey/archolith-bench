@@ -144,9 +144,10 @@ nothing here touches menhir production recall):
 - `archolith_bench/oracle/models.py` — `QueryContext`, `CandidateMemory`, `OracleResult`, `OraclePacket`
   (the R4 interface, immutable for thread-safety) + the fixture model (`OracleMemory`/`OracleQuery`/
   `OracleFixture`).
-- `archolith_bench/oracle/oracles.py` — cheap `RetrievalOracle`s (R6): Semantic (lexical stand-in),
-  Structure (file/symbol/test overlap), Scope (repo/branch/project/namespace), **Temporal (structured —
-  see below)**, Evidence (provenance strength).
+- `archolith_bench/oracle/oracles.py` — cheap `RetrievalOracle`s (R6): Semantic (pluggable
+  `SemanticScorer` — lexical stand-in by default, **real-embedder seam**), Structure (file/symbol/test
+  overlap), Scope (repo/branch/project/namespace), **Temporal (structured — see below)**, Evidence
+  (provenance strength).
 - `archolith_bench/oracle/executor.py` — bounded, deterministic `OracleExecutor` (R4).
 - `archolith_bench/oracle/combiner.py` — `WeightedOracleCombiner` (ladder E) and
   `LogSpaceOracleCombiner` (ladder F, R7): role-specific log-space logits, contradiction as negative
@@ -161,7 +162,7 @@ nothing here touches menhir production recall):
   `oracle_correlated.json` (five stale echoes), `oracle_scope.json` (scope convergence control). All
   validate clean.
 - `scripts/run_oracle_bench.py` — runs the ladder (validates first), `--ablate`, `--validate`.
-- `tests/test_oracle_*.py` — 58 unit tests (pure stdlib, deterministic, ruff clean).
+- `tests/test_oracle_*.py` — 60 unit tests (pure stdlib, deterministic, ruff clean).
 
 Run it: `python scripts/run_oracle_bench.py`
 
@@ -302,7 +303,10 @@ Only if F clears that bar does the R7 combiner earn a menhir production surface.
 
 ## Owed before any promotion decision (R4-R7)
 
-1. **A real semantic scorer** in place of the lexical stand-in (conditions A/E/F all use it).
+1. **Inject a real semantic scorer** — the seam now exists (`SemanticScorer` protocol;
+   `OracleBenchmarkRunner(..., semantic_scorer=...)` / `default_oracles(scorer)`); plug a real embedding
+   model in place of the `LexicalSemanticScorer` stand-in. This is the single highest-value owed item;
+   every E/F/ablation number rides the stand-in until then.
 2. **Calibration** of `FAMILY_ALPHA` / `TARGET_LAMBDA` / `GAMMA` / the ranking-score role blend (they
    ship as placeholders, not tuned values).
 3. **A source-family-cap fixture**: a single candidate citing many same-source supports (the cap is not

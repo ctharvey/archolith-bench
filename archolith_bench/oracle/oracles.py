@@ -61,8 +61,29 @@ def _jaccard(a: set[object], b: set[object]) -> float:
     return len(a & b) / len(union) if union else 0.0
 
 
+class SemanticScorer(Protocol):
+    """Query↔candidate text similarity in [0, 1]. The real-embedder seam.
+
+    The default is a deterministic lexical stand-in; inject a real embedding model
+    (one that caches/batches internally) before quoting semantic numbers.
+    """
+
+    name: str
+
+    def similarity(self, query_text: str, candidate_text: str) -> float: ...
+
+
+class LexicalSemanticScorer:
+    """Deterministic lexical-overlap stand-in (token overlap coefficient)."""
+
+    name = "lexical_stub"
+
+    def similarity(self, query_text: str, candidate_text: str) -> float:
+        return _overlap_coefficient(_tokens(query_text), _tokens(candidate_text))
+
+
 class SemanticOracle:
-    """Lexical-overlap stand-in for embedding similarity (deterministic).
+    """Semantic relevance via a pluggable `SemanticScorer` (lexical stand-in by default).
 
     Swap a real embedding scorer in here before quoting semantic numbers — this is
     the same honest stand-in discipline the facet bench uses.
@@ -71,8 +92,11 @@ class SemanticOracle:
     name = "semantic"
     source_family = "semantic"
 
+    def __init__(self, scorer: SemanticScorer | None = None) -> None:
+        self.scorer = scorer or LexicalSemanticScorer()
+
     def evaluate(self, query: QueryContext, candidate: CandidateMemory) -> OracleResult:
-        sim = _overlap_coefficient(_tokens(query.text), _tokens(candidate.content))
+        sim = self.scorer.similarity(query.text, candidate.content)
         return OracleResult(
             oracle=self.name,
             probability=sim,
@@ -302,6 +326,15 @@ class EvidenceOracle:
         )
 
 
-def default_oracles() -> list[RetrievalOracle]:
-    """The cheap oracle set, in deterministic priority order."""
-    return [SemanticOracle(), StructureOracle(), ScopeOracle(), TemporalOracle(), EvidenceOracle()]
+def default_oracles(semantic_scorer: SemanticScorer | None = None) -> list[RetrievalOracle]:
+    """The cheap oracle set, in deterministic priority order.
+
+    Pass `semantic_scorer` to swap the lexical stand-in for a real embedding model.
+    """
+    return [
+        SemanticOracle(semantic_scorer),
+        StructureOracle(),
+        ScopeOracle(),
+        TemporalOracle(),
+        EvidenceOracle(),
+    ]

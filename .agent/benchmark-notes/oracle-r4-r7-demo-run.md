@@ -7,6 +7,20 @@ not verify a claim.
 **Owner docs (menhir):** `docs/research/oracle-amplified-retrieval.md` (interface + combiner math),
 `docs/research/oracle-runtime-interfaces.md` (the runtime contract), execution-ladder rungs R4/R6/R7.
 
+## Headline finding
+
+> **A linear combiner lets relevance buy back currentness; role-separated logits don't.**
+
+The important result is not the deltas — it is that a hand-authored fixture finally **exposes the
+failure mode**: a weighted sum lets a "very relevant but stale" memory buy its way back into the top-k.
+That is exactly the failure Menhir/Archolith exists to prevent. The log-space role-logit combiner (F)
+routes the temporal contradiction to a separate currentness logit, so relevance cannot pay for
+staleness.
+
+**Verdict:** R7 graduates from *unjustified complexity* to *bench-justified, bench-only machinery*.
+Not production, not headline, not a general benchmark win — but worth continuing. **R11 (iterative
+amplification) remains blocked** (must beat F first).
+
 ## What landed
 
 The benchmark-local oracle pipeline, entirely inside archolith-bench (R4-R7 are build-first rungs but
@@ -106,14 +120,72 @@ meaningful. (Captured as `test_logspace_beats_weighted_on_hard_fixture`.)
 longer separates E from F here (both handle it once the corpus is deep enough) — the separation that
 survives is on stale / current-truth, which is exactly the role-separation claim.
 
+## Correlated-evidence trap (`fixtures/oracle_correlated.json`)
+
+One CURRENT truth ("resolved by the load-order adjustment") vs **five STALE echoes** of the same
+superseded belief ("the patch fully fixes it") spread across a design note, commit message, test
+comment, memory summary, and a copied README — with the stale belief given *higher* lexical match to the
+query than the current truth. 12 memories / 2 queries (a current-intent trap + a historical query that
+must preserve the echoes).
+
+| condition | recall@5 | stale_hit | current_truth_suppression |
+|-----------|---------:|----------:|--------------------------:|
+| A_semantic | 1.000 | 0.400 | 0.600 |
+| E_weighted | 0.900 | 0.200 | 0.800 |
+| F_logspace | 0.900 | **0.000** | **1.000** |
+
+```
+q_trap_current top-5:
+  E: [ct_truth, fill_name, echo_commit, echo_testcomment, fill_lease]   <- 2 stale echoes leak in
+  F: [ct_truth, fill_name, fill_lease, fill_floor, fill_graph]          <- all 5 echoes suppressed
+```
+
+Gate: **GRADUATES** (F cuts stale_hit 0.2→0.0 and lifts suppression 0.8→1.0; recall_loss 0.1 vs the
+A baseline, at the tolerance boundary).
+
+**Two honest corrections this trap forced:**
+
+1. **The "five echoes overpower one truth" hypothesis was partially falsified.** A *well-evidenced*
+   current truth (user+test evidence + currentness swing) is **not** buried by the chorus even under the
+   linear sum E — E ranked `ct_truth` #1. So a chorus does not automatically win; the truth's evidence
+   carried it. What E *does* do is admit 2 of the 5 stale echoes into the top-5 as noise; F admits none.
+   The sharper, true claim: **F keeps stale out of top-k; E admits it.** Whether stale then *displaces*
+   the truth (recall failure — `oracle_hard` q01) or only adds top-k noise (this trap) depends on the
+   evidence balance.
+2. **This trap exercises temporal role-separation, NOT the source-family cap.** Five separate echoes are
+   five candidates; the within-candidate independence cap (`1/√n` over one candidate's own oracle
+   results) never fires. Each echo is suppressed individually by its temporal contradiction. A genuine
+   test of the source-family cap needs a *single* candidate piling up many same-source SUPPORT signals —
+   still owed.
+
+## Do NOT claim (bounds on this result)
+
+This is bench-only, lexical-stand-in, placeholder-weight machinery. None of the following is shown:
+
+1. real embedding performance,
+2. calibrated weights,
+3. latency viability,
+4. general benchmark superiority,
+5. production readiness.
+
+## Next promotion gate (the real-setup bar for R7)
+
+F must beat E when **all** of these hold:
+
+1. the semantic scorer is **real** (not the lexical stand-in),
+2. the stale truth has a **stronger semantic match** than the current truth,
+3. **duplicate stale evidence** is present,
+4. **scoped corpus depth** is sufficient (≥ k in-scope candidates per scoped query),
+5. with **no recall@5 loss**.
+
+Only if F clears that bar does the R7 combiner earn a menhir production surface.
+
 ## Owed before any promotion decision (R4-R7)
 
 1. **A real semantic scorer** in place of the lexical stand-in (conditions A/E/F all use it).
-2. **A harder fixture** that actually separates E from F: high-support-but-stale, correlated-duplicate
-   evidence, and candidate-vs-candidate contradiction cases. The current demo cannot graduate F because
-   it cannot stress it — that is by design, not a failure.
-3. **Calibration** of `FAMILY_ALPHA` / `TARGET_LAMBDA` / `GAMMA` / the ranking-score role blend on that
-   fixture (they ship as placeholders, not tuned values).
+2. **Calibration** of `FAMILY_ALPHA` / `TARGET_LAMBDA` / `GAMMA` / the ranking-score role blend (they
+   ship as placeholders, not tuned values).
+3. **A source-family-cap fixture**: a single candidate citing many same-source supports (the cap is not
+   yet exercised by any fixture).
 4. **R5 (CostAwareOracleScheduler)** and the snapshot/budget rules before any latency claim.
-5. Only if F beats E on the real setup does the R7 combiner earn a menhir production surface. Until then
-   this stays bench-only; **iterative amplification (R11) is out of scope until it beats F.**
+5. **Takeaway:** R7 is now justified as **bench-only machinery**; **R11 remains blocked** (must beat F).

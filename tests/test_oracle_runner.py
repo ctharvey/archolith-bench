@@ -10,6 +10,7 @@ from archolith_bench.oracle.runner import CONDITIONS, OracleBenchmarkRunner
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 FIXTURE = FIXTURES / "oracle_demo.json"
 HARD_FIXTURE = FIXTURES / "oracle_hard.json"
+CORRELATED_FIXTURE = FIXTURES / "oracle_correlated.json"
 
 
 def _artifact() -> dict:
@@ -76,6 +77,22 @@ def test_logspace_beats_weighted_on_hard_fixture() -> None:
     assert f["stale_hit_rate"] <= e["stale_hit_rate"]
     assert f["current_truth_suppression_accuracy"] >= e["current_truth_suppression_accuracy"]
     assert f["recall_at_5"] >= e["recall_at_5"]
+    assert art["promotion_gate"]["graduates"] is True
+
+
+def test_correlated_trap_f_suppresses_all_stale_echoes() -> None:
+    # One current truth vs five stale echoes of the same belief. F must keep every
+    # stale echo out of the current-intent top-5; E admits some.
+    fx = OracleFixture.from_file(CORRELATED_FIXTURE)
+    by_id = fx.memories_by_id
+    art = OracleBenchmarkRunner(fx).run(include_traces=False)
+    f_pq = {r["query_id"]: r for r in art["conditions"]["F_logspace"]["per_query"]}
+    top5 = f_pq["q_trap_current"]["ranked"][:5]
+    assert top5[0] == "ct_truth"
+    assert not any(by_id[m].is_stale for m in top5), f"F leaked stale echo into top5: {top5}"
+    e = art["conditions"]["E_weighted"]["metrics"]
+    f = art["conditions"]["F_logspace"]["metrics"]
+    assert f["stale_hit_rate"] <= e["stale_hit_rate"]
     assert art["promotion_gate"]["graduates"] is True
 
 

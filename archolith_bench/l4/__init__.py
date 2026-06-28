@@ -21,9 +21,12 @@ from .models import (
 from .brief import BriefItem, ColdStartBriefV0, Epistemic, build_brief
 from .memory_oracle import ArtifactMatch, MemoryOracle
 from .mutator import ArtifactMutator, MutatorError
+from .runner import CONDITIONS, METRIC_KEYS, L4Task, run_l4_benchmark, run_task, score_brief
 
 __all__ = [
+    "CONDITIONS",
     "EVIDENCE_KINDS",
+    "METRIC_KEYS",
     "STRUCTURAL_EVIDENCE",
     "Artifact",
     "ArtifactFixture",
@@ -34,9 +37,13 @@ __all__ = [
     "ColdStartBriefV0",
     "Epistemic",
     "Evidence",
+    "L4Task",
     "MemoryOracle",
     "MutatorError",
     "Source",
     "Status",
     "build_brief",
+    "run_l4_benchmark",
+    "run_task",
+    "score_brief",
 ]

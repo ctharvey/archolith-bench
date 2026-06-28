@@ -1,0 +1,90 @@
+{
+  "name": "l4_failure_demo",
+  "description": "Smallest L4 contrast: does surfacing a TRUSTED Failure artifact (plus its corrective Decision) stop an agent repeating a known dead end? Corpus also carries an LLM CANDIDATE (must stay a hypothesis), a superseded Decision (must read historical), and an evidence-less human note (un-promotable) so the brief's epistemic bucketing is exercised, not just the happy path. Anchored on the real cosine-floor recall regression in scoring_service.py.",
+  "artifacts": [
+    {
+      "id": "floor_fail",
+      "type": "failure",
+      "summary": "fixed 0.15 cosine MIN_SIMILARITY_THRESHOLD dropped BM25/facet candidates before ranking",
+      "body": "A hard cosine floor on similarity silently discarded low-cosine but high-value candidates (BM25 and facet hits), tanking recall. Floor must not gate before the ranker sees them.",
+      "status": "trusted",
+      "source": "human",
+      "evidence": [
+        {"kind": "git", "ref": "e8da67d"},
+        {"kind": "test", "ref": "test_scoring_service::test_floor_does_not_drop_bm25"}
+      ],
+      "anchors": ["scoring_service.py"]
+    },
+    {
+      "id": "floor_fix",
+      "type": "decision",
+      "summary": "rank all candidates and apply a source-aware floor after ranking, not before",
+      "body": "Replace the pre-rank hard floor with a source-aware threshold applied post-ranking so BM25/facet candidates survive to the ranker.",
+      "status": "trusted",
+      "source": "human",
+      "evidence": [
+        {"kind": "git", "ref": "e8da67d"},
+        {"kind": "test", "ref": "test_scoring_service::test_source_aware_floor"}
+      ],
+      "anchors": ["scoring_service.py"]
+    },
+    {
+      "id": "floor_guess",
+      "type": "failure",
+      "summary": "the floor may also interact badly with the recency boost on cosine scores",
+      "body": "LLM-proposed hypothesis: recency boost could push stale items over the floor. Unverified.",
+      "status": "candidate",
+      "source": "llm",
+      "evidence": [
+        {"kind": "agent_inference", "ref": "scoring_service.py", "directness": 0.3}
+      ],
+      "anchors": ["scoring_service.py"]
+    },
+    {
+      "id": "old_floor",
+      "type": "decision",
+      "summary": "use a fixed 0.15 cosine floor on similarity to cut low-relevance candidates",
+      "body": "Original decision, superseded after it was shown to drop recall.",
+      "status": "historical",
+      "source": "human",
+      "evidence": [
+        {"kind": "git", "ref": "a11c0de"}
+      ],
+      "anchors": ["scoring_service.py"],
+      "superseded_by": "floor_fix"
+    },
+    {
+      "id": "floor_hunch",
+      "type": "decision",
+      "summary": "consider lowering the floor to 0.05 instead of removing it",
+      "body": "Human note with no evidence anchor — captured for review, must stay CANDIDATE and be un-promotable.",
+      "status": "candidate",
+      "source": "human",
+      "evidence": [],
+      "anchors": ["scoring_service.py"]
+    },
+    {
+      "id": "lease_inc",
+      "type": "incident",
+      "summary": "force_acquire overwrote an active scheduler lease, double-running a job",
+      "body": "Unrelated INCIDENT for type coverage; different anchor, should not surface for the floor task.",
+      "status": "trusted",
+      "source": "human",
+      "evidence": [
+        {"kind": "log", "ref": "incident-2026-05-02"}
+      ],
+      "anchors": ["scheduler_lease.py"]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t_floor",
+      "text": "Recall is dropping low-cosine candidates — tighten the similarity floor in scoring.",
+      "anchors": ["scoring_service.py"],
+      "gold_failure": "floor_fail",
+      "gold_decision": "floor_fix",
+      "gold_historical": "old_floor",
+      "baseline_ids": []
+    }
+  ]
+}

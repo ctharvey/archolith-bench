@@ -18,14 +18,17 @@ from .models import (
     Source,
     Status,
 )
+from .mutator import ArtifactMutator, MutatorError
 
 __all__ = [
     "EVIDENCE_KINDS",
     "STRUCTURAL_EVIDENCE",
     "Artifact",
     "ArtifactFixture",
+    "ArtifactMutator",
     "ArtifactType",
     "Evidence",
+    "MutatorError",
     "Source",
     "Status",
 ]

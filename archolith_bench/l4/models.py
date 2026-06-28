@@ -26,6 +26,12 @@ from pathlib import Path
 EVIDENCE_KINDS: frozenset[str] = frozenset({"git", "test", "user", "log", "agent_inference"})
 STRUCTURAL_EVIDENCE: frozenset[str] = frozenset({"git", "test"})
 
+# agent_inference is LLM self-evidence: it can back a CANDIDATE hypothesis but can NEVER, on
+# its own, justify TRUST ("not trusted because an LLM said so" — invariant 4 extended). Trust
+# requires at least one piece of non-LLM-self evidence (human / git / test / log).
+NON_PROMOTING_EVIDENCE: frozenset[str] = frozenset({"agent_inference"})
+PROMOTABLE_EVIDENCE: frozenset[str] = EVIDENCE_KINDS - NON_PROMOTING_EVIDENCE
+
 
 class ArtifactType(str, Enum):
     DECISION = "decision"
@@ -57,6 +63,11 @@ class Evidence:
     def is_structural(self) -> bool:
         """Deterministic anchor (git/test) — never LLM-derived (invariant 6)."""
         return self.kind in STRUCTURAL_EVIDENCE
+
+    @property
+    def is_promotable(self) -> bool:
+        """Can this evidence justify TRUST? LLM self-inference (agent_inference) cannot."""
+        return self.kind not in NON_PROMOTING_EVIDENCE
 
     @classmethod
     def from_dict(cls, data: dict) -> "Evidence":
@@ -93,6 +104,11 @@ class Artifact:
     @property
     def has_evidence(self) -> bool:
         return len(self.evidence) > 0
+
+    @property
+    def has_promotable_evidence(self) -> bool:
+        """True iff at least one evidence item can justify trust (not agent_inference)."""
+        return any(e.is_promotable for e in self.evidence)
 
     @property
     def is_trusted(self) -> bool:

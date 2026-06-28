@@ -66,6 +66,29 @@ def test_unknown_and_duplicate_and_self_supersede_raise() -> None:
         m.supersede("a", "a")
 
 
+def test_agent_inference_only_cannot_promote() -> None:
+    # Fix 1: LLM self-evidence (agent_inference) can back a hypothesis but never justify trust.
+    m = _m()
+    ai = [Evidence(kind="agent_inference", ref="scoring_service.py", directness=0.3)]
+    m.create(id="g1", type=ArtifactType.FAILURE, summary="hunch", source=Source.LLM, evidence=ai)
+    with pytest.raises(MutatorError):
+        m.promote("g1")  # invariant 3 + 4: agent_inference alone is not promotable
+
+
+def test_human_with_agent_inference_only_is_candidate_not_trusted() -> None:
+    # Fix 1: even a human artifact needs non-self evidence to be born TRUSTED.
+    ai = [Evidence(kind="agent_inference", ref="foo.py")]
+    a = _m().create(id="h1", type=ArtifactType.DECISION, summary="x", source=Source.HUMAN, evidence=ai)
+    assert a.status is Status.CANDIDATE
+
+
+def test_user_and_log_evidence_are_promotable() -> None:
+    # Non-structural but non-LLM evidence (user, log) still justifies trust.
+    a = _m().create(id="u1", type=ArtifactType.INCIDENT, summary="x", source=Source.HUMAN,
+                    evidence=[Evidence(kind="log", ref="inc-1")])
+    assert a.status is Status.TRUSTED
+
+
 def test_cannot_promote_historical() -> None:
     m = _m()
     m.create(id="old", type=ArtifactType.DECISION, summary="old", source=Source.HUMAN, evidence=_EV)

@@ -6,9 +6,10 @@ enforces the L4 invariants fail-closed so no other code path can mint a trusted 
 - create() DERIVES status from source+evidence — there is no `status` parameter, so an
   LLM artifact structurally CANNOT be TRUSTED on write (invariant 4):
     * source=llm   -> always CANDIDATE
-    * source=human -> TRUSTED iff it has >=1 evidence, else CANDIDATE (invariant 5)
-- promote() flips CANDIDATE -> TRUSTED and REFUSES without >=1 evidence (invariant 3).
-  Calling promote() is the review action (invariant 4: LLM needs evidence AND review).
+    * source=human -> TRUSTED iff it has >=1 PROMOTABLE evidence, else CANDIDATE (invariant 5)
+- promote() flips CANDIDATE -> TRUSTED and REFUSES without >=1 promotable evidence (invariant 3).
+  "Promotable" excludes agent_inference (LLM self-evidence): trust is never granted just
+  because an LLM said so. Calling promote() is the review action (invariant 4).
 - supersede() marks the old artifact HISTORICAL and links it — never deletes (invariant 7).
 
 `load()` seeds pre-established state from a fixture and is intentionally NOT gated (a
@@ -54,10 +55,11 @@ class ArtifactMutator:
         if id in self._store:
             raise MutatorError(f"artifact {id!r} already exists")
         ev = list(evidence or [])
+        promotable = any(e.is_promotable for e in ev)  # agent_inference alone never trusts
         if source is Source.LLM:
             status = Status.CANDIDATE  # invariant 4: never trusted on write
         else:
-            status = Status.TRUSTED if ev else Status.CANDIDATE  # invariant 5
+            status = Status.TRUSTED if promotable else Status.CANDIDATE  # invariant 5
         art = Artifact(
             id=id, type=type, summary=summary, body=body, status=status, source=source,
             evidence=ev, anchors=list(anchors or []), created_at=self._clock(),
@@ -68,8 +70,11 @@ class ArtifactMutator:
     def promote(self, id: str, *, reviewed_by: str = "human") -> Artifact:
         """Review action: CANDIDATE -> TRUSTED. Refuses without evidence (invariant 3)."""
         art = self._require(id)
-        if not art.has_evidence:
-            raise MutatorError(f"cannot promote {id!r}: TRUSTED requires >=1 evidence (invariant 3)")
+        if not art.has_promotable_evidence:
+            raise MutatorError(
+                f"cannot promote {id!r}: TRUSTED requires >=1 non-agent_inference evidence "
+                "(invariant 3; LLM self-inference cannot justify trust)"
+            )
         if art.is_historical:
             raise MutatorError(f"cannot promote {id!r}: it is historical/superseded")
         art.status = Status.TRUSTED

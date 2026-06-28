@@ -57,3 +57,23 @@ def test_extract_memory_preserves_provenance_facets() -> None:
     assert out.facets.source_id == "commit:abc"
     assert out.facets.learned_time == "2026-06-01"
     assert "recall_service.py" in out.facets.file
+
+
+def test_hybrid_reads_deterministic_from_gold_interpretive_from_text() -> None:
+    ex = FacetExtractor()
+    gold = MemoryFacetSet(
+        file={"a.py"}, symbol={"Foo"}, repo="menhir", valid_time="2026-01-01",
+        object={"goldobj"}, operation={"add"},
+    )
+    mem = Memory("m1", "we refactored `realobj` in unrelated.py", gold)
+    hy = ex.extract_memory_hybrid(mem).facets
+    # deterministic facets come from gold (structure/Git), NOT regex over prose
+    assert hy.file == {"a.py"}
+    assert hy.symbol == {"Foo"}
+    assert hy.repo == "menhir"
+    assert hy.valid_time == "2026-01-01"
+    # interpretive facets come from extraction (text), NOT gold
+    assert "realobj" in hy.object
+    assert "goldobj" not in hy.object
+    assert "refactor" in hy.operation
+    assert "add" not in hy.operation

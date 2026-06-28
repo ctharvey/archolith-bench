@@ -9,9 +9,12 @@ Runs the honest-baseline ladder over a `FacetFixture`, in both facet modes:
     E  facet index + embedding rerank
     F  facet index + meet-point rerank
 
-Two facet modes are kept strictly separate (R2 Risk #2):
+Three facet modes are kept strictly separate (R2 Risk #2):
 - gold       — memories use their hand-authored facets.
-- extracted  — memories use `FacetExtractor` output instead.
+- extracted  — memories use `FacetExtractor` output instead (regex/vocab over prose).
+- hybrid     — deterministic facets (file/symbol/test/scope/time/bucket) read from
+               structure/Git (gold stand-in); only interpretive facets extracted from
+               text. The realistic case (facet-extraction-plan.md, Priority 6).
 
 In both modes the *query* facets stay gold, and all correctness (stale /
 wrong-scope / support) is judged against the **gold** corpus — the extractor only
@@ -39,7 +42,7 @@ from .reranker import MeetPointReranker, MeetPointWeights
 
 CONDITIONS: tuple[str, ...] = ("A_bm25", "B_embedding", "C_hybrid", "D_file_context", "E_facet_embed", "F_facet_meet")
 BASELINE_CONDITIONS: tuple[str, ...] = ("A_bm25", "B_embedding", "C_hybrid")
-FACET_MODES: tuple[str, ...] = ("gold", "extracted")
+FACET_MODES: tuple[str, ...] = ("gold", "extracted", "hybrid")
 DEFAULT_K = 5
 
 
@@ -83,6 +86,8 @@ class FacetBenchmarkRunner:
             return self.fixture.memories
         if mode == "extracted":
             return [self.extractor.extract_memory(m) for m in self.fixture.memories]
+        if mode == "hybrid":
+            return [self.extractor.extract_memory_hybrid(m) for m in self.fixture.memories]
         raise ValueError(f"unknown facet mode: {mode}")
 
     # -- per-condition rankers ---------------------------------------------

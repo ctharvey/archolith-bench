@@ -115,3 +115,19 @@ def test_gate_helper_handles_synthetic_metrics() -> None:
     blocked = evaluate_promotion_gate(cond_results)
     assert blocked["graduates"] is False
     assert blocked["recall_acceptable"] is False
+
+
+def test_hybrid_mode_closes_the_extracted_gap() -> None:
+    # Priority 6: reading deterministic facets from structure/Git (hybrid) instead of
+    # regexing them from prose (extracted) should recover most of gold's performance.
+    draft = Path(__file__).resolve().parent.parent / "fixtures" / "facet_r2_draft.json"
+    artifact = FacetBenchmarkRunner(FacetFixture.from_file(draft)).run(include_traces=False)
+    f_extracted = artifact["modes"]["extracted"]["F_facet_meet"]["metrics"]["recall_at_5"]
+    f_hybrid = artifact["modes"]["hybrid"]["F_facet_meet"]["metrics"]["recall_at_5"]
+    f_gold = artifact["modes"]["gold"]["F_facet_meet"]["metrics"]["recall_at_5"]
+    # hybrid recovers far above pure extraction, near gold
+    assert f_hybrid > f_extracted
+    assert f_hybrid >= 0.75 * f_gold
+    # and the hybrid promotion gate graduates while extracted does not
+    assert artifact["promotion_gate"]["hybrid"]["graduates"] is True
+    assert artifact["promotion_gate"]["extracted"]["graduates"] is False

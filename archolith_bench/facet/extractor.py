@@ -156,6 +156,39 @@ class FacetExtractor:
         extracted.learned_time = memory.facets.learned_time
         return Memory(id=memory.id, text=memory.text, facets=extracted, superseded=memory.superseded)
 
+    def extract_memory_hybrid(self, memory: Memory) -> Memory:
+        """Hybrid extraction (facet-extraction-plan.md, Priority 6).
+
+        Deterministic facets are **read from the gold record** — standing in for the
+        Layer-2 structural model + Git history, where `file/symbol/test/repo/project/
+        namespace/source_id/valid_time/learned_time/belief_bucket` are *exact*. Only
+        the interpretive facets (`actor/object/operation/evidence_type`) are extracted
+        from prose. This models the realistic case the pure-`extracted` mode gets
+        wrong: a system never regexes "which repo / which file / when" out of text —
+        it knows them; only intent is genuinely hard to recover.
+        """
+        interp = self.extract(memory.text)
+        gold = memory.facets
+        facets = MemoryFacetSet(
+            # interpretive — recovered from text (the genuinely lossy part)
+            actor=interp.actor,
+            object=interp.object,
+            operation=interp.operation,
+            evidence_type=interp.evidence_type,
+            # deterministic — read from structure/Git (gold stand-in), never from prose
+            file=set(gold.file),
+            symbol=set(gold.symbol),
+            test=set(gold.test),
+            repo=gold.repo,
+            project=gold.project,
+            namespace=gold.namespace,
+            source_id=gold.source_id,
+            valid_time=gold.valid_time,
+            learned_time=gold.learned_time,
+            belief_bucket=gold.belief_bucket,
+        )
+        return Memory(id=memory.id, text=memory.text, facets=facets, superseded=memory.superseded)
+
     def _extract_actor(self, text: str) -> set[str]:
         actors: set[str] = set()
         if re.search(r"\b(?:I|we|our|my)\b", text):

@@ -113,14 +113,22 @@ DRAFT run (still the lexical-embedding stand-in, not a real embedder):
 
 | mode | A bm25 R@5 | F facet+meet R@5 | F stale | F wrong-scope | gate |
 |---|---|---|---|---|---|
-| gold      | 0.88 | 0.85 | 0.13 (vs 0.23 best baseline) | 0.08 (vs 0.40) | **graduates** (recall loss 0.025) |
-| extracted | 0.88 | 0.28 | — | 0.73 | fails (recall loss 0.60) |
+| gold      | 0.85 | 0.85 | 0.15 (vs 0.23 best baseline) | 0.07 (vs 0.40) | **graduates** (recall loss 0.000) |
+| extracted | 0.85 | 0.28 | 0.00 | 0.73 | fails (recall loss 0.575) |
+| **hybrid** | 0.85 | **0.83** | 0.13 | 0.07 | **graduates** (recall loss 0.025) |
 
-Notably more discriminating than the demo: BM25 is a *strong* baseline (R@5 0.88), F barely beats it
-on recall but slashes wrong-scope (0.40→0.08) and stale (0.23→0.13) — the win is exactly on the
+Notably more discriminating than the demo: BM25 is a *strong* baseline (R@5 0.85), F barely beats it
+on recall but slashes wrong-scope (0.40→0.07) and stale (0.23→0.13) — the win is exactly on the
 targeted metrics. Extracted-mode F collapses, honestly exposing that the cheap extractor can't recover
-facets from real prose (full file paths in gold vs basenames in text). Validator flags 4/20 queries as
-"uncontested" (no competing distractor) — acceptable (real corpora have easy queries too) but a place
-ctharvey can harden. **These DRAFT numbers still use a stand-in embedder; not a promotion decision.**
+facets from real prose (full file paths in gold vs basenames in text).
+
+**Hybrid mode (Priority 6 — the fix) recovers the gap.** Reading the deterministic facets
+(file/symbol/test/scope/time/bucket) from structure/Git instead of regexing them from prose — and
+extracting *only* the interpretive facets (actor/object/operation/evidence_type) — takes F's recall from
+**0.28 → 0.83** (gold is 0.85) and re-graduates the gate (recall loss 0.025), with stale/wrong-scope at
+gold levels. This confirms the plan's central claim: **the extractor bottleneck is the structural-facet
+extraction, not the engine** — a system should *read* those facets, never regex them. The small residual
+vs gold (0.83 vs 0.85) is the genuinely-interpretive facets the regex still misses. **Still the stand-in
+embedder; still a DRAFT fixture; not a promotion decision.**
 
 Run: `python scripts/run_facet_bench.py fixtures/facet_r2_draft.json`

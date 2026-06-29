@@ -57,6 +57,7 @@ in the provenance, ctharvey confirmation still the stated pairing step.
 | `r3_floor_retroactive` (current) | retroactive_correction | 0.50 | **0.00** | 0.0 | GRADUATES |
 | `r3_rename_wrong_scope` (current) | wrong_repo_or_branch | 0.50 | 0.33 | 0.0 | GRADUATES |
 | `r3_floor_history` (historical) | out_of_order / drift | 0.67 | **0.00** | 0.0 | GRADUATES |
+| `r3_seed_refactor` (current) | refactor_stale_memory (yawn.seed) | 0.60 | **0.00** | 0.0 | GRADUATES |
 
 Provenance: the floor cosine→rank-cut correction is recorded in `scoring_service.py:50-55`
 (R1 commit e8da67d) and confirmed live by `probe_rrf_scale.py` (RRF max 2.0); the
@@ -75,11 +76,27 @@ exactly where R3 stops. `r3_floor_history` is the intent-sensitivity control: th
 superseded belief that D suppresses under *current* intent is *surfaced as history*
 (preservation 1.0) under *historical* intent.
 
+### Second finding — Rung-0 buckets are useless against refactor-staleness (`r3_seed_refactor`)
+
+The yawn.seed god-class split (`LocalDataSourceService` → `CardIngestMapper` c9940ae +
+`RepoSyncService` cb2d013) is the `refactor_stale_memory` family. Result: **C scores
+identically to the baseline (stale 0.60 = 0.60)** — it does nothing. Refactor-stale
+beliefs ("mapping lives in LocalDataSourceService") are *well-supported* (`source_is_git`,
+`embedding_match`), so the Rung-0 scorer rates them SAFE_TO_ASSERT. **Staleness is not low
+confidence.** Only the currentness policy, reading the `is_expired` / `symbol_changed`
+supersession signals, catches them — D cuts stale 0.60 → 0.00. This is the strongest
+argument for R3: confidence-based bucketing alone cannot detect superseded-but-confident
+beliefs; you need an explicit supersession axis.
+
+A secondary nuance it exposed: a belief that is BOTH superseded AND noise (the wrong+stale
+"Japanese sets imported by default", now blocked by 139163f) lands in HISTORICAL_ONLY
+(surfaced) rather than BLOCKED, because `is_unsafe_belief` treats any superseded item as
+history. Distinguishing "superseded-but-was-true" from "superseded-and-was-wrong" is a
+future policy refinement (poison stayed 0.20 here).
+
 ### Still owed
 
-- The remaining families: `agent_retrieval_loop`, `structural_neighbor_bug`,
-  `auth_payload_refactor_stale_memory` (yawn.seed color-preservation refactor is a real
-  candidate).
+- The remaining families: `agent_retrieval_loop`, `structural_neighbor_bug`.
 - B (temporal metadata) + E/F (exhaustion penalty / bounded structural expansion) rungs.
 - ctharvey confirmation of gold labels; then production-recall wiring (still gated).
 

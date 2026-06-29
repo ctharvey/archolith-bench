@@ -1,0 +1,66 @@
+{
+  "name": "r3_seed_refactor",
+  "description": "REAL refactor-stale-memory fixture from yawn.seed history (auth_payload_refactor_stale_memory family). LocalDataSourceService was a 1200-line god-class that got split: DTO->entity mapping extracted to CardIngestMapper (commit c9940ae, ~480 lines out, 1200->723) and the repo/script sync phase extracted to RepoSyncService (commit cb2d013). Memories pinned to 'X lives in LocalDataSourceService' are now stale — the classic refactor-stale-memory poisoning case. Provenance: git log yawn.seed (c9940ae, cb2d013, 7e6c22e). Gold labels grounded in cited commits; ctharvey confirmation pending. intent=current ('where does this live in yawn.seed now?').",
+  "intent": "current",
+  "items": [
+    {
+      "id": "mapping_in_local_data_source",
+      "statement": "In yawn.seed, card DTO->entity mapping lives in LocalDataSourceService.",
+      "evidence": [
+        {"signal": "source_is_git", "note": "true before c9940ae; LocalDataSourceService was ~1200 lines"},
+        {"signal": "embedding_match", "note": "on-topic for 'where is card mapping'"},
+        {"signal": "is_expired", "note": "expired by c9940ae — mapping extracted out"},
+        {"signal": "symbol_changed", "note": "~480 lines moved to CardIngestMapper"}
+      ],
+      "gold_current": false,
+      "gold_historical": true,
+      "is_noise": false
+    },
+    {
+      "id": "mapping_in_card_ingest_mapper",
+      "statement": "Card DTO->entity mapping lives in CardIngestMapper (@Service), extracted from LocalDataSourceService.",
+      "evidence": [
+        {"signal": "source_is_git", "note": "commit c9940ae created CardIngestMapper (543 lines)"},
+        {"signal": "file_changed"},
+        {"signal": "later_confirmed", "note": "followed by 7e6c22e moving preload into it too"}
+      ],
+      "gold_current": true,
+      "gold_historical": false,
+      "is_noise": false
+    },
+    {
+      "id": "reposync_in_local_data_source",
+      "statement": "The repo clone/script sync phase of syncDatabase() lives inline in LocalDataSourceService.",
+      "evidence": [
+        {"signal": "embedding_match", "note": "on-topic for 'where is the repo sync phase'"},
+        {"signal": "source_is_git", "note": "true before cb2d013"},
+        {"signal": "is_expired", "note": "expired by cb2d013 — extracted to RepoSyncService"}
+      ],
+      "gold_current": false,
+      "gold_historical": true,
+      "is_noise": false
+    },
+    {
+      "id": "reposync_in_reposync_service",
+      "statement": "The repo/script phase is in RepoSyncService; LocalDataSourceService injects it and delegates.",
+      "evidence": [
+        {"signal": "source_is_git", "note": "commit cb2d013 created RepoSyncService (210 lines)"},
+        {"signal": "later_confirmed"}
+      ],
+      "gold_current": true,
+      "gold_historical": false,
+      "is_noise": false
+    },
+    {
+      "id": "stale_japanese_set_note",
+      "statement": "Japanese sets are imported into the catalog by default.",
+      "evidence": [
+        {"signal": "embedding_match", "strength": 0.3, "note": "weak overlap; actually blocked by 139163f"},
+        {"signal": "is_expired", "note": "139163f now blocks Japanese sets — this belief is wrong AND stale"}
+      ],
+      "gold_current": false,
+      "gold_historical": false,
+      "is_noise": true
+    }
+  ]
+}

@@ -108,3 +108,19 @@ def test_real_wrong_scope_exposes_currentness_policy_boundary() -> None:
     assert art["win_gate"]["graduates"] is True               # still a net improvement
     assert d["stale_current_assertion_rate"] < base["stale_current_assertion_rate"]
     assert d["stale_current_assertion_rate"] > 0.0            # but NOT eliminated (scope gap)
+
+
+def test_real_seed_refactor_rung0_is_useless_against_refactor_staleness() -> None:
+    """REAL yawn.seed refactor (LocalDataSourceService god-class split into CardIngestMapper
+    + RepoSyncService). Key finding: Rung-0 belief buckets (C) do NOTHING here — refactor-
+    stale beliefs are WELL-SUPPORTED (source_is_git, embedding), so the scorer rates them
+    SAFE_TO_ASSERT just like the baseline. Staleness is not low confidence. Only the
+    currentness policy (reading is_expired/symbol_changed) catches it: D cuts stale to 0."""
+    art = _run_fixture("r3_seed_refactor")
+    base = art["conditions"]["A_assert_all"]["metrics"]
+    c = art["conditions"]["C_belief_buckets"]["metrics"]
+    d = art["conditions"]["D_currentness"]["metrics"]
+    assert c["stale_current_assertion_rate"] == base["stale_current_assertion_rate"]  # C == A: no help
+    assert d["stale_current_assertion_rate"] == 0.0                                    # D eliminates it
+    assert d["historical_context_preservation"] == 1.0
+    assert art["win_gate"]["graduates"] is True

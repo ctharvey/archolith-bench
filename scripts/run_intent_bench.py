@@ -59,6 +59,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the IntentOracle benchmark over a fixture.")
     parser.add_argument("fixture", nargs="?", default=str(DEFAULT_FIXTURE))
     parser.add_argument("--out", default="results/intent_run.json")
+    parser.add_argument("--embedder", action="store_true",
+                        help="use the real LM Studio embedder instead of the lexical stand-in")
     args = parser.parse_args(argv)
 
     fixture_path = Path(args.fixture)
@@ -77,7 +79,18 @@ def main(argv: list[str] | None = None) -> int:
             print("\nerror: fixture has validation errors — results are not trustworthy", file=sys.stderr)
             return 1
 
-    artifact = IntentBenchmarkRunner(fixture).run()
+    scorer = None
+    if args.embedder:
+        from archolith_bench.intent.embedder import EmbedderUnavailable, LMStudioEmbeddingScorer
+        scorer = LMStudioEmbeddingScorer()
+        try:
+            scorer.similarity("warmup", "warmup")  # fail loudly now, not mid-run
+        except EmbedderUnavailable as exc:
+            print(f"error: --embedder requested but {exc}", file=sys.stderr)
+            return 1
+        print(f"semantic scorer: {scorer.name}")
+
+    artifact = IntentBenchmarkRunner(fixture, semantic_scorer=scorer).run()
     _print_report(artifact)
 
     out_path = Path(args.out)

@@ -183,6 +183,41 @@ def test_validator_flags_single_role_corpus() -> None:
     assert "NO-PREFERRED-ROLE" in codes  # debug prefers no reference-only corpus role
 
 
+TWO_TOPIC = Path(__file__).resolve().parent.parent / "fixtures" / "intent_two_topic_corpus.json"
+
+
+def test_two_topic_validates_and_graduates() -> None:
+    from archolith_bench.intent.validate import has_errors, validate_intent_fixture
+    fx = IntentFixture.from_file(TWO_TOPIC)
+    assert not has_errors(validate_intent_fixture(fx))
+    art = IntentBenchmarkRunner(fx).run()
+    # role carried by metadata only -> embedder-invariant; shuffle must collapse below intent_on
+    assert art["promotion_gate"]["graduates"] is True
+    assert art["intent_correct_at_1"]["shuffle_ablation"] < art["intent_correct_at_1"]["intent_on"]
+
+
+# --- embedder (hermetic math; network test skips when offline) ---------------
+
+def test_embedder_cosine_and_clamp() -> None:
+    from archolith_bench.intent.embedder import LMStudioEmbeddingScorer
+    s = LMStudioEmbeddingScorer()
+    s._cache["search_query: a"] = [1.0, 0.0]
+    s._cache["search_document: a"] = [1.0, 0.0]
+    s._cache["search_document: b"] = [0.0, 1.0]
+    assert s.similarity("a", "a") == 1.0          # identical -> cosine 1
+    assert s.similarity("a", "b") == 0.0          # orthogonal -> clamped to 0
+
+
+def test_embedder_live_or_skip() -> None:
+    from archolith_bench.intent.embedder import EmbedderUnavailable, LMStudioEmbeddingScorer
+    s = LMStudioEmbeddingScorer()
+    try:
+        sim = s.similarity("source aware floor recall", "source aware floor recall")
+    except EmbedderUnavailable:
+        pytest.skip("embedding endpoint offline")
+    assert 0.0 <= sim <= 1.0
+
+
 def test_validator_flags_dangling_and_mismatch() -> None:
     from archolith_bench.intent.models import IntentMemory, IntentQuery
     from archolith_bench.intent.validate import has_errors, validate_intent_fixture

@@ -81,9 +81,44 @@ benchmark. **Errors** (untrustworthy): empty corpus/queries, dup memory/query id
 
 The shipped `intent_floor_corpus.json` validates clean. 31 tests (incl. validator tests).
 
+## Real-embedder run (2026-06-29) — the conclusion changed, as the gating discipline predicted
+
+Swapped the lexical stand-in for a real embedder — **`text-embedding-nomic-embed-text-v1.5`
+(768-dim) on LM Studio :1234**, via `intent/embedder.py` (`--embedder` flag; nomic
+`search_query:`/`search_document:` prefixes, cached, cosine clamped to [0,1]). Ran two
+fixtures x two scorers:
+
+| fixture | scorer | baseline | intent_on | shuffle | gate |
+|---|---|---|---|---|---|
+| floor (1 topic, role-words in prose) | lexical | 0.143 | 1.000 | 0.691 | **GRADUATES** |
+| floor (1 topic, role-words in prose) | **embedder** | 0.571 | 1.000 | **0.905** | **does NOT** (shuffle won't collapse) |
+| two-topic CONTROLLED (role=metadata) | lexical | 0.571 | 0.714 | 0.429 | **GRADUATES** |
+| two-topic CONTROLLED (role=metadata) | **embedder** | 0.571 | 0.714 | 0.429 | **GRADUATES** |
+
+**The load-bearing finding.** On the single-topic floor fixture the artifact text *names its
+own role* ("...decision config", "...failure regression"). A real embedder embeds "why did we
+choose" near "decision" on its own, so it recovers role-matching without intent — and a
+*wrong* intent (shuffle) rides that same floor, so the shuffle does not collapse and the gate
+fails. The lexical stand-in could not do this, which is exactly why the lexical run was only
+ever a harness sanity check, not a promotion decision.
+
+**The fix is a fixture-design law, not a code change:** carry the content role in **metadata
+(`artifact_type`), not in prose.** The controlled two-topic fixture does this — within a topic
+all artifact TEXT is identical (the topic phrase), so neither lexical nor embedder can separate
+roles by text; the task intent is the ONLY within-topic role signal. Result: it graduates
+**identically under both backends** (intent_on 0.714 vs shuffle 0.429, +0.286 margin) — i.e.
+the IntentOracle's contribution is **embedder-invariant**, the strongest form of the claim.
+
+Caveats that remain: baseline 0.571 is partly an id-tiebreak artifact (alphabetically-first
+`benchmark_*` is a broadly-preferred role), so read the **shuffle collapse** (0.429 << 0.714),
+not the baseline delta, as the proof. intent_on 0.714 (not 1.0) because the other oracles
+co-decide within a tied-text topic. Determinism 1.0 (embedder cached). The single-topic floor
+fixture is kept only as the lexical-era demo; **the controlled two-topic fixture is canonical.**
+
 ## Open
 
 - Matrix **magnitudes** (PREFER=1.0/NEUTRAL=0.25/PENALIZE=0.05/IGNORE=0.0) are the bench's
   first calibration — the design left them open. Signs (P/N/X/-) are the human contract.
-- Grow the fixture beyond one topic (multiple single-topic blocks) and swap a real embedder
-  before the production-graduation re-run.
+- Grow the controlled fixture to more topics/roles; consider de-biasing the baseline
+  id-tiebreak. Then the gated menhir production integration (add IntentOracle to
+  `default_oracles()` + wire `task_intents_to_lens` at the recall entry point).

@@ -168,10 +168,36 @@ Entity hub and keeping the pool at 6 (cap 22). The guards (per-hit/total cap, de
 limit, utility suppression) are unit-proven to actually bound — the whole risk of
 structural expansion is unbounded blow-up, and it doesn't.
 
-### Still owed
+## Rung B — temporal metadata / bitemporal clock model (2026-06-28)
 
-- B (temporal-metadata rung). The Chronostratum bitemporal track (parked `rung1a`) is the
-  natural source for B's evidence.
+The last ladder rung, built: menhir `domain/temporal.py` (the Chronostratum clock model)
++ `archolith_bench/r3/temporal.py` + `fixtures/r3_temporal_ce_willow.json` (the RimWorld
+scrambled-ingestion seed straight from menhir-temporal-chronostratum-plan.md) +
+`scripts/run_r3_temporal_bench.py`.
+
+Four bitemporally-stamped facts; three temporal lenses queried.
+
+| condition | temporal_recall | temporal_precision | leak_rate |
+|---|---|---|---|
+| A_no_temporal | 1.000 | 0.583 | 0.417 |
+| **B_temporal** | 1.000 | **1.000** | **0.000** |
+
+**GRADUATES.** Temporal-blind recall returns every fact for every query (leaking the
+superseded "patch fixed it" belief as current, plus not-yet-valid / world-expired facts);
+the clock model returns exactly the right set per lens with zero leakage and no recall
+loss. Specifically: current-belief excludes the expired belief; *as-known-Wednesday*
+surfaces it as a **former belief** (the belief-drift story); *as-of-world-Thursday* returns
+what was true in the world then. This is the keystone the belief currentness policy (D)
+sits on — B is the deterministic producer of the supersession/validity signal, D the
+policy consumer.
+
+### R3 ladder complete
+
+All belief-layer.md rungs are now built and bench-graduating: B (temporal) · C/D
+(belief buckets + currentness) · E (exhaustion) · F (bounded structural expansion), plus
+7 real currentness fixture families. Still owed: Git/structure stale-evidence wiring (Rung
+2 of the belief-layer internal ladder — feed FILE_CHANGED/SYMBOL_CHANGED from real git into
+BeliefEvidence) and, gated on ctharvey label confirmation, production recall wiring.
 - B (temporal metadata) + E/F (exhaustion penalty / bounded structural expansion) rungs.
 - ctharvey confirmation of gold labels; then production-recall wiring (still gated).
 

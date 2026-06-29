@@ -44,3 +44,44 @@ historical-preservation loss.
   recall (still gated — no production recall change until graduation on real fixtures).
 
 Artifact: `results/r3_run.json` (gitignored).
+
+---
+
+## Real fixtures (grounded in menhir history, 2026-06-28)
+
+Three fixtures authored from CITED menhir history (not invented), gold labels grounded
+in the provenance, ctharvey confirmation still the stated pairing step.
+
+| fixture (intent) | family | A stale | D stale | hist loss | gate |
+|---|---|---|---|---|---|
+| `r3_floor_retroactive` (current) | retroactive_correction | 0.50 | **0.00** | 0.0 | GRADUATES |
+| `r3_rename_wrong_scope` (current) | wrong_repo_or_branch | 0.50 | 0.33 | 0.0 | GRADUATES |
+| `r3_floor_history` (historical) | out_of_order / drift | 0.67 | **0.00** | 0.0 | GRADUATES |
+
+Provenance: the floor cosine→rank-cut correction is recorded in `scoring_service.py:50-55`
+(R1 commit e8da67d) and confirmed live by `probe_rrf_scale.py` (RRF max 2.0); the
+`cth.mcp.memory → yawn_memory → menhir` rename is `chain-handoff.md:480`.
+
+### The honest finding the real fixtures surfaced — the policy's boundary
+
+`r3_rename_wrong_scope` only cuts stale 0.50 → 0.33 (not to zero) and leaves poison at
+0.25. That is **correct and important**: the currentness policy gates **temporal
+staleness** (superseded / expired beliefs), **not scope conflict**. The wrong-repo
+`hybrid_alpha_other_repo` belief carries no supersession signal and scores assertable,
+so D does not suppress it. Scope conflict is a *different* gate — R1's
+`wrong_scope_injection` / the belief-layer `SelfToleranceGate` — not R3's job. A
+too-clean synthetic fixture would have hidden this; the real wrong-repo case exposed
+exactly where R3 stops. `r3_floor_history` is the intent-sensitivity control: the same
+superseded belief that D suppresses under *current* intent is *surfaced as history*
+(preservation 1.0) under *historical* intent.
+
+### Still owed
+
+- The remaining families: `agent_retrieval_loop`, `structural_neighbor_bug`,
+  `auth_payload_refactor_stale_memory` (yawn.seed color-preservation refactor is a real
+  candidate).
+- B (temporal metadata) + E/F (exhaustion penalty / bounded structural expansion) rungs.
+- ctharvey confirmation of gold labels; then production-recall wiring (still gated).
+
+Artifacts: `results/r3_floor_retroactive.json`, `results/r3_rename_wrong_scope.json`,
+`results/r3_floor_history.json` (gitignored).

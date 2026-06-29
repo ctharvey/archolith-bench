@@ -1,0 +1,52 @@
+{
+  "name": "r3_floor_retroactive",
+  "description": "REAL belief-drift from menhir history (retroactive_correction family). The recall similarity floor was BELIEVED to be a cosine threshold (~0.15, 'genuine matches >0.3') — that was the original code comment in scoring_service.py. It was later CORRECTED: the value the floor gates is graphiti's RRF node_reranker_score (rank_const=1 -> dual-method top = 2.0), so 0.15 is a RANK cut, not a cosine cutoff. Confirmed live by archolith-bench/scripts/probe_rrf_scale.py (RRF max 2.0). Provenance: scoring_service.py:50-55 (the correction is now in-code), R1 commit e8da67d, deferred-verification.md. Gold labels grounded in cited history; ctharvey confirmation is the stated pairing step. intent=current.",
+  "intent": "current",
+  "items": [
+    {
+      "id": "floor_is_cosine",
+      "statement": "The recall similarity floor (0.15) is a cosine-similarity threshold; genuine matches typically exceed 0.3.",
+      "evidence": [
+        {"signal": "source_is_git", "note": "the original scoring_service.py code comment asserted this"},
+        {"signal": "embedding_match", "note": "directly on-topic for a query about the floor"},
+        {"signal": "is_expired", "note": "expired by the live RRF-scale measurement (probe_rrf_scale.py)"}
+      ],
+      "gold_current": false,
+      "gold_historical": true,
+      "is_noise": false
+    },
+    {
+      "id": "floor_is_rank_cut",
+      "statement": "The 0.15 floor gates graphiti's RRF node_reranker_score (rank_const=1, dual-method top = 2.0), so it behaves as a rank cut, not a cosine cutoff.",
+      "evidence": [
+        {"signal": "test_passed", "note": "probe_rrf_scale.py measured RRF max 2.0 live on the throwaway graph"},
+        {"signal": "source_is_log", "note": "live measurement output"},
+        {"signal": "later_confirmed", "note": "confirmed the code-analysis prediction exactly"}
+      ],
+      "gold_current": true,
+      "gold_historical": false,
+      "is_noise": false
+    },
+    {
+      "id": "source_aware_floor_exemption",
+      "statement": "BM25/file-linked candidates are exempt from the floor because their relevance is provenance, not cosine similarity.",
+      "evidence": [
+        {"signal": "source_is_git", "note": "scoring_service.py FLOOR_EXEMPT_SOURCES, R1 e8da67d"},
+        {"signal": "entity_match"}
+      ],
+      "gold_current": true,
+      "gold_historical": false,
+      "is_noise": false
+    },
+    {
+      "id": "stale_unrelated_token_estimator",
+      "statement": "The token estimator validation run used a different sampling window last month.",
+      "evidence": [
+        {"signal": "embedding_match", "strength": 0.2, "note": "weak spurious lexical overlap on 'validation'"}
+      ],
+      "gold_current": false,
+      "gold_historical": false,
+      "is_noise": true
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "name": "r3_rename_wrong_scope",
+  "description": "REAL belief-drift from menhir history (wrong_repo_or_branch_memory family). The project was renamed cth.mcp.memory -> yawn_memory -> menhir (chain-handoff.md:480), so memories keyed to the old names/repo are stale or wrong-scope for a current menhir query. Also: hybrid_alpha is a real menhir recall knob (retrieval_tuning.py) — a same-named concept in another repo is wrong-scope. Provenance cited per item; gold labels grounded in cited history, ctharvey confirmation pending. intent=current (menhir).",
+  "intent": "current",
+  "items": [
+    {
+      "id": "package_is_menhir",
+      "statement": "The memory service package is 'menhir' (src/menhir/, env MENHIR_*, console script 'menhir serve').",
+      "evidence": [
+        {"signal": "source_is_git", "note": "current package layout, chain-handoff.md:480"},
+        {"signal": "later_confirmed"},
+        {"signal": "entity_match"}
+      ],
+      "gold_current": true,
+      "gold_historical": false,
+      "is_noise": false
+    },
+    {
+      "id": "package_is_cth_mcp_memory",
+      "statement": "The memory service package is 'cth_mcp_memory' under projects/ctharvey/cth.mcp.memory.",
+      "evidence": [
+        {"signal": "embedding_match", "note": "on-topic for 'what is the memory package'"},
+        {"signal": "is_expired", "note": "renamed away; the old path no longer exists"}
+      ],
+      "gold_current": false,
+      "gold_historical": true,
+      "is_noise": false
+    },
+    {
+      "id": "hybrid_alpha_menhir",
+      "statement": "In menhir, hybrid_alpha is a rank-fusion weight blending vector and BM25 passes in recall (retrieval_tuning.py).",
+      "evidence": [
+        {"signal": "source_is_git", "note": "menhir RetrievalTuningConfig, R1"},
+        {"signal": "entity_match"}
+      ],
+      "gold_current": true,
+      "gold_historical": false,
+      "is_noise": false
+    },
+    {
+      "id": "hybrid_alpha_other_repo",
+      "statement": "The hybrid alpha slider in the dashboard project blends two demo scores in the UI.",
+      "evidence": [
+        {"signal": "embedding_match", "note": "same symbol name, different repo -> wrong scope for a menhir query"}
+      ],
+      "gold_current": false,
+      "gold_historical": false,
+      "is_noise": true
+    }
+  ]
+}

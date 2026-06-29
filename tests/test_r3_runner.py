@@ -69,3 +69,42 @@ def test_gate_reports_missing_conditions() -> None:
     gate = evaluate_win_gate(partial)
     assert gate["graduates"] is False
     assert "missing" in gate["reason"]
+
+
+# --- real fixtures grounded in menhir history ------------------------------
+
+def _run_fixture(name: str) -> dict:
+    return R3BenchmarkRunner(BeliefFixture.from_file(REPO_ROOT / "fixtures" / f"{name}.json")).run()
+
+
+def test_real_floor_retroactive_graduates() -> None:
+    """REAL menhir drift: cosine-floor belief -> rank-cut correction. D eliminates the
+    stale current assertion and keeps the former belief as history."""
+    art = _run_fixture("r3_floor_retroactive")
+    d = art["conditions"]["D_currentness"]["metrics"]
+    assert art["win_gate"]["graduates"] is True
+    assert d["stale_current_assertion_rate"] == 0.0
+    assert d["historical_context_preservation"] == 1.0
+
+
+def test_real_floor_history_surfaces_former_belief_under_historical_intent() -> None:
+    """Intent-sensitivity control: under HISTORICAL intent the superseded cosine belief
+    is surfaced (preservation 1.0) but still not asserted as current (stale 0.0)."""
+    art = _run_fixture("r3_floor_history")
+    d = art["conditions"]["D_currentness"]["metrics"]
+    assert art["intent"] == "historical"
+    assert d["stale_current_assertion_rate"] == 0.0
+    assert d["historical_context_preservation"] == 1.0
+
+
+def test_real_wrong_scope_exposes_currentness_policy_boundary() -> None:
+    """HONEST limitation a real fixture surfaces: the currentness policy catches TEMPORAL
+    staleness (superseded), not SCOPE conflict. A wrong-repo same-name belief with no
+    supersession signal is NOT fully suppressed by D — scope is R1/SelfToleranceGate's
+    job, not R3's. D still improves over baseline but does not reach zero here."""
+    art = _run_fixture("r3_rename_wrong_scope")
+    base = art["conditions"]["A_assert_all"]["metrics"]
+    d = art["conditions"]["D_currentness"]["metrics"]
+    assert art["win_gate"]["graduates"] is True               # still a net improvement
+    assert d["stale_current_assertion_rate"] < base["stale_current_assertion_rate"]
+    assert d["stale_current_assertion_rate"] > 0.0            # but NOT eliminated (scope gap)

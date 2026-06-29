@@ -66,9 +66,24 @@ The four producer modules are the contract menhir's pure-domain layer reproduces
 `services/retrieval_oracles.py`. **Not** added to `default_oracles()` in production until a
 real-embedder + grown-fixture run re-confirms the gate.
 
+## Fixture validator (`intent/validate.py`) — added
+
+Auto-runs before every ladder run (like `oracle/validate.py`); flags it, does not design the
+benchmark. **Errors** (untrustworthy): empty corpus/queries, dup memory/query id, dangling
+`expected_top`/support, date-order, bad belief bucket. **Intent-specific silliness warnings:**
+- `SINGLE-ROLE-CORPUS` — < 3 distinct content roles, so intent has nothing to re-rank between.
+- `NO-PREFERRED-ROLE` — a query's intent prefers no role any memory carries (unrewardable).
+- `EXPECTED-TOP-MISMATCH` — the hand-authored gold carries no preferred role for its intent.
+- `UNCLASSIFIED-QUERY` — a main query matches no intent cue (LOW confidence).
+- `NO-SUPERSEDED` — history-wanting intents present but no superseded memory to exercise the lens.
+- `TOPIC-NOT-CONSTANT` — no token shared by half the corpus (a ranking change could be topic
+  leakage, the thing this bench design exists to rule out).
+
+The shipped `intent_floor_corpus.json` validates clean. 31 tests (incl. validator tests).
+
 ## Open
 
 - Matrix **magnitudes** (PREFER=1.0/NEUTRAL=0.25/PENALIZE=0.05/IGNORE=0.0) are the bench's
   first calibration — the design left them open. Signs (P/N/X/-) are the human contract.
-- Grow the fixture beyond one topic; add a fixture validator (mirror `oracle/validate.py`)
-  if this rung continues.
+- Grow the fixture beyond one topic (multiple single-topic blocks) and swap a real embedder
+  before the production-graduation re-run.

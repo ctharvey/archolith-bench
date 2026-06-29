@@ -28,6 +28,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from archolith_bench.intent.models import IntentFixture  # noqa: E402
 from archolith_bench.intent.runner import IntentBenchmarkRunner  # noqa: E402
+from archolith_bench.intent.validate import has_errors, validate_intent_fixture  # noqa: E402
 
 DEFAULT_FIXTURE = REPO_ROOT / "fixtures" / "intent_floor_corpus.json"
 
@@ -66,6 +67,16 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     fixture = IntentFixture.from_file(fixture_path)
+
+    findings = validate_intent_fixture(fixture)
+    if findings:
+        print(f"\n=== fixture validation: {len(findings)} finding(s) ===")
+        for f in findings:
+            print(" ", f)
+        if has_errors(findings):
+            print("\nerror: fixture has validation errors — results are not trustworthy", file=sys.stderr)
+            return 1
+
     artifact = IntentBenchmarkRunner(fixture).run()
     _print_report(artifact)
 

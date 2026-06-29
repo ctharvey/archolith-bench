@@ -24,6 +24,7 @@ from .models import IntentFixture, IntentMemory, IntentQuery
 from .oracle import IntentOracle
 from .roles import ContentRole, derive_content_role
 from .runner import IntentBenchmarkRunner
+from .validate import Finding, has_errors, validate_intent_fixture
 
 __all__ = [
     "TaskIntent", "IntentConfidence", "IntentHit", "classify_intent", "primary_intent",
@@ -32,4 +33,5 @@ __all__ = [
     "resolve_affinity", "task_intents_to_query_intent",
     "IntentMemory", "IntentQuery", "IntentFixture",
     "IntentOracle", "IntentBenchmarkRunner",
+    "Finding", "validate_intent_fixture", "has_errors",
 ]

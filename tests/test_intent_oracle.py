@@ -160,3 +160,46 @@ def test_ladder_graduates() -> None:
     assert ic["intent_on"] > ic["baseline"]
     assert art["determinism"] == 1.0
     assert art["promotion_gate"]["graduates"] is True
+
+
+# --- validator --------------------------------------------------------------
+
+def test_validator_clean_on_shipped_fixture() -> None:
+    from archolith_bench.intent.validate import has_errors, validate_intent_fixture
+    findings = validate_intent_fixture(IntentFixture.from_file(FIXTURE))
+    assert not has_errors(findings)
+
+
+def test_validator_flags_single_role_corpus() -> None:
+    from archolith_bench.intent.models import IntentMemory, IntentQuery
+    from archolith_bench.intent.validate import validate_intent_fixture
+    fx = IntentFixture(
+        name="x", description="",
+        memories=[IntentMemory(id=f"m{i}", text="floor recall topic", artifact_type="reference") for i in range(3)],
+        queries=[IntentQuery(id="q", text="why is the floor failing")],
+    )
+    codes = {f.code for f in validate_intent_fixture(fx)}
+    assert "SINGLE-ROLE-CORPUS" in codes
+    assert "NO-PREFERRED-ROLE" in codes  # debug prefers no reference-only corpus role
+
+
+def test_validator_flags_dangling_and_mismatch() -> None:
+    from archolith_bench.intent.models import IntentMemory, IntentQuery
+    from archolith_bench.intent.validate import has_errors, validate_intent_fixture
+    fx = IntentFixture(
+        name="x", description="",
+        memories=[
+            IntentMemory(id="dec", text="floor recall decision", artifact_type="decision"),
+            IntentMemory(id="fail", text="floor recall failure", artifact_type="failure"),
+            IntentMemory(id="bench", text="floor recall benchmark", artifact_type="benchmark"),
+        ],
+        queries=[
+            IntentQuery(id="q_bad", text="why did we choose the floor", expected_top="ghost"),  # dangling
+            IntentQuery(id="q_mis", text="why did we choose the floor", expected_top="fail"),    # explain->failure not preferred
+        ],
+    )
+    findings = validate_intent_fixture(fx)
+    codes = {f.code for f in findings}
+    assert has_errors(findings)
+    assert "DANGLING-EXPECTED" in codes
+    assert "EXPECTED-TOP-MISMATCH" in codes

@@ -74,41 +74,7 @@ class R1BenchmarkRunner:
     def _aggregate(
         self, ranked_by_query: dict[str, list[str]], latencies: list[float]
     ) -> dict[str, float]:
-        k = self.k
-        queries_by_id = {q.id: q for q in self.fixture.queries}
-        n = len(self.fixture.queries) or 1
-
-        recall = stale = wrong = 0.0
-        exact_hits: list[float] = []
-        symbol_hits: list[float] = []
-        family_recall: dict[str, list[float]] = {}
-
-        for qid, ranked in ranked_by_query.items():
-            q = queries_by_id[qid]
-            recall += M.recall_at_k(ranked, q.support_ids, k)
-            stale += M.stale_hit_rate(ranked, self.memories_by_id, q, k)
-            wrong += M.wrong_scope_injection_rate(ranked, self.memories_by_id, q, k)
-
-            es = M.exact_string_hit(ranked, self.memories_by_id, q, k)
-            if es is not None:
-                exact_hits.append(es)
-            sy = M.symbol_hit(ranked, self.memories_by_id, q, k)
-            if sy is not None:
-                symbol_hits.append(sy)
-
-            family_recall.setdefault(q.family, []).append(M.recall_at_k(ranked, q.support_ids, k))
-
-        agg = {
-            "recall_at_5": round(recall / n, 4),
-            "exact_string_recall": round(_mean(exact_hits), 4),
-            "symbol_recall": round(_mean(symbol_hits), 4),
-            "stale_hit_rate": round(stale / n, 4),
-            "wrong_scope_injection_rate": round(wrong / n, 4),
-            "latency_ms": round(_mean(latencies), 4),
-        }
-        for family, vals in family_recall.items():
-            agg[f"recall_at_5__{family}"] = round(_mean(vals), 4)
-        return agg
+        return aggregate_metrics(self.fixture, ranked_by_query, latencies, self.k)
 
     def run(self) -> dict:
         results = {name: self.run_condition(name, r) for name, r in self.conditions.items()}
@@ -128,6 +94,55 @@ class R1BenchmarkRunner:
             },
             "win_gate": gate,
         }
+
+
+def aggregate_metrics(
+    fixture: R1Fixture,
+    ranked_by_query: dict[str, list[str]],
+    latencies: list[float],
+    k: int = DEFAULT_K,
+) -> dict[str, float]:
+    """Compute the six headline R1 metrics (+ per-family recall) for one condition.
+
+    Shared by the stub runner and the live driver so both score identically.
+    exact_string_recall / symbol_recall average only over the queries that target
+    an exact string / symbol.
+    """
+    queries_by_id = {q.id: q for q in fixture.queries}
+    memories_by_id = fixture.memories_by_id
+    n = len(fixture.queries) or 1
+
+    recall = stale = wrong = 0.0
+    exact_hits: list[float] = []
+    symbol_hits: list[float] = []
+    family_recall: dict[str, list[float]] = {}
+
+    for qid, ranked in ranked_by_query.items():
+        q = queries_by_id[qid]
+        recall += M.recall_at_k(ranked, q.support_ids, k)
+        stale += M.stale_hit_rate(ranked, memories_by_id, q, k)
+        wrong += M.wrong_scope_injection_rate(ranked, memories_by_id, q, k)
+
+        es = M.exact_string_hit(ranked, memories_by_id, q, k)
+        if es is not None:
+            exact_hits.append(es)
+        sy = M.symbol_hit(ranked, memories_by_id, q, k)
+        if sy is not None:
+            symbol_hits.append(sy)
+
+        family_recall.setdefault(q.family, []).append(M.recall_at_k(ranked, q.support_ids, k))
+
+    agg = {
+        "recall_at_5": round(recall / n, 4),
+        "exact_string_recall": round(_mean(exact_hits), 4),
+        "symbol_recall": round(_mean(symbol_hits), 4),
+        "stale_hit_rate": round(stale / n, 4),
+        "wrong_scope_injection_rate": round(wrong / n, 4),
+        "latency_ms": round(_mean(latencies), 4),
+    }
+    for family, vals in family_recall.items():
+        agg[f"recall_at_5__{family}"] = round(_mean(vals), 4)
+    return agg
 
 
 def evaluate_win_gate(

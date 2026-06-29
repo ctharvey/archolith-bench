@@ -120,6 +120,7 @@ class MenhirLiveRetriever:
     tuning: Any  # menhir RetrievalTuningConfig (imported lazily by the caller)
     group_ids: list[str] | None = None
     candidate_k: int = 50
+    uuid_to_id: dict[str, str] | None = None  # graph node uuid -> fixture memory id
     name: str = "menhir_live"
 
     def rank(self, query: R1Query, k: int) -> RankResult:
@@ -130,7 +131,7 @@ class MenhirLiveRetriever:
         result = asyncio.run(
             self.recall_service.recall(
                 query.text,
-                limit=k,
+                limit=self.candidate_k,  # full ranking; metrics slice top-k after id-mapping
                 candidate_k=self.candidate_k,
                 namespace=namespace,
                 tuning=self.tuning,
@@ -138,8 +139,26 @@ class MenhirLiveRetriever:
             )
         )
         latency_ms = (time.perf_counter() - start) * 1000.0
-        ranked = [r.uuid for r in result.results]
+        ranked = self._to_fixture_ids([r.uuid for r in result.results])
         return RankResult(ranked_ids=ranked, latency_ms=latency_ms, trace=_trace_to_dict(result.trace))
+
+    def _to_fixture_ids(self, uuids: list[str]) -> list[str]:
+        """Map graph node uuids -> fixture memory ids (dedup, preserve order).
+
+        When no grounding map is set, return the raw uuids unchanged. Unmapped
+        uuids are dropped (a retrieved node with no fixture provenance is not a
+        gold support candidate).
+        """
+        if self.uuid_to_id is None:
+            return uuids
+        out: list[str] = []
+        seen: set[str] = set()
+        for u in uuids:
+            mid = self.uuid_to_id.get(u)
+            if mid is not None and mid not in seen:
+                seen.add(mid)
+                out.append(mid)
+        return out
 
 
 def _trace_to_dict(trace: Any) -> dict[str, Any] | None:

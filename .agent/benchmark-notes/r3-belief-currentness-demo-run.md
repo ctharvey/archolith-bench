@@ -125,10 +125,30 @@ structural-expansion rung; breaking a recency loop needs the **RetrievalExhausti
 fixtures (the unflag wiring fix b49f3c0/7528c11; menhir's last_accessed recency loop) that
 motivate E/F — not as proof R3 alone solves loops or structural bugs.
 
+## Rung E — RetrievalExhaustionPenalty (session-replay, 2026-06-28)
+
+The `agent_retrieval_loop` boundary fixture motivated rung E, now built:
+menhir `domain/exhaustion.py` (the policy) + `archolith_bench/r3/session.py` (a
+session-trace ladder) + `fixtures/r3_session_loop.json` + `scripts/run_r3_exhaustion_bench.py`.
+
+Fixture: an agent re-retrieves the unproductive "just lower the 0.15 cosine floor" tweak
+every turn (recency self-reinforced) with no progress until turn 6.
+
+| condition | loop_injection_rate | productive_retention | exempt_retention |
+|---|---|---|---|
+| A_no_penalty | 0.400 | 1.000 | 1.000 |
+| **E_exhaustion** | **0.000** | 1.000 | 1.000 |
+
+**GRADUATES.** E eliminates loop injections (0.40 → 0.00) while keeping productive AND
+exempt retention at 1.0 — it suppresses the trap only after it crosses the unproductive
+threshold (`retrievals_since_progress >= 4`), and never touches the exempt active-error /
+task-goal memories or the productive progress-driver. A unit test also confirms that a
+trap which *produces progress* every couple of turns is never suppressed (counter resets) —
+productive recency is preserved, which is the entire design constraint.
+
 ### Still owed
 
-- B (temporal metadata) + E/F (exhaustion penalty / bounded structural expansion) rungs —
-  motivated by the two boundary fixtures above.
+- B (temporal metadata) + F (bounded structural expansion) rungs.
 - B (temporal metadata) + E/F (exhaustion penalty / bounded structural expansion) rungs.
 - ctharvey confirmation of gold labels; then production-recall wiring (still gated).
 

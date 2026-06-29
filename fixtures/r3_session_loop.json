@@ -1,0 +1,18 @@
+{
+  "name": "r3_session_loop",
+  "description": "Session-trace fixture for the exhaustion policy (R3 rung E), grounded in the agent_retrieval_loop story: an agent keeps re-retrieving the unproductive 'just lower the 0.15 cosine floor' tweak across turns (recency self-reinforced), never progressing, until the rank-cut finding lands at turn 6. The active error log is exempt (must keep surfacing); a productive memory drives the eventual progress. Items: lower_floor_tweak = loop trap; active_error = exempt (active_error_log); rank_cut_finding = productive (progress driver). Provenance: menhir recall last_accessed recency loop + the real floor finding.",
+  "items": [
+    {"id": "lower_floor_tweak", "is_loop_trap": true},
+    {"id": "active_error", "exempt_reason": "active_error_log"},
+    {"id": "rank_cut_finding"},
+    {"id": "task_goal", "exempt_reason": "current_task_goal"}
+  ],
+  "turns": [
+    {"retrieved": ["task_goal", "active_error", "lower_floor_tweak"], "progress": false},
+    {"retrieved": ["task_goal", "active_error", "lower_floor_tweak"], "progress": false},
+    {"retrieved": ["task_goal", "active_error", "lower_floor_tweak"], "progress": false},
+    {"retrieved": ["task_goal", "active_error", "lower_floor_tweak"], "progress": false},
+    {"retrieved": ["task_goal", "active_error", "lower_floor_tweak", "rank_cut_finding"], "progress": false},
+    {"retrieved": ["task_goal", "active_error", "rank_cut_finding"], "progress": true}
+  ]
+}

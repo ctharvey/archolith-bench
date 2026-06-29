@@ -150,6 +150,22 @@ cone…" (no cue collision); intent_on then rose 0.679 -> 0.714. The `TOPIC-NOT-
 also reworked to flag all-distinct-text corpora (the leaky shape), which correctly warns on the
 old single-topic floor fixture and passes the controlled multi-topic one.
 
+## Baseline honesty — what we compare against (and what we DON'T)
+
+The gate now compares intent against the **oracle-stack default** (full default_oracles WITHOUT
+intent), not the semantic-only strawman. On the 4-topic controlled fixture (OpenAI 3-small):
+`semantic_only=0.393 -> oracle_default=0.429 -> intent_on=0.714` (shuffle 0.429). So intent adds
++0.286 over the oracle stack itself — the honest marginal-value-of-intent number.
+
+**Critical caveat — none of these arms is menhir's pre-oracle, pre-frontier SHIPPED recall.**
+The shipped recall path is the two-phase `recall_service` + `scoring_service` over Graphiti
+hybrid (vector + BM25) search — a different code path that needs a live Neo4j+Graphiti graph and
+is NOT run by this pure-stdlib bench. So we have demonstrated that intent improves the **frontier
+oracle pipeline** in a controlled harness; we have **NOT** shown intent (or the oracle stack)
+beats what menhir actually ships today. That comparison requires wiring the shipped recall as a
+bench baseline arm over the same fixtures on a live graph — the long-standing live-graph owed
+work (`deferred-verification.md`), still outstanding.
+
 ## Open
 
 - Matrix **magnitudes** (PREFER=1.0/NEUTRAL=0.25/PENALIZE=0.05/IGNORE=0.0) are the bench's

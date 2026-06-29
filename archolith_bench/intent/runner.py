@@ -43,11 +43,13 @@ _ALL_INTENTS: tuple[TaskIntent, ...] = tuple(
 class QueryDetail:
     query_id: str
     true_intent: str
-    baseline_top: str
-    baseline_correct: float
+    semantic_top: str
+    semantic_correct: float        # semantic-only reference floor
+    default_top: str
+    default_correct: float         # the DEFAULT production method (full stack, no intent)
     intent_top: str
-    intent_correct: float
-    shuffle_correct: float  # mean intent-correct@1 over all WRONG forced intents
+    intent_correct: float          # default method + intent
+    shuffle_correct: float         # mean intent-correct@1 over all WRONG forced intents
 
 
 @dataclass
@@ -108,13 +110,15 @@ class IntentBenchmarkRunner:
 
     def run(self) -> dict:
         details: list[QueryDetail] = []
-        b_sum = on_sum = sh_sum = 0.0
+        sem_sum = def_sum = on_sum = sh_sum = 0.0
         for q in self.fixture.queries:
             true = primary_intent(classify_intent(q.text)[0])
-            base = self._rank_baseline(q.text)
-            on = self._rank_intent(q.text)
+            sem = self._rank_baseline(q.text)            # semantic-only reference floor
+            default = self._rank_full_no_intent(q.text)  # the DEFAULT production method
+            on = self._rank_intent(q.text)               # default method + intent
 
-            b_ok = M.intent_correct_at_1(self._meta(base), true)
+            sem_ok = M.intent_correct_at_1(self._meta(sem), true)
+            def_ok = M.intent_correct_at_1(self._meta(default), true)
             on_ok = M.intent_correct_at_1(self._meta(on), true)
             # Shuffle: feed every WRONG intent and average — the expected accuracy of a
             # random wrong intent. If intent_on's lift were topic leakage, this would
@@ -125,22 +129,26 @@ class IntentBenchmarkRunner:
                 for w in wrongs
             ) / (len(wrongs) or 1)
 
-            b_sum += b_ok
+            sem_sum += sem_ok
+            def_sum += def_ok
             on_sum += on_ok
             sh_sum += sh_ok
             details.append(QueryDetail(
                 query_id=q.id, true_intent=true.value,
-                baseline_top=base[0] if base else "", baseline_correct=b_ok,
+                semantic_top=sem[0] if sem else "", semantic_correct=sem_ok,
+                default_top=default[0] if default else "", default_correct=def_ok,
                 intent_top=on[0] if on else "", intent_correct=on_ok,
                 shuffle_correct=round(sh_ok, 4),
             ))
 
         n = len(self.fixture.queries) or 1
-        baseline_acc = round(b_sum / n, 4)
+        semantic_acc = round(sem_sum / n, 4)
+        default_acc = round(def_sum / n, 4)
         intent_acc = round(on_sum / n, 4)
         shuffle_acc = round(sh_sum / n, 4)
         no_harm = self._run_no_harm()
-        gate = self._gate(baseline_acc, intent_acc, shuffle_acc, no_harm)
+        # Gate against the DEFAULT production method, not the semantic-only strawman.
+        gate = self._gate(default_acc, intent_acc, shuffle_acc, no_harm)
 
         return {
             "fixture": self.fixture.name,
@@ -152,7 +160,8 @@ class IntentBenchmarkRunner:
                 "n_no_harm_queries": len(self.fixture.no_harm_queries),
             },
             "intent_correct_at_1": {
-                "baseline": baseline_acc,
+                "semantic_only": semantic_acc,
+                "oracle_default_no_intent": default_acc,
                 "intent_on": intent_acc,
                 "shuffle_ablation": shuffle_acc,
             },
@@ -183,21 +192,25 @@ class IntentBenchmarkRunner:
 
     @staticmethod
     def _gate(
-        baseline: float, intent_on: float, shuffle: float, no_harm: dict,
+        oracle_default: float, intent_on: float, shuffle: float, no_harm: dict,
         tol: float = 1e-9, shuffle_margin: float = 0.15,
     ) -> dict:
-        beats_baseline = intent_on > baseline + tol
+        # Gate against the ORACLE-STACK DEFAULT (full stack, no intent) — the honest
+        # marginal-value-of-intent question within the frontier oracle pipeline. NOTE: this
+        # is NOT menhir's pre-frontier shipped recall (graphiti hybrid + scoring), which the
+        # bench does not run (needs a live graph); see benchmark notes.
+        beats_default = intent_on > oracle_default + tol
         # Collapse: a random WRONG intent loses most of the lift (proves the gain is the
         # intent signal, not topic leakage). Residual shuffle accuracy is expected — some
         # artifact roles are broadly task-useful — so we require a margin, not zero.
         shuffle_collapses = intent_on - shuffle > shuffle_margin
         no_harm_ok = no_harm["intent_on"] >= no_harm["no_intent"] - tol
         return {
-            "graduates": bool(beats_baseline and shuffle_collapses and no_harm_ok),
-            "intent_beats_baseline": bool(beats_baseline),
+            "graduates": bool(beats_default and shuffle_collapses and no_harm_ok),
+            "intent_beats_oracle_default": bool(beats_default),
             "shuffle_collapses": bool(shuffle_collapses),
             "no_harm_holds": bool(no_harm_ok),
             "shuffle_margin": shuffle_margin,
-            "lift_vs_baseline": round(intent_on - baseline, 4),
+            "lift_vs_oracle_default": round(intent_on - oracle_default, 4),
             "lift_vs_shuffle": round(intent_on - shuffle, 4),
         }

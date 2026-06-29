@@ -157,7 +157,7 @@ def test_fixture_loads() -> None:
 def test_ladder_graduates() -> None:
     art = IntentBenchmarkRunner(IntentFixture.from_file(FIXTURE)).run()
     ic = art["intent_correct_at_1"]
-    assert ic["intent_on"] > ic["baseline"]
+    assert ic["intent_on"] > ic["oracle_default_no_intent"]   # beats the oracle-stack default
     assert art["determinism"] == 1.0
     assert art["promotion_gate"]["graduates"] is True
 
@@ -193,7 +193,9 @@ def test_multi_topic_validates_and_graduates() -> None:
     art = IntentBenchmarkRunner(fx).run()
     # role carried by metadata only -> embedder-invariant; shuffle must collapse below intent_on
     assert art["promotion_gate"]["graduates"] is True
-    assert art["intent_correct_at_1"]["shuffle_ablation"] < art["intent_correct_at_1"]["intent_on"]
+    ic = art["intent_correct_at_1"]
+    assert ic["shuffle_ablation"] < ic["intent_on"]
+    assert ic["intent_on"] > ic["oracle_default_no_intent"]
 
 
 # --- embedder (hermetic math; network test skips when offline) ---------------

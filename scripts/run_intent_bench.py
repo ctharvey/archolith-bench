@@ -38,21 +38,23 @@ def _print_report(art: dict) -> None:
     nh = art["no_harm_ndcg_at_5"]
     gate = art["promotion_gate"]
     print(f"\n=== intent ladder: {art['fixture']} ===")
-    print(f"  intent-correct@1   baseline={ic['baseline']:.3f}  "
+    print(f"  intent-correct@1   semantic_only={ic['semantic_only']:.3f}  "
+          f"oracle_default={ic['oracle_default_no_intent']:.3f}  "
           f"intent_on={ic['intent_on']:.3f}  shuffle={ic['shuffle_ablation']:.3f}")
+    print("                     (gate baseline = oracle_default; NOT menhir's pre-frontier shipped recall)")
     print(f"  no-harm nDCG@5     no_intent={nh['no_intent']:.3f}  intent_on={nh['intent_on']:.3f} (n={nh['n']})")
     print(f"  determinism        {art['determinism']:.1f}")
-    print("\n  per-query (true intent -> intent_on top / baseline top):")
+    print("\n  per-query (true intent -> intent_on top / oracle_default top):")
     for d in art["per_query"]:
         flag = "OK " if d["intent_correct"] else "-- "
-        print(f"    {flag}{d['query_id']:11s} {d['true_intent']:18s} "
-              f"on={d['intent_top']:16s} base={d['baseline_top']:16s} shuffle={d['shuffle_correct']:.2f}")
+        print(f"    {flag}{d['query_id']:13s} {d['true_intent']:18s} "
+              f"on={d['intent_top']:18s} default={d['default_top']:18s} shuffle={d['shuffle_correct']:.2f}")
     verdict = "GRADUATES" if gate["graduates"] else "does not graduate"
-    print(f"\n  promotion gate: {verdict}")
-    print(f"    intent beats baseline: {gate['intent_beats_baseline']} (lift {gate['lift_vs_baseline']:+.3f})")
-    print(f"    shuffle collapses:     {gate['shuffle_collapses']} "
+    print(f"\n  promotion gate (intent vs oracle_default): {verdict}")
+    print(f"    intent beats oracle default: {gate['intent_beats_oracle_default']} (lift {gate['lift_vs_oracle_default']:+.3f})")
+    print(f"    shuffle collapses:           {gate['shuffle_collapses']} "
           f"(lift vs shuffle {gate['lift_vs_shuffle']:+.3f}, margin {gate['shuffle_margin']})")
-    print(f"    no-harm holds:         {gate['no_harm_holds']}")
+    print(f"    no-harm holds:               {gate['no_harm_holds']}")
 
 
 def main(argv: list[str] | None = None) -> int:

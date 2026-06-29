@@ -24,9 +24,40 @@ import urllib.request
 DEFAULT_BASE_URL = os.environ.get("INTENT_EMBED_BASE_URL", "http://localhost:1234/v1")
 DEFAULT_MODEL = os.environ.get("INTENT_EMBED_MODEL", "text-embedding-nomic-embed-text-v1.5")
 
+OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+OPENAI_MODEL = os.environ.get("OPENAI_EMBED_MODEL", "text-embedding-3-small")
+
 
 class EmbedderUnavailable(RuntimeError):
     """Raised when the embedding endpoint cannot be reached — never fall back silently."""
+
+
+def _cosine(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(y * y for y in b))
+    if na == 0 or nb == 0:
+        return 0.0
+    return dot / (na * nb)
+
+
+def _post_embeddings(url: str, payload: dict, headers: dict, timeout: float) -> list[float]:
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json", **headers}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")[:200] if hasattr(exc, "read") else ""
+        if exc.code == 429:
+            raise EmbedderUnavailable(f"RATE LIMITED (429) at {url}: {detail}") from exc
+        raise EmbedderUnavailable(f"HTTP {exc.code} at {url}: {detail}") from exc
+    except (urllib.error.URLError, OSError, TimeoutError) as exc:
+        raise EmbedderUnavailable(f"embedding endpoint {url} unreachable: {exc}") from exc
+    vec = data.get("data", [{}])[0].get("embedding")
+    if not vec:
+        raise EmbedderUnavailable(f"embedding endpoint {url} returned no vector")
+    return vec
 
 
 class LMStudioEmbeddingScorer:
@@ -55,34 +86,51 @@ class LMStudioEmbeddingScorer:
         return f"{'search_query' if is_query else 'search_document'}: {text}"
 
     def _embed(self, text: str) -> list[float]:
-        if text in self._cache:
-            return self._cache[text]
-        payload = json.dumps({"input": text, "model": self.model}).encode("utf-8")
-        req = urllib.request.Request(
-            f"{self.base_url}/embeddings", data=payload,
-            headers={"Content-Type": "application/json"}, method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-        except (urllib.error.URLError, OSError, TimeoutError) as exc:
-            raise EmbedderUnavailable(f"embedding endpoint {self.base_url} unreachable: {exc}") from exc
-        vec = data.get("data", [{}])[0].get("embedding")
-        if not vec:
-            raise EmbedderUnavailable(f"embedding endpoint returned no vector for model {self.model!r}")
-        self._cache[text] = vec
-        return vec
-
-    @staticmethod
-    def _cosine(a: list[float], b: list[float]) -> float:
-        dot = sum(x * y for x, y in zip(a, b))
-        na = math.sqrt(sum(x * x for x in a))
-        nb = math.sqrt(sum(y * y for y in b))
-        if na == 0 or nb == 0:
-            return 0.0
-        return dot / (na * nb)
+        if text not in self._cache:
+            self._cache[text] = _post_embeddings(
+                f"{self.base_url}/embeddings", {"input": text, "model": self.model}, {}, self.timeout
+            )
+        return self._cache[text]
 
     def similarity(self, query_text: str, candidate_text: str) -> float:
         q = self._embed(self._prefix(query_text, is_query=True))
         c = self._embed(self._prefix(candidate_text, is_query=False))
-        return max(0.0, min(1.0, self._cosine(q, c)))
+        return max(0.0, min(1.0, _cosine(q, c)))
+
+
+class OpenAIEmbeddingScorer:
+    """Cosine similarity from the OpenAI embeddings API (text-embedding-3-small by default).
+
+    Reads the key from `OPENAI_API_KEY` (never hard-coded). No task prefixes (OpenAI models
+    do not use them). Caches each unique text; embeddings are cheap (~4 tokens/short input)
+    but a 429 is surfaced as EmbedderUnavailable, never silently retried."""
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str = OPENAI_MODEL,
+        base_url: str = OPENAI_BASE_URL,
+        timeout: float = 30.0,
+    ) -> None:
+        self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
+        self.model = model
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+        self._cache: dict[str, list[float]] = {}
+
+    @property
+    def name(self) -> str:
+        return f"openai:{self.model}"
+
+    def _embed(self, text: str) -> list[float]:
+        if not self.api_key:
+            raise EmbedderUnavailable("OPENAI_API_KEY is not set")
+        if text not in self._cache:
+            self._cache[text] = _post_embeddings(
+                f"{self.base_url}/embeddings", {"input": text, "model": self.model},
+                {"Authorization": f"Bearer {self.api_key}"}, self.timeout,
+            )
+        return self._cache[text]
+
+    def similarity(self, query_text: str, candidate_text: str) -> float:
+        return max(0.0, min(1.0, _cosine(self._embed(query_text), self._embed(candidate_text))))

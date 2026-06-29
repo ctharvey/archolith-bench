@@ -183,12 +183,12 @@ def test_validator_flags_single_role_corpus() -> None:
     assert "NO-PREFERRED-ROLE" in codes  # debug prefers no reference-only corpus role
 
 
-TWO_TOPIC = Path(__file__).resolve().parent.parent / "fixtures" / "intent_two_topic_corpus.json"
+MULTI_TOPIC = Path(__file__).resolve().parent.parent / "fixtures" / "intent_multi_topic_corpus.json"
 
 
-def test_two_topic_validates_and_graduates() -> None:
+def test_multi_topic_validates_and_graduates() -> None:
     from archolith_bench.intent.validate import has_errors, validate_intent_fixture
-    fx = IntentFixture.from_file(TWO_TOPIC)
+    fx = IntentFixture.from_file(MULTI_TOPIC)
     assert not has_errors(validate_intent_fixture(fx))
     art = IntentBenchmarkRunner(fx).run()
     # role carried by metadata only -> embedder-invariant; shuffle must collapse below intent_on

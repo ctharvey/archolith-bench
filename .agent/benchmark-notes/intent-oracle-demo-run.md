@@ -115,10 +115,45 @@ not the baseline delta, as the proof. intent_on 0.714 (not 1.0) because the othe
 co-decide within a tied-text topic. Determinism 1.0 (embedder cached). The single-topic floor
 fixture is kept only as the lexical-era demo; **the controlled two-topic fixture is canonical.**
 
+## Grown corpus + de-biased baseline + three backends (2026-06-29)
+
+Three follow-ups landed together:
+1. **De-biased baseline.** The semantic-only baseline tiebroke ties by alphabetical id, which
+   systematically picked `benchmark_*` (a broadly-preferred role) and inflated baseline to
+   0.571. Now `IntentBenchmarkRunner._tiebreak` hashes the id (role-neutral, deterministic), so
+   the baseline sits at the true chance rate (~0.39).
+2. **Grown corpus.** `intent_multi_topic_corpus.json` — **4 menhir topics** (source-aware floor;
+   hybrid RRF rank-fusion; belief currentness buckets; structural dependency-cone temporal join)
+   x 7 roles = 28 memories / 28 queries / 4 no-harm. Controlled design (within-topic text
+   identical, role in metadata).
+3. **OpenAI embedder.** `OpenAIEmbeddingScorer` (`text-embedding-3-small`, 1536-dim; key from
+   `OPENAI_API_KEY`, never hard-coded; 429 surfaced, never silently retried). `--scorer
+   {lexical,lmstudio,openai}`.
+
+**Result — identical across all three backends (lexical / nomic-embed / OpenAI 3-small):**
+
+```
+intent-correct@1   baseline=0.393  intent_on=0.714  shuffle=0.429   (all three scorers)
+gate: GRADUATES    lift vs baseline +0.321 | shuffle collapses +0.286 | no-harm holds | determinism 1.0
+```
+
+Because within-topic text is identical, the semantic backend cannot drive within-topic ranking,
+so the three scorers produce **byte-identical** intent metrics — the IntentOracle's contribution
+is **embedder-invariant**, now demonstrated across a lexical stub, a local model, and a
+production OpenAI model. Baseline (0.393) ~= shuffle (0.429) ~= chance; intent_on (0.714) is the
+only arm above chance, and the shuffle collapse proves that lift is the intent signal.
+
+**The validator earned its keep:** it flagged `EXPECTED-TOP-MISMATCH` on the blast-topic plan
+query — the topic name "structural **blast radius**…" collided with the `CHANGE_ANALYSIS` cue
+"blast radius", misclassifying all 7 blast queries. Renamed the topic to "structural dependency
+cone…" (no cue collision); intent_on then rose 0.679 -> 0.714. The `TOPIC-NOT-CONSTANT` guard was
+also reworked to flag all-distinct-text corpora (the leaky shape), which correctly warns on the
+old single-topic floor fixture and passes the controlled multi-topic one.
+
 ## Open
 
 - Matrix **magnitudes** (PREFER=1.0/NEUTRAL=0.25/PENALIZE=0.05/IGNORE=0.0) are the bench's
   first calibration — the design left them open. Signs (P/N/X/-) are the human contract.
-- Grow the controlled fixture to more topics/roles; consider de-biasing the baseline
-  id-tiebreak. Then the gated menhir production integration (add IntentOracle to
-  `default_oracles()` + wire `task_intents_to_lens` at the recall entry point).
+- Gated menhir production integration remains (add IntentOracle to `default_oracles()` + wire
+  `task_intents_to_lens` at the recall entry point) — now the embedder gate is met on a real
+  OpenAI model, this is unblocked pending an explicit go (it changes production recall).

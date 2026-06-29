@@ -104,17 +104,19 @@ def validate_intent_fixture(fixture: IntentFixture) -> list[Finding]:
                                 f"only {len(all_roles)} distinct content role(s) (< {MIN_DISTINCT_ROLES}); "
                                 "intent has too little to re-rank between"))
 
-    # topic held constant: some token must appear in a majority of memories.
-    if len(fixture.memories) > 1:
-        counts: dict[str, int] = {}
+    # controlled design: roles within a topic should share identical text, so the semantic
+    # backend cannot drive within-topic ranking (only intent can). If EVERY memory has
+    # distinct text, there is no controlled topic grouping and a ranking change could be
+    # topic/semantic leakage rather than the intent signal. (This correctly flags the
+    # role-words-in-prose fixtures the real-embedder run showed were leaky.)
+    if len(fixture.memories) > MIN_DISTINCT_ROLES:
+        text_counts: dict[str, int] = {}
         for m in fixture.memories:
-            for t in _tokens(m.text):
-                counts[t] = counts.get(t, 0) + 1
-        half = (len(fixture.memories) + 1) // 2
-        if not any(c >= half for c in counts.values()):
+            text_counts[m.text] = text_counts.get(m.text, 0) + 1
+        if max(text_counts.values()) < 2:
             findings.append(Finding("warn", "TOPIC-NOT-CONSTANT", "fixture",
-                                    "no token shared by half the corpus; a ranking change may be topic "
-                                    "leakage, not the intent signal"))
+                                    "every memory has distinct text — no controlled topic grouping; "
+                                    "a ranking change may be topic/semantic leakage, not the intent signal"))
 
     has_superseded = any(m.superseded or m.belief_bucket in ("historical", "anergic", "blocked")
                          for m in fixture.memories)

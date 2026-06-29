@@ -59,8 +59,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the IntentOracle benchmark over a fixture.")
     parser.add_argument("fixture", nargs="?", default=str(DEFAULT_FIXTURE))
     parser.add_argument("--out", default="results/intent_run.json")
-    parser.add_argument("--embedder", action="store_true",
-                        help="use the real LM Studio embedder instead of the lexical stand-in")
+    parser.add_argument("--scorer", choices=("lexical", "lmstudio", "openai"), default="lexical",
+                        help="semantic backend: lexical stand-in (default), LM Studio, or OpenAI")
     args = parser.parse_args(argv)
 
     fixture_path = Path(args.fixture)
@@ -80,13 +80,17 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     scorer = None
-    if args.embedder:
-        from archolith_bench.intent.embedder import EmbedderUnavailable, LMStudioEmbeddingScorer
-        scorer = LMStudioEmbeddingScorer()
+    if args.scorer != "lexical":
+        from archolith_bench.intent.embedder import (
+            EmbedderUnavailable,
+            LMStudioEmbeddingScorer,
+            OpenAIEmbeddingScorer,
+        )
+        scorer = LMStudioEmbeddingScorer() if args.scorer == "lmstudio" else OpenAIEmbeddingScorer()
         try:
             scorer.similarity("warmup", "warmup")  # fail loudly now, not mid-run
         except EmbedderUnavailable as exc:
-            print(f"error: --embedder requested but {exc}", file=sys.stderr)
+            print(f"error: --scorer {args.scorer} requested but {exc}", file=sys.stderr)
             return 1
         print(f"semantic scorer: {scorer.name}")
 

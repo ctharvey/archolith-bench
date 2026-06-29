@@ -17,6 +17,7 @@ before quoting absolute numbers).
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 
 from archolith_bench.oracle.combiner import LogSpaceOracleCombiner
@@ -62,11 +63,19 @@ class IntentBenchmarkRunner:
 
     # --- ranking arms -------------------------------------------------------
 
+    @staticmethod
+    def _tiebreak(cid: str) -> str:
+        """Role-neutral deterministic tiebreak. Alphabetical-id tiebreak systematically
+        favored `benchmark_*` (a broadly-preferred role), inflating the semantic-only
+        baseline above chance; hashing the id removes that role correlation while staying
+        deterministic."""
+        return hashlib.md5(cid.encode()).hexdigest()
+
     def _rank_baseline(self, text: str) -> list[str]:
         ctx = QueryContext(text=text)
         sem = SemanticOracle(self.semantic_scorer)
         scored = [(c.id, sem.evaluate(ctx, c).probability) for c in self.candidates]
-        return [cid for cid, _ in sorted(scored, key=lambda kv: (-kv[1], kv[0]))]
+        return [cid for cid, _ in sorted(scored, key=lambda kv: (-kv[1], self._tiebreak(kv[0])))]
 
     def _rank_intent(self, text: str, forced: TaskIntent | None = None) -> list[str]:
         if forced is not None:

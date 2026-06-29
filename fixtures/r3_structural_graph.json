@@ -1,0 +1,32 @@
+{
+  "name": "r3_structural_unflag",
+  "description": "REAL structural-expansion fixture from THIS session's unflag_memory bug (commit b49f3c0/7528c11). Query 'is unflag_memory wired?' semantically surfaces the obvious route + tool (seed hits), but the actual cause was a STRUCTURAL NEIGHBOR two hops down the RPC chain: BackendClient.unflag_memory was missing and unflag_memory was absent from _BACKEND_METHODS. Bounded structural expansion from the semantic seeds reaches those neighbors (depth 2) while suppressing the generic Entity hub. Graph mirrors the real call chain: route -> backend_invoke -> {_BACKEND_METHODS allowlist, BackendClient}. Provenance: menhir api/routes.py + core/backend_impl.py.",
+  "seed_hits": ["unflag_route", "unflag_tool"],
+  "gold_neighbors": ["backendclient_unflag_memory", "backend_methods_allowlist"],
+  "hub_nodes": ["entity_node_generic"],
+  "max_depth": 2,
+  "max_clones_per_hit": 5,
+  "max_total_clones": 20,
+  "utility_degree_threshold": 25,
+  "degrees": {
+    "entity_node_generic": 500,
+    "backendclient_unflag_memory": 4,
+    "backend_methods_allowlist": 6,
+    "backend_invoke": 12
+  },
+  "graph": {
+    "unflag_route": [
+      {"id": "backend_invoke", "relation": "callee"},
+      {"id": "unflag_response_model", "relation": "imports"}
+    ],
+    "unflag_tool": [
+      {"id": "backend_invoke", "relation": "callee"},
+      {"id": "entity_node_generic", "relation": "callee"}
+    ],
+    "backend_invoke": [
+      {"id": "backend_methods_allowlist", "relation": "callee"},
+      {"id": "backendclient_unflag_memory", "relation": "callee"},
+      {"id": "entity_node_generic", "relation": "callee"}
+    ]
+  }
+}

@@ -146,9 +146,32 @@ task-goal memories or the productive progress-driver. A unit test also confirms 
 trap which *produces progress* every couple of turns is never suppressed (counter resets) —
 productive recency is preserved, which is the entire design constraint.
 
+## Rung F — bounded structural expansion (2026-06-28)
+
+The `structural_neighbor_bug` boundary fixture motivated rung F, now built:
+menhir `domain/structural_expansion.py` (the bounded BFS + guards) +
+`archolith_bench/r3/structural.py` + `fixtures/r3_structural_graph.json` +
+`scripts/run_r3_structural_bench.py`.
+
+Fixture (real, from this session's unflag bug b49f3c0/7528c11): query "is unflag wired?"
+semantically surfaces the route + tool, but the actual cause is two hops down the RPC
+chain (`route -> backend_invoke -> {_BACKEND_METHODS, BackendClient.unflag_memory}`).
+
+| condition | structural_neighbor_recall | hub_kept_out | pool_size |
+|---|---|---|---|
+| A_semantic_only | 0.000 | 1.000 | 2 |
+| **F_structural_expansion** | **1.000** | 1.000 | 6 |
+
+**GRADUATES.** Semantic-only misses both bug-relevant neighbors (recall 0.0); bounded
+depth-2 expansion surfaces both (recall 1.0) while suppressing the degree-500 generic
+Entity hub and keeping the pool at 6 (cap 22). The guards (per-hit/total cap, depth
+limit, utility suppression) are unit-proven to actually bound — the whole risk of
+structural expansion is unbounded blow-up, and it doesn't.
+
 ### Still owed
 
-- B (temporal metadata) + F (bounded structural expansion) rungs.
+- B (temporal-metadata rung). The Chronostratum bitemporal track (parked `rung1a`) is the
+  natural source for B's evidence.
 - B (temporal metadata) + E/F (exhaustion penalty / bounded structural expansion) rungs.
 - ctharvey confirmation of gold labels; then production-recall wiring (still gated).
 

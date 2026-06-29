@@ -1,0 +1,52 @@
+{
+  "name": "r3_agent_retrieval_loop",
+  "description": "agent_retrieval_loop family. Real menhir mechanism: recall touches last_accessed (recall_service _post_recall_updates) -> recency score rises -> the same memory is retrieved again -> the agent repeats the same FAILED reasoning (belief-layer.md 'Productive recency and exhaustion'). The currentness core: the looped belief is a SUPERSEDED failed fix that recency keeps resurfacing; the currentness policy suppresses it from current assertion so the loop can't keep re-poisoning. Grounded in the documented menhir recency loop + the real floor finding (the 'just lower the 0.15 cosine floor' tweak that kept looking attractive until the RRF-scale finding). BOUNDARY: fully breaking the loop needs the RetrievalExhaustionPenalty (E rung, session-local counters) — R3 currentness only helps because the looped belief is also superseded. intent=current.",
+  "intent": "current",
+  "items": [
+    {
+      "id": "loop_lower_the_cosine_floor",
+      "statement": "To fix weak recall just lower the 0.15 cosine floor a bit more — it keeps coming up as the obvious tweak.",
+      "evidence": [
+        {"signal": "embedding_match", "note": "high semantic match to recall-tuning queries; keeps getting retrieved"},
+        {"signal": "mentioned_by_agent", "note": "re-surfaced across turns (recency self-reinforced)"},
+        {"signal": "later_contradicted", "polarity": "contradicts", "note": "the floor is an RRF rank cut, not a cosine knob — lowering it does not do what the loop assumes"},
+        {"signal": "is_expired", "note": "superseded by the rank-cut finding"}
+      ],
+      "gold_current": false,
+      "gold_historical": true,
+      "is_noise": false
+    },
+    {
+      "id": "loop_progress_truth",
+      "statement": "Recall tuning is blocked on R0 traces + the bench A-E ladder; hybrid_alpha is a seam, not a value to hand-tune mid-loop.",
+      "evidence": [
+        {"signal": "source_is_git", "note": "deferred-verification.md: ladder gates hybrid_alpha"},
+        {"signal": "later_confirmed", "note": "R0 instrument + R1 ladder landed this session"}
+      ],
+      "gold_current": true,
+      "gold_historical": false,
+      "is_noise": false
+    },
+    {
+      "id": "loop_recency_mechanism",
+      "statement": "Recall touches last_accessed on retrieval, so a repeatedly-retrieved memory gains recency and resurfaces.",
+      "evidence": [
+        {"signal": "source_is_git", "note": "recall_service _post_recall_updates touches last_accessed"},
+        {"signal": "entity_match"}
+      ],
+      "gold_current": true,
+      "gold_historical": false,
+      "is_noise": false
+    },
+    {
+      "id": "stale_loop_red_herring",
+      "statement": "The weak recall is caused by the embedding model dimension being wrong.",
+      "evidence": [
+        {"signal": "embedding_match", "strength": 0.3, "note": "plausible-sounding but unsupported red herring the loop also pulls"}
+      ],
+      "gold_current": false,
+      "gold_historical": false,
+      "is_noise": true
+    }
+  ]
+}

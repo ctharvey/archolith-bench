@@ -58,6 +58,8 @@ in the provenance, ctharvey confirmation still the stated pairing step.
 | `r3_rename_wrong_scope` (current) | wrong_repo_or_branch | 0.50 | 0.33 | 0.0 | GRADUATES |
 | `r3_floor_history` (historical) | out_of_order / drift | 0.67 | **0.00** | 0.0 | GRADUATES |
 | `r3_seed_refactor` (current) | refactor_stale_memory (yawn.seed) | 0.60 | **0.00** | 0.0 | GRADUATES |
+| `r3_structural_neighbor_bug` (current) | structural_neighbor_bug (unflag fix) | 0.50 | **0.00** | 0.0 | GRADUATES |
+| `r3_agent_retrieval_loop` (current) | agent_retrieval_loop (recency mechanism) | 0.50 | **0.00** | 0.0 | GRADUATES |
 
 Provenance: the floor cosine→rank-cut correction is recorded in `scoring_service.py:50-55`
 (R1 commit e8da67d) and confirmed live by `probe_rrf_scale.py` (RRF max 2.0); the
@@ -94,9 +96,39 @@ A secondary nuance it exposed: a belief that is BOTH superseded AND noise (the w
 history. Distinguishing "superseded-but-was-true" from "superseded-and-was-wrong" is a
 future policy refinement (poison stayed 0.20 here).
 
+### Cross-fixture synthesis — when is R3 actually essential (vs nice-to-have)?
+
+All seven fixtures graduate, but C-vs-D tells the real story of *where the currentness
+axis earns its keep*:
+
+| C vs D | fixtures | why |
+|---|---|---|
+| **D >> C** (R3 essential) | `r3_seed_refactor` (C == baseline) | stale belief is *confidently held* (well-supported, no in-score contradiction) — confidence bucketing is blind to it; only the supersession axis catches it |
+| **D > C** (R3 adds value) | `r3_floor_retroactive`, `r3_floor_history` | C drops the stale belief but also loses history; D suppresses-without-deleting |
+| **D == C** (Rung-0 suffices) | `r3_structural_neighbor_bug`, `r3_agent_retrieval_loop`, `ce_willow` | stale belief carries explicit `later_contradicted` -> already low-confidence/CONFLICT under Rung-0 |
+| **D partial** (out of scope) | `r3_rename_wrong_scope` | wrong-*scope* not temporal staleness — R1/SelfToleranceGate's job |
+
+**The headline claim, precisely scoped:** R3's distinctive, non-redundant contribution is
+detecting **confidently-held stale beliefs** — the refactor-stale case, where a belief is
+well-evidenced yet superseded. That is exactly the failure a confidence score cannot see,
+and it is the case that most poisons a coding agent ("the mapping is in LocalDataSourceService"
+stated with full confidence, long after it moved). For already-contradicted beliefs the
+Rung-0 scorer is enough; for wrong-scope, R3 is the wrong tool.
+
+### Boundary families (last two) — honest framing
+
+`r3_structural_neighbor_bug` and `r3_agent_retrieval_loop` each have a currentness CORE
+(a superseded belief) that D handles, but their *full* mechanisms live in later rungs:
+surfacing the real structural-neighbor cause is R1/file-context + the **F** bounded-
+structural-expansion rung; breaking a recency loop needs the **RetrievalExhaustionPenalty
+(E rung)**, session-local counters R3 does not model. They are included as real grounded
+fixtures (the unflag wiring fix b49f3c0/7528c11; menhir's last_accessed recency loop) that
+motivate E/F — not as proof R3 alone solves loops or structural bugs.
+
 ### Still owed
 
-- The remaining families: `agent_retrieval_loop`, `structural_neighbor_bug`.
+- B (temporal metadata) + E/F (exhaustion penalty / bounded structural expansion) rungs —
+  motivated by the two boundary fixtures above.
 - B (temporal metadata) + E/F (exhaustion penalty / bounded structural expansion) rungs.
 - ctharvey confirmation of gold labels; then production-recall wiring (still gated).
 

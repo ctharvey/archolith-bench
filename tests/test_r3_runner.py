@@ -124,3 +124,19 @@ def test_real_seed_refactor_rung0_is_useless_against_refactor_staleness() -> Non
     assert d["stale_current_assertion_rate"] == 0.0                                    # D eliminates it
     assert d["historical_context_preservation"] == 1.0
     assert art["win_gate"]["graduates"] is True
+
+
+def test_real_structural_neighbor_and_loop_graduate() -> None:
+    """The last two families (structural_neighbor_bug from the unflag fix; agent_retrieval_
+    loop from the recency mechanism). Both graduate. Honest counterpoint to yawn.seed:
+    here the stale belief carries explicit contradiction, so Rung-0 (C) ALREADY catches it
+    (C ties D). R3's distinctive value (D >> C) shows up only for confidently-held stale
+    beliefs (the refactor case), not contradicted ones."""
+    for name in ("r3_structural_neighbor_bug", "r3_agent_retrieval_loop"):
+        art = _run_fixture(name)
+        c = art["conditions"]["C_belief_buckets"]["metrics"]
+        d = art["conditions"]["D_currentness"]["metrics"]
+        assert art["win_gate"]["graduates"] is True, name
+        assert d["stale_current_assertion_rate"] == 0.0, name
+        # contradicted stale belief -> Rung-0 already handles the stale metric here
+        assert c["stale_current_assertion_rate"] == d["stale_current_assertion_rate"], name

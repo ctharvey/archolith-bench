@@ -30,10 +30,10 @@ die() { printf '[retry] ERROR: %s\n' "$*" >&2; exit 1; }
 command -v docker >/dev/null 2>&1 || die "docker not on PATH"
 docker ps --format '{{.Names}}' | grep -qx "${NEO4J_NAME}" \
   || die "${NEO4J_NAME} is not running — start it with: docker start ${NEO4J_NAME}"
-[ -x "${MENHIR_PY}" ] || die "menhir-frontier venv python missing: ${MENHIR_PY}"
-[ -e "${MENHIR_BIN}" ] || [ -e "${MENHIR_BIN}.exe" ] \
+[ -f "${MENHIR_PY}" ] || die "menhir-frontier venv python missing: ${MENHIR_PY}"
+[ -f "${MENHIR_BIN}" ] || [ -f "${MENHIR_BIN}.exe" ] \
   || die "menhir console script missing — pip install -e ${MENHIR_DIR}"
-[ -e "${BENCH_PY}" ] || die "archolith-bench venv python missing: ${BENCH_PY}"
+[ -f "${BENCH_PY}" ] || die "archolith-bench venv python missing: ${BENCH_PY}"
 
 OPENAI_KEY="$("${MENHIR_PY}" - "${MENHIR_DIR}/.env" OPENAI_API_KEY <<'PY'
 import sys; from dotenv import dotenv_values; print(dotenv_values(sys.argv[1]).get(sys.argv[2],""))

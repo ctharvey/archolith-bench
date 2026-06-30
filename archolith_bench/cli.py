@@ -166,6 +166,14 @@ def main(argv: list[str] | None = None) -> None:
                            help="Allow memory benchmarks to reset throwaway Menhir groups after each item")
     harness_p.add_argument("--dry-run-menhir-reset", action="store_true",
                            help="Print Menhir group resets without performing them")
+    harness_p.add_argument("--recall-only", action="store_true",
+                           help="Memory benchmarks: recall against a PRE-BUILT graph in stable "
+                                "per-question namespaces (--namespace-template). Skips ingest AND "
+                                "reset, so no --confirm-menhir-reset is needed. Use after the graph "
+                                "is ingested+enriched once (the LongMemEval Mode-B recall-only A/B).")
+    harness_p.add_argument("--namespace-template", default="lme-{question_id}",
+                           help="Recall-only: namespace per item, formatted with {question_id} "
+                                "(default: lme-{question_id}, matching _ingest_lme.py).")
     harness_p.add_argument("--format", choices=["markdown", "json"], default="markdown",
                            help="Evidence output format (default: markdown)")
     harness_p.add_argument("--output-dir", type=Path, default=Path("results"),
@@ -610,6 +618,8 @@ def _run_harness(args: argparse.Namespace) -> None:
             fixture_path=args.offline_fixture,
             reset_confirmed=args.confirm_menhir_reset,
             dry_run_reset=args.dry_run_menhir_reset,
+            recall_only=getattr(args, "recall_only", False),
+            namespace_template=getattr(args, "namespace_template", "lme-{question_id}"),
             checkpoint=checkpoint,
             score_fn=score_fn,
         )

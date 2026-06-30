@@ -96,6 +96,8 @@ def _run_memory_arm(
     reset_memory: bool,
     reset_confirmed: bool,
     dry_run_reset: bool,
+    recall_only: bool = False,
+    namespace_template: str = "lme-{question_id}",
     checkpoint: "MemoryCheckpoint | None" = None,
     score_fn=None,  # noqa: ANN001
 ) -> ArmResult:
@@ -114,6 +116,13 @@ def _run_memory_arm(
         question = adapter.question(item)
         if arm == NO_MEMORY or client is None:
             memory_context = ""
+        elif recall_only:
+            # Recall-only A/B: the graph is pre-built once in stable per-question
+            # namespaces (e.g. lme-<question_id>), so skip ingest AND reset entirely and
+            # recall in place. No new_group, no mutation -> needs no --confirm-menhir-reset.
+            group_id = namespace_template.format(question_id=item.get("question_id") or task_id)
+            recalled = client.recall(group_id, question, limit=recall_limit)
+            memory_context = "\n".join(recalled)
         else:
             group_id = client.new_group()
             try:
@@ -179,6 +188,8 @@ def run_memory_ab(
     reset_memory: bool = True,
     reset_confirmed: bool = False,
     dry_run_reset: bool = False,
+    recall_only: bool = False,
+    namespace_template: str = "lme-{question_id}",
     checkpoint: "MemoryCheckpoint | None" = None,
     score_fn=None,  # noqa: ANN001
 ) -> ABResult:
@@ -201,6 +212,11 @@ def run_memory_ab(
     needs_client = any(a != NO_MEMORY for a in arms)
     if needs_client and client is None:
         raise ValueError("memory arms require a MenhirClient (got None)")
+    if recall_only:
+        # Recall-only A/B reads a pre-built graph in place: never ingest, never reset.
+        # This also makes --confirm-menhir-reset unnecessary (the guard below keys on
+        # reset_memory, which we force off here).
+        reset_memory = False
     if (
         needs_client
         and isinstance(client, HttpMenhirClient)
@@ -235,6 +251,8 @@ def run_memory_ab(
                         reset_memory=reset_memory,
                         reset_confirmed=reset_confirmed,
                         dry_run_reset=dry_run_reset,
+                        recall_only=recall_only,
+                        namespace_template=namespace_template,
                         checkpoint=checkpoint,
                         score_fn=score_fn,
                     )

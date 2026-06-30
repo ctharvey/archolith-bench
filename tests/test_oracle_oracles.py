@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from archolith_bench.oracle.models import OracleMemory, OraclePolarity, OracleTarget, QueryContext
+from archolith_bench.oracle.models import (
+    CandidateMemory,
+    OracleMemory,
+    OraclePolarity,
+    OracleTarget,
+    QueryContext,
+)
 from archolith_bench.oracle.oracles import (
     EvidenceOracle,
     ScopeOracle,
@@ -155,6 +161,43 @@ def test_semantic_scorer_is_injectable() -> None:
     injected = SemanticOracle(ConstantScorer()).evaluate(q, _cand(text="totally unrelated"))
     assert default.probability == 0.0
     assert injected.probability == 0.5
+
+
+def test_semantic_prefers_precomputed_similarity_over_scorer() -> None:
+    # Production parity: a precomputed cosine in metadata wins over the text scorer, so
+    # the bench ranks on the same embedding signal recall uses. Text has zero lexical
+    # overlap (stub would score 0.0) -> the precomputed value proves it was preferred.
+    q = QueryContext(text="alpha beta")
+    cand = CandidateMemory(id="m", content="gamma delta", metadata={"similarity": 0.83})
+    r = SemanticOracle().evaluate(q, cand)
+    assert r.probability == 0.83
+    assert r.polarity == OraclePolarity.SUPPORT
+    assert "precomputed_similarity" in r.note
+
+
+def test_semantic_precomputed_similarity_is_clamped() -> None:
+    q = QueryContext(text="x")
+    hi = SemanticOracle().evaluate(q, CandidateMemory(id="m", content="y", metadata={"similarity": 1.7}))
+    lo = SemanticOracle().evaluate(q, CandidateMemory(id="m", content="y", metadata={"similarity": -0.4}))
+    assert hi.probability == 1.0
+    assert lo.probability == 0.0
+
+
+def test_semantic_falls_back_to_scorer_when_no_precomputed() -> None:
+    # Absent similarity (None) -> the lexical stub (or an injected embedder) still runs.
+    q = QueryContext(text="source aware similarity floor")
+    r = SemanticOracle().evaluate(q, _cand(text="the similarity floor is source aware now"))
+    assert r.probability > 0.0
+    assert "lexical_overlap" in r.note
+
+
+def test_oracle_memory_carries_similarity_into_metadata() -> None:
+    # The fixture seam: a memory's precomputed cosine flows through to_candidate so the
+    # SemanticOracle can prefer it. Backward-compatible — absent -> None -> scorer path.
+    cand = OracleMemory("m", text="t", similarity=0.6).to_candidate()
+    assert cand.metadata["similarity"] == 0.6
+    assert SemanticOracle().evaluate(QueryContext(text="unrelated"), cand).probability == 0.6
+    assert _cand(text="t").metadata["similarity"] is None
 
 
 def test_default_oracles_accepts_semantic_scorer() -> None:

@@ -93,7 +93,7 @@ class CandidateMemory:
     Oracles read `metadata` (a prefetched snapshot) — they never fetch the world.
     Known metadata keys: repo, branch, project, namespace, files, symbols, tests,
     valid_at, invalid_at, created_at, superseded, belief_bucket, evidence_kinds,
-    conflict_group.
+    conflict_group, similarity (precomputed real cosine; SemanticOracle prefers it).
     """
 
     id: str
@@ -161,6 +161,7 @@ class OracleMemory:
     belief_bucket: str | None = None
     evidence_kinds: set[str] = field(default_factory=set)
     conflict_group: str | None = None
+    similarity: float | None = None  # precomputed real cosine; SemanticOracle prefers it
 
     @property
     def is_stale(self) -> bool:
@@ -187,6 +188,7 @@ class OracleMemory:
                 "belief_bucket": self.belief_bucket,
                 "evidence_kinds": tuple(sorted(self.evidence_kinds)),
                 "conflict_group": self.conflict_group,
+                "similarity": self.similarity,
             },
         )
 
@@ -209,6 +211,7 @@ class OracleMemory:
             belief_bucket=data.get("belief_bucket"),
             evidence_kinds={str(v) for v in data.get("evidence_kinds", [])},
             conflict_group=data.get("conflict_group"),
+            similarity=data.get("similarity"),
         )
 
 

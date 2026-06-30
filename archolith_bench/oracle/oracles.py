@@ -83,10 +83,14 @@ class LexicalSemanticScorer:
 
 
 class SemanticOracle:
-    """Semantic relevance via a pluggable `SemanticScorer` (lexical stand-in by default).
+    """Semantic relevance, preferring a precomputed real cosine over the text scorer.
 
-    Swap a real embedding scorer in here before quoting semantic numbers — this is
-    the same honest stand-in discipline the facet bench uses.
+    Mirrors menhir production (`services/retrieval_oracles.SemanticOracle`): when the
+    candidate metadata carries a precomputed `similarity` (the recall path's cosine from
+    vector search), the oracle ranks on that real embedding signal; otherwise it falls
+    back to the pluggable `SemanticScorer` (lexical stand-in by default, or an injected
+    real embedder). This keeps the bench's semantic signal identical to production
+    instead of scoring on lexical overlap.
     """
 
     name = "semantic"
@@ -96,7 +100,13 @@ class SemanticOracle:
         self.scorer = scorer or LexicalSemanticScorer()
 
     def evaluate(self, query: QueryContext, candidate: CandidateMemory) -> OracleResult:
-        sim = self.scorer.similarity(query.text, candidate.content)
+        precomputed = candidate.metadata.get("similarity")
+        if precomputed is not None:
+            sim = max(0.0, min(1.0, float(precomputed)))
+            note = f"precomputed_similarity={sim:.2f}"
+        else:
+            sim = self.scorer.similarity(query.text, candidate.content)
+            note = f"lexical_overlap={sim:.2f}"
         return OracleResult(
             oracle=self.name,
             probability=sim,
@@ -104,7 +114,7 @@ class SemanticOracle:
             polarity=OraclePolarity.SUPPORT if sim > 0 else OraclePolarity.NEUTRAL,
             target=OracleTarget.RELEVANCE,
             source_family=self.source_family,
-            note=f"lexical_overlap={sim:.2f}",
+            note=note,
         )
 
 

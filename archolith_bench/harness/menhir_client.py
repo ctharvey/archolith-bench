@@ -24,7 +24,16 @@ class StubMenhirClient:
         """Return a fresh isolated namespace id."""
         return uuid.uuid4().hex
 
-    def ingest(self, group_id: str, role: str, content: str) -> None:
+    def ingest(
+        self,
+        group_id: str,
+        role: str,
+        content: str,
+        *,
+        occurred_at: str | None = None,
+        session_id: str | None = None,
+        wait: bool = True,
+    ) -> None:
         """Append a formatted snippet to the group's list."""
         if not content:
             return
@@ -109,18 +118,41 @@ class HttpMenhirClient:
         """Return a fresh isolated namespace id."""
         return uuid.uuid4().hex
 
-    def ingest(self, group_id: str, role: str, content: str) -> None:
+    def ingest(
+        self,
+        group_id: str,
+        role: str,
+        content: str,
+        *,
+        occurred_at: str | None = None,
+        session_id: str | None = None,
+        wait: bool = True,
+    ) -> None:
         """Ingest a snippet as a menhir episode in the group's namespace silo.
 
-        Uses ``wait=true`` so the episode is fully enriched (and therefore
-        recallable) before the call returns.
+        By default uses ``wait=true`` so the episode is fully enriched before
+        the call returns (back-compat for Mode-B per-item driver). Pass
+        ``wait=False`` for throughput-optimised bulk ingest where a separate
+        drain step provides the completeness guarantee.
+
+        ``occurred_at`` (ISO-8601) backdates the episode's Graphiti
+        ``reference_time`` so temporal-KG edges reflect historical event dates
+        rather than ingestion time.  ``session_id`` pins all turns of one LME
+        haystack session to the same menhir session silo.
         """
         if not content:
             return
         url = self._base_url.rstrip("/") + self._ingest_path
-        payload = {"episode": f"{role}: {content}", "namespace": group_id}
+        payload: dict = {"episode": f"{role}: {content}", "namespace": group_id}
+        if occurred_at is not None:
+            payload["occurred_at"] = occurred_at
+        if session_id is not None:
+            payload["session_id"] = session_id
         response = self._client.post(
-            url, params={"wait": "true"}, json=payload, headers=self._headers
+            url,
+            params={"wait": "true" if wait else "false"},
+            json=payload,
+            headers=self._headers,
         )
         response.raise_for_status()
 

@@ -101,6 +101,28 @@ unlike consolidation) and does **not** change existing recall-only A/B results �
 pass `include_session=True`, so the nodes were always visible; promotion only *also* exposes them
 to `build_context` and plain recall.
 
+### ⚠️ Temporal grounding: dates need a backfill
+
+**Known menhir bug (as of 2026-07-02):** the ingest path does **not** honor `occurred_at` —
+an episode ingested with the session's historical date still lands `valid_at = now()` (verified
+live: ingest with `occurred_at=2020-01-01` → node `valid_at` = today). `ingest.py` sends the
+correct session date and menhir accepts the field, but the world-time is lost before the graph
+node is written. So a **freshly built graph has fake temporal grounding** (every episode/edge
+stamped with the build date), which breaks temporal-reasoning and the BriefBuilder Timeline.
+
+Repair without a ~1-day re-ingest — the real date is recoverable (`episode.session_id` → dataset
+haystack date; `edge.episodes[0]` → source episode):
+
+```bash
+./scripts/longmemeval/lme.sh backfill-dates --dry-run   # preview counts
+./scripts/longmemeval/lme.sh backfill-dates             # apply (writes a revert snapshot first)
+```
+
+Only `valid_at` (world-time) is rewritten; `created_at`/`expired_at` (belief-time = ingestion) are
+correct as-is. Genuine LLM-extracted edge dates are preserved (only ingestion-defaulted edges are
+touched). Idempotent; a revert snapshot is written to `results/lme-ingest/date-backfill-revert.json`
+before any mutation. **Run this after every `build` until the menhir ingest path is fixed.**
+
 ## run_manifest.json Contract
 
 Every `recall-ab` run writes `results/lme-recall-<variant>/run_manifest.json` — a reproducibility record that captures:

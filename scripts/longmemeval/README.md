@@ -74,12 +74,32 @@ LME_RECALL_LIMIT=5 ./lme.sh recall-ab main 30 --subset temporal-reasoning
 
 ## Graph Lifecycle
 
-1. **Build**: `lme.sh build [N]` — ingest N items (default 30, full 500 in oracle mode takes ~1 day) into a fresh persistent Neo4j, then leave it up.
-2. **Backup/Restore**: `lme.sh backup` / `lme.sh restore` — dump and restore for safe archival.
-3. **Recall A/B**: `lme.sh recall-ab <branch> [N]` — read-only against the persistent graph; never resets it.
-4. **Retry failed**: `lme.sh retry` — reset+drain episodic nodes in FAILED state.
+1. **Build**: `lme.sh build [N]` — ingest N items (default 30, full 500 in oracle mode takes ~1 day) into a fresh persistent Neo4j, then leave it up. Build finishes by promoting all memories to PERSISTENT scope (step 2), so builds end ready-to-recall.
+2. **Promote**: `lme.sh promote` — flip every LME memory from `SESSION` to `PERSISTENT` scope (run automatically at the end of `build`; also runnable standalone, e.g. after a partial/legacy build). Idempotent and non-destructive. See [Memory scope](#memory-scope-regular-vs-session) below.
+3. **Backup/Restore**: `lme.sh backup` / `lme.sh restore` — dump and restore for safe archival.
+4. **Recall A/B**: `lme.sh recall-ab <branch> [N]` — read-only against the persistent graph; never resets it.
+5. **Retry failed**: `lme.sh retry` — reset+drain episodic nodes in FAILED state.
 
 **Rule**: Never reset a built graph. The manifest (`results/lme-ingest/manifest.json`) tracks ingested items; a fresh build needs all 500 questions re-ingested.
+
+### Memory scope: regular vs. session
+
+menhir stamps freshly-extracted `Entity` nodes as **`SESSION`** scope; only the consolidation
+pass promotes reinforced facts to **`PERSISTENT`**. But consolidation is off in benchmark mode,
+*and* it **deletes** low-sharpness one-off facts — which is most LME answer entities. So without
+intervention every benchmark memory stays `SESSION` forever.
+
+That matters because recall filters out `SESSION` nodes unless `include_session=True`
+(`recall_service.py:937`). Consequences of leaving them `SESSION`:
+- `build_context` returns **empty briefs** (it calls recall without `include_session`).
+- Any plain (non-session) recall path sees **nothing**.
+
+LME facts are durable knowledge the system should always recall, so we write them as **regular
+memories**: `promote_persistent.sh` does a blanket `SESSION → PERSISTENT` flip (nodes +
+`RELATES_TO` edges) at the end of every build. This is **non-destructive** (nothing deleted,
+unlike consolidation) and does **not** change existing recall-only A/B results — those already
+pass `include_session=True`, so the nodes were always visible; promotion only *also* exposes them
+to `build_context` and plain recall.
 
 ## run_manifest.json Contract
 
@@ -193,8 +213,8 @@ The ingest script retries FAILED episodes once. If episodes still fail, they hit
 ### Per-branch venv guard
 If a menhir variant enforces interpreter identity (e.g., frontier's `runtime.py`), `recall-ab` auto-detects and uses the variant's own `.venv` if it has one. Explicitly pass a worktree path to override: `lme.sh recall-ab /path/to/worktree 30`.
 
-### include_session=True requirement
-The harness uses `include_session=True` in all recall requests so the Episodic graph (sessions) is included in retrieval. If disabled, recall will be incomplete.
+### Empty recall / empty build_context
+If recall returns 0 results (or `build_context` returns an empty brief) on a graph you know has data, the memories are almost certainly still `SESSION`-scoped — `recall_service.py:937` drops `SESSION` nodes unless `include_session=True`. Fix: `lme.sh promote` (blanket `SESSION → PERSISTENT`). See [Memory scope](#memory-scope-regular-vs-session). The recall-only harness sidesteps this by always passing `include_session=True`, but that flag only masks the scope issue for that one path — `promote` is the real fix and is now part of every `build`.
 
 ### Disk space for dumps
 `lme.sh backup` dumps the full graph to disk. With 500 items in oracle mode (~10k episodic nodes), expect ~500MB.

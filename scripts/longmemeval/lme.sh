@@ -3,6 +3,7 @@
 #
 # Usage:
 #   lme.sh build [N]                   # build persistent graph (default N=30)
+#   lme.sh promote                     # flip SESSION -> PERSISTENT (regular memories)
 #   lme.sh recall-ab <branch|path> [N] # recall-only A/B on built graph
 #   lme.sh buildout-ab [N]             # ingest A/B (main vs frontier, fresh graphs)
 #   lme.sh backup                      # dump the persistent graph
@@ -21,7 +22,7 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
 usage(){
-  sed -n '2,21p' "${BASH_SOURCE[0]}" | sed 's/^# //'
+  sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# //'
   exit "${1:-0}"
 }
 
@@ -31,6 +32,9 @@ COMMAND="${1:-}"
 case "$COMMAND" in
   build)
     "${_LONGMEMEVAL_DIR}/build_graph.sh" "${2:-30}"
+    ;;
+  promote)
+    "${_LONGMEMEVAL_DIR}/promote_persistent.sh"
     ;;
   recall-ab)
     if [ -z "${2:-}" ]; then echo "usage: lme.sh recall-ab <branch|path> [limit]" >&2; exit 1; fi

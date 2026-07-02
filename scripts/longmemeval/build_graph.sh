@@ -67,4 +67,11 @@ curl -sf "${MENHIR_URL}/api/health" >/dev/null 2>&1 || die "menhir not healthy"
 log "menhir healthy. ingesting ${LIMIT} items..."
 
 "${BENCH_PY}" "$(dirname "${BASH_SOURCE[0]}")/lib/ingest.py" --limit "${LIMIT}" --menhir-url "${MENHIR_URL}"
-log "ingest complete. Neo4j ${LME_NEO4J_NAME} (bolt ${LME_BOLT}) holds the data; manifest in results/lme-ingest/."
+log "ingest complete. promoting SESSION -> PERSISTENT (regular memories)..."
+
+# Write the benchmark as regular memories: freshly-extracted nodes are SESSION-scoped and
+# would be invisible to build_context / plain recall (recall_service.py:937). See
+# promote_persistent.sh for the full rationale.
+"$(dirname "${BASH_SOURCE[0]}")/promote_persistent.sh"
+
+log "build complete. Neo4j ${LME_NEO4J_NAME} (bolt ${LME_BOLT}) holds the data; manifest in results/lme-ingest/."

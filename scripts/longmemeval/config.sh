@@ -46,6 +46,7 @@ LME_EMBED_MODEL="${LME_EMBED_MODEL:-text-embedding-3-small}"
 LME_SCORER="${LME_SCORER:-llm-judge}"
 
 # ---- Dataset and limits ----
+LME_NS_PREFIX="${LME_NS_PREFIX:-lme-}"               # namespace prefix for all LME graphs (promote scope filter)
 LME_DATASET="${LME_DATASET:-xiaowu0162/longmemeval}"
 LONGMEMEVAL_VARIANT="${LONGMEMEVAL_VARIANT:-oracle}"
 LME_LIMIT="${LME_LIMIT:-30}"

@@ -1,6 +1,9 @@
 # Plan: Organize the LongMemEval testing framework in archolith-bench
 
-Status: PLANNED — execute after the running buildout job finishes (see Execution gate).
+Status: READY TO EXECUTE — all gating jobs finished (2026-07-02). Execute in the worktree
+`C:/wt/lme-reorg` on branch `lme-framework-reorg`. See the **2026-07-02 UPDATE** at the bottom
+for what this session added (analysis harnesses, committed knobs, stratification) — the update
+supersedes the original where they differ.
 
 ## Context
 
@@ -131,5 +134,75 @@ ranking bottleneck from the root-cause trace); **Troubleshooting** (per-branch v
 
 ## Out of scope (note in README as future work)
 - Full cross-platform portability (scripts assume Git Bash on Windows + Docker Desktop).
-- Making recall `top_k` / `preset` configurable from the launcher (the ranking bottleneck the
-  trace exposed) — that is a menhir/harness change, tracked separately, not this reorg.
+- (DONE this session) Recall `top_k` is now launcher-configurable via `LME_RECALL_LIMIT`
+  (committed `6cacfa7`, `run_memory_ab`). `preset` remains a future menhir/harness change.
+
+---
+
+## 2026-07-02 UPDATE — supersedes the above where they differ
+
+**Gate cleared.** The buildout job, the answer-accuracy matrix, the MSC sweep, and the oracle
+ablation have all finished. Nothing is using `_ingest_lme.py` or the harness. Safe to `git mv`.
+
+**Already done since the original plan was written (do NOT redo — just integrate):**
+- One-off scripts are now **committed** (`a64d78d`): `_lme_build_db.sh`, `_lme_progress.sh`,
+  `_lme_expected.py`, `_run_lme_variant.sh`, `_overnight_ab.py`, `_lme_retry_failed.sh`. So use
+  `git mv` for ALL of them (history preserved) — the original plan marked several "untracked".
+- `_ingest_lme.py` env-param edit and `menhir_client.py` source-label: already committed (`51f8abb`).
+- `LME_RECALL_LIMIT` env knob in `run_memory_ab`: committed (`6cacfa7`).
+
+**NEW capability layer to promote — the analysis harnesses (this session's real product).**
+The framework is no longer just build/recall-ab/buildout-ab; it now has a measurement+analysis
+tier that produced the campaign findings. These live in the job tmp dir
+`C:/Users/thron/.claude/jobs/a039ffc7/tmp/` and must be promoted into `scripts/longmemeval/`:
+
+| session-tmp artifact | → promote to | what it does |
+|---|---|---|
+| `answer_matrix.sh` | `analysis/answer_matrix.sh` | config × question-type answer-accuracy grid (llm-judge) |
+| `msc_sweep.sh` | `analysis/msc_sweep.sh` | minimal-sufficient-context: accuracy vs recall top-k (uses `LME_RECALL_LIMIT`) |
+| `ablation_sweep.sh` | `analysis/ablation_sweep.sh` | per-oracle add-one-in ablation → the routing table |
+| `retrieval_quality.py` | `analysis/lib/retrieval_quality.py` | deterministic gold+support presence, menhir vs graphiti-native (no answer-model spend) |
+
+All four hardcode the same config (bolt 7689, pw, ports 8109–8114, absolute paths, model names)
+— **strip to `config.sh`** exactly like the runbook scripts. Add `config.sh` values they need:
+`LME_ANSWER_MODEL`, `LME_JUDGE_MODEL`, `LME_PER_TYPE` (stratified sample size), and the analysis
+port block (`LME_PORT_MATRIX`, `LME_PORT_MSC`, `LME_PORT_ABL`, `LME_PORT_RQ`).
+
+**Dispatcher gains analysis verbs** (`lme.sh`):
+- `matrix [per_type]` → analysis/answer_matrix.sh
+- `msc <config>` → analysis/msc_sweep.sh
+- `ablation` → analysis/ablation_sweep.sh
+- `presence` → analysis/lib/retrieval_quality.py (gold+support presence)
+
+**STRATIFICATION is mandatory — the load-bearing lesson.** `--limit N` alone takes the first N
+oracle items, which are **100% temporal-reasoning** (the file is grouped by type). Every fair
+run MUST sweep all 6 `question_type`s via `--subset` (temporal-reasoning, multi-session,
+knowledge-update, single-session-user, single-session-assistant, single-session-preference),
+`LME_PER_TYPE` each. The analysis harnesses already loop `--subset`; the README must warn that
+bare `--limit` is a **sampling trap** and document the 6 types.
+
+**config.sh corrections from this session's reality:**
+- Graph holds the full **500** oracle namespaces (`lme-<question_id>`), not ~10.9k episodic
+  nodes for one slice — verification step 2's "READY≈10924" is stale; use "500 namespaces".
+- Persistent graph creds/host confirmed: `menhir-lme-neo4j`, bolt 7689, http 7476, pw `lmedata123`.
+- Answer/judge models actually used: `LME_ANSWER_MODEL=gpt-4o`, `LME_JUDGE_MODEL=gpt-4o-mini`.
+
+**README additions (Interpreting results):**
+- The stratification trap (above) — non-negotiable.
+- N=15/cell is ±~0.13 noise; report per-type, not just an average; cross-run reproducibility
+  is good (node-plain hit 0.367 on three independent runs).
+- The campaign's headline findings belong in a short "What we learned" box: node-only is the
+  strongest config (0.367); the frontier `EvidenceAnchorWarden` under `warden_gate` zeroes the
+  score on anecdotal (0.000) while every other oracle is score-neutral; MSC plateaus at k=5
+  (~400 tok = 95% of ceiling) ⇒ bottleneck is brief-construction, not retrieval.
+- Cross-reference the menhir-frontier plan `anecdotal-recall-oracle-ladder.md` (the oracle-router
+  + BriefBuilder roadmap those measurements feed).
+
+**Do NOT promote** (one-off orchestration, stays in job tmp): `rung_a.sh`, `rung_b_3arm.sh`,
+`rung_c_gated.sh`, `edge_recall_probe*.sh`, `oracle_packet_dump.py`, `edge_search_proof.py`,
+`frontier_trace_probe.sh`. Their durable ideas already live in the promoted harnesses + READMEs.
+
+**Scope discipline for the handoff:** this is a **reorg only** — move/rename/de-hardcode/document.
+Do NOT change harness logic or menhir code. The one allowed code touch is stripping hardcoded
+config into `config.sh`. Verify with the cheap end-to-end steps (§Verification) using
+`LME_PER_TYPE=1` so it's a 2-minute smoke test, not a full run.

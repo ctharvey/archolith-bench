@@ -25,6 +25,17 @@ archolith-bench proxy --all --arms direct,proxy_only  # run against live proxy
 archolith-bench industry --launch-only                # generate launch benchmark coverage matrix
 ```
 
+## LongMemEval Framework
+
+Memory-specific A/B testing for menhir's recall and ingest. See `scripts/longmemeval/README.md` for the full runbook.
+
+Quickstart:
+```bash
+./scripts/longmemeval/lme.sh build 500          # persistent graph (~1 day for oracle)
+./scripts/longmemeval/lme.sh recall-ab main 30  # A/B against that graph
+./scripts/longmemeval/lme.sh matrix             # analysis: accuracy × config × type
+```
+
 ## Headline Numbers Policy
 
 **`HEADLINE-NUMBERS.md` is the canonical source for any stat used in marketing copy or README headlines.**

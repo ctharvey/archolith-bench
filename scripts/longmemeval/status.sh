@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 # Read-only progress tracker for the LongMemEval persistent-graph ingest.
-# Queries the dedicated menhir-lme-neo4j (Neo4j 5.x MVCC -> reads are safe to run
+# Queries the LME Neo4j (Neo4j 5.x MVCC -> reads are safe to run
 # concurrently with the ingest writes) plus the resume manifest. Does NOT write to
 # the graph and does NOT block the ingest.
 #
 # Usage:
-#   _lme_progress.sh                 # one-shot snapshot
-#   _lme_progress.sh watch [secs]    # repeat every <secs> (default 30), also logs
-#                                     # one summary line to results/lme-ingest/progress.log
+#   status.sh                 # one-shot snapshot
+#   status.sh watch [secs]    # repeat every <secs> (default 30), also logs
+#                              # one summary line to results/lme-ingest/progress.log
 set -uo pipefail
-NEO4J_NAME="menhir-lme-neo4j"; NEO4J_PW="lmedata123"
-BENCH_DIR="/c/Users/thron/IdeaProjects/projects/archolith/archolith-bench"
-MANIFEST="${BENCH_DIR}/results/lme-ingest/manifest.json"
-EXPECTED="${BENCH_DIR}/results/lme-ingest/expected_turns.json"
-PROGRESS_LOG="${BENCH_DIR}/results/lme-ingest/progress.log"
+
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
+
+MANIFEST="${LME_RESULTS_DIR}/manifest.json"
+EXPECTED="${LME_RESULTS_DIR}/expected_turns.json"
+PROGRESS_LOG="${LME_RESULTS_DIR}/progress.log"
 
 manifest_done() {
   if [ -f "$MANIFEST" ] && [ -s "$MANIFEST" ]; then
@@ -30,7 +31,7 @@ snapshot() {
   done="$(manifest_done)"
 
   # Per-namespace processing breakdown (read-only; Neo4j 5.x MVCC -> safe mid-ingest).
-  rows="$(docker exec "$NEO4J_NAME" cypher-shell -u neo4j -p "$NEO4J_PW" --format plain \
+  rows="$(docker exec "${LME_NEO4J_NAME}" cypher-shell -u neo4j -p "${LME_NEO4J_PW}" --format plain \
 "MATCH (e:Episodic) RETURN e.namespace AS ns, count(*) AS total,
  sum(CASE WHEN e.processing_state='READY' THEN 1 ELSE 0 END) AS ready,
  sum(CASE WHEN e.processing_state='ENRICHING' THEN 1 ELSE 0 END) AS enriching,

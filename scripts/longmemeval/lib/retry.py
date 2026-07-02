@@ -1,22 +1,23 @@
 """Re-enrich FAILED Episodic nodes in the LongMemEval oracle Neo4j.
 
 Run with menhir-frontier already serving on --menhir-url (started by
-_lme_retry_failed.sh). Queries Neo4j for all FAILED episodes, calls
+retry.sh). Queries Neo4j for all FAILED episodes, calls
 force_reset_failed_episode for each, then drains globally.
 
 Usage:
-    python scripts/_retry_failed_episodes.py [--menhir-url http://localhost:8102]
+    python lib/retry.py [--menhir-url http://localhost:8102]
 """
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import time
 
 import httpx
 
-NEO4J_CONTAINER = "menhir-lme-neo4j"
-NEO4J_PW = "lmedata123"
+NEO4J_CONTAINER = os.getenv("LME_NEO4J_CONTAINER", "menhir-lme-neo4j")
+NEO4J_PW = os.getenv("LME_NEO4J_PW", "lmedata123")
 
 
 def _cypher(query: str, timeout: int = 300) -> list[list[str]]:

@@ -7,31 +7,27 @@
 # (no per-variant rewiring), and runs the no_memory vs menhir_recall A/B in RECALL-ONLY
 # mode — it never re-ingests and never resets the graph.
 #
-# Prereq: the graph must already be built once via scripts/_lme_build_db.sh.
-# Usage:  run_lme_recall_ab.sh <branch|worktree-path> [limit]
-#   run_lme_recall_ab.sh main 30
-#   run_lme_recall_ab.sh claude/menhir-chain-handoff-doc-7iuat2 30
-#   run_lme_recall_ab.sh ../menhir-frontier 30
-# Env overrides: ANSWER_MODEL (default gpt-4o-mini), LONGMEMEVAL_VARIANT (default oracle —
+# Prereq: the graph must already be built once via scripts/longmemeval/build_graph.sh.
+# Usage:  recall_ab.sh <branch|worktree-path> [limit]
+#   recall_ab.sh main 30
+#   recall_ab.sh claude/menhir-chain-handoff-doc-7iuat2 30
+#   recall_ab.sh ../menhir-frontier 30
+# Env overrides: LME_ANSWER_MODEL (default gpt-4o), LONGMEMEVAL_VARIANT (default oracle —
 #   MUST match the variant the graph was built with), SCORER (containment|llm-judge).
 set -euo pipefail
 
-SRC_ARG="${1:?usage: run_lme_recall_ab.sh <branch|worktree-path> [limit]}"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
+
+SRC_ARG="${1:?usage: recall_ab.sh <branch|worktree-path> [limit]}"
 LIMIT="${2:-30}"
 
-ARCH_DIR="/c/Users/thron/IdeaProjects/projects/archolith"
-BENCH_DIR="${ARCH_DIR}/archolith-bench"
-MENHIR_MAIN="${ARCH_DIR}/menhir"            # repo root + the installed menhir venv/console script
-MENHIR_PY="${MENHIR_MAIN}/.venv/Scripts/python.exe"
-MENHIR_BIN="${MENHIR_MAIN}/.venv/Scripts/menhir"
-BENCH_BIN="${BENCH_DIR}/.venv/Scripts/archolith-bench"
-# Pre-built LME graph (from _lme_build_db.sh) — REUSE only, NEVER create or reset here.
-NEO4J_NAME="menhir-lme-neo4j"; NEO4J_BOLT=7689; NEO4J_HTTP=7476; NEO4J_PW="lmedata123"
-MENHIR_PORT=8103; MENHIR_URL="http://localhost:${MENHIR_PORT}"
-ANSWER_MODEL="${ANSWER_MODEL:-gpt-4o-mini}"
+# Pre-built LME graph (from build_graph.sh) — REUSE only, NEVER create or reset here.
+MENHIR_PORT="${LME_PORT_RECALL}"
+MENHIR_URL="http://localhost:${MENHIR_PORT}"
+ANSWER_MODEL="${LME_ANSWER_MODEL:-gpt-4o}"
 SCORER="${SCORER:-containment}"
-JUDGE_MODEL="${JUDGE_MODEL:-gpt-4o-mini}"   # llm-judge grader model (recorded in the manifest)
-RECALL_TOP_K="${RECALL_TOP_K:-10}"          # per-question recall depth (harness/menhir_client default is 10)
+JUDGE_MODEL="${LME_JUDGE_MODEL:-gpt-4o-mini}"   # llm-judge grader model (recorded in the manifest)
+RECALL_TOP_K="${LME_RECALL_LIMIT}"              # per-question recall depth
 # MUST match the variant the graph was ingested under, or question_ids (namespaces) won't line up.
 export LONGMEMEVAL_VARIANT="${LONGMEMEVAL_VARIANT:-oracle}"
 
@@ -64,22 +60,22 @@ fi
 if [ -f "${SRC_DIR}/.venv/Scripts/menhir" ] || [ -f "${SRC_DIR}/.venv/Scripts/menhir.exe" ]; then
   SERVE_BIN="${SRC_DIR}/.venv/Scripts/menhir"
 else
-  SERVE_BIN="${MENHIR_BIN}"
+  SERVE_BIN="${MENHIR_MAIN_BIN}"
 fi
 VARIANT="$(basename "${SRC_DIR}")"
 RUN_OUTPUT_DIR="${BENCH_DIR}/results/lme-recall-${VARIANT}"; mkdir -p "${RUN_OUTPUT_DIR}"
 
-OPENAI_KEY="$("${MENHIR_PY}" - "${MENHIR_MAIN}/.env" OPENAI_API_KEY <<'PY'
+OPENAI_KEY="$("${MENHIR_MAIN_PY}" - "${MENHIR_MAIN}/.env" OPENAI_API_KEY <<'PY'
 import sys; from dotenv import dotenv_values; print(dotenv_values(sys.argv[1]).get(sys.argv[2],""))
 PY
 )"; [ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY in ${MENHIR_MAIN}/.env"
 
 # ---- ensure the PRE-BUILT Neo4j is up (reuse only; never create, never reset) ----
-docker ps --format '{{.Names}}' | grep -qx "${NEO4J_NAME}" \
-  || docker start "${NEO4J_NAME}" >/dev/null 2>&1 \
-  || die "pre-built ${NEO4J_NAME} not found — run scripts/_lme_build_db.sh first"
-for _ in $(seq 1 60); do curl -sf "http://localhost:${NEO4J_HTTP}" >/dev/null 2>&1 && break; sleep 2; done
-curl -sf "http://localhost:${NEO4J_HTTP}" >/dev/null 2>&1 || die "Neo4j ${NEO4J_NAME} not ready"
+docker ps --format '{{.Names}}' | grep -qx "${LME_NEO4J_NAME}" \
+  || docker start "${LME_NEO4J_NAME}" >/dev/null 2>&1 \
+  || die "pre-built ${LME_NEO4J_NAME} not found — run scripts/longmemeval/build_graph.sh first"
+for _ in $(seq 1 60); do curl -sf "http://localhost:${LME_HTTP}" >/dev/null 2>&1 && break; sleep 2; done
+curl -sf "http://localhost:${LME_HTTP}" >/dev/null 2>&1 || die "Neo4j ${LME_NEO4J_NAME} not ready"
 
 MENHIR_PID=""
 cleanup(){
@@ -96,12 +92,12 @@ export MENHIR_LOG_DIR="${RUN_OUTPUT_DIR}/menhir-logs"; mkdir -p "${MENHIR_LOG_DI
 export MENHIR_BENCHMARK_MODE=1 MENHIR_API_HOST=127.0.0.1 MENHIR_API_PORT="${MENHIR_PORT}"
 export OTEL_SDK_DISABLED=true LANGFUSE_TRACING_ENABLED=false LANGFUSE_PUBLIC_KEY="" LANGFUSE_SECRET_KEY="" LANGFUSE_HOST=""
 export MENHIR_OPERATOR_KEY="" MENHIR_AGENT_KEY="" MENHIR_READONLY_KEY="" MENHIR_API_KEY=""
-export NEO4J_URI="bolt://localhost:${NEO4J_BOLT}" NEO4J_USER="neo4j" NEO4J_PASSWORD="${NEO4J_PW}" NEO4J_DATABASE="neo4j"
+export NEO4J_URI="bolt://localhost:${LME_BOLT}" NEO4J_USER="neo4j" NEO4J_PASSWORD="${LME_NEO4J_PW}" NEO4J_DATABASE="neo4j"
 # Recall embeds the query, so it needs the SAME embedder the graph was built with.
 export GRAPHITI_EMBED_PROVIDER="openai" MEMORY_GRAPHITI_EMBED_PROVIDER="openai"
-export OPENAI_API_KEY="${OPENAI_KEY}" OPENAI_EMBED_MODEL="text-embedding-3-small"
+export OPENAI_API_KEY="${OPENAI_KEY}" OPENAI_EMBED_MODEL="${LME_EMBED_MODEL}"
 
-log "serving menhir (${VARIANT}) on ${MENHIR_URL} over ${NEO4J_NAME} (bolt ${NEO4J_BOLT}) via ${SERVE_BIN}..."
+log "serving menhir (${VARIANT}) on ${MENHIR_URL} over ${LME_NEO4J_NAME} (bolt ${LME_BOLT}) via ${SERVE_BIN}..."
 ( cd "${SRC_DIR}" && "${SERVE_BIN}" serve --port "${MENHIR_PORT}" ) & MENHIR_PID=$!
 for _ in $(seq 1 90); do curl -sf "${MENHIR_URL}/api/health" >/dev/null 2>&1 && break; sleep 2; done
 curl -sf "${MENHIR_URL}/api/health" >/dev/null 2>&1 || die "menhir not healthy"
@@ -126,13 +122,13 @@ MFT_MENHIR_BRANCH="$(git -C "${SRC_DIR}" rev-parse --abbrev-ref HEAD 2>/dev/null
 MFT_MENHIR_DIRTY="$(git -C "${SRC_DIR}" status --porcelain 2>/dev/null | head -1 | grep -q . && echo true || echo false)"
 MFT_BENCH_COMMIT="$(git -C "${BENCH_DIR}" rev-parse HEAD 2>/dev/null || echo unknown)"
 MFT_BENCH_BRANCH="$(git -C "${BENCH_DIR}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
-MFT_NEO4J_IMAGE="$(docker inspect "${NEO4J_NAME}" --format '{{.Config.Image}}' 2>/dev/null || echo unknown)"
+MFT_NEO4J_IMAGE="$(docker inspect "${LME_NEO4J_NAME}" --format '{{.Config.Image}}' 2>/dev/null || echo unknown)"
 MFT_DATASET_SNAPSHOT="$(ls -1 "${HOME}/.cache/huggingface/hub/datasets--xiaowu0162--longmemeval/snapshots" 2>/dev/null | head -1 || echo unknown)"
-MFT_GRAPH_COUNTS="$(docker exec "${NEO4J_NAME}" cypher-shell -u neo4j -p "${NEO4J_PW}" --format plain \
+MFT_GRAPH_COUNTS="$(docker exec "${LME_NEO4J_NAME}" cypher-shell -u neo4j -p "${LME_NEO4J_PW}" --format plain \
   "MATCH (e:Episodic) WHERE e.processing_state IS NOT NULL RETURN e.processing_state AS s, count(*) AS n ORDER BY s" 2>/dev/null | tr '\n' '|' || echo unknown)"
 export MFT_MENHIR_COMMIT MFT_MENHIR_BRANCH MFT_MENHIR_DIRTY MFT_BENCH_COMMIT MFT_BENCH_BRANCH \
        MFT_NEO4J_IMAGE MFT_DATASET_SNAPSHOT MFT_GRAPH_COUNTS RUN_STARTED VARIANT SRC_DIR SERVE_BIN \
-       ANSWER_MODEL SCORER JUDGE_MODEL RECALL_TOP_K LIMIT LONGMEMEVAL_VARIANT NEO4J_NAME NEO4J_BOLT
+       ANSWER_MODEL SCORER JUDGE_MODEL RECALL_TOP_K LIMIT LONGMEMEVAL_VARIANT LME_NEO4J_NAME LME_BOLT
 "${MENHIR_PY}" - "${MANIFEST}" "${RUN_OUTPUT_DIR}/harness_recall_ab.md" <<'PY'
 import json, os, re, sys, datetime
 manifest_path, md_path = sys.argv[1], sys.argv[2]
@@ -162,8 +158,8 @@ manifest = {
         "bench": {"branch": os.environ.get("MFT_BENCH_BRANCH"), "commit": os.environ.get("MFT_BENCH_COMMIT")},
     },
     "graph": {
-        "neo4j_container": os.environ.get("NEO4J_NAME"), "neo4j_image": os.environ.get("MFT_NEO4J_IMAGE"),
-        "bolt_port": os.environ.get("NEO4J_BOLT"), "lme_variant": os.environ.get("LONGMEMEVAL_VARIANT"),
+        "neo4j_container": os.environ.get("LME_NEO4J_NAME"), "neo4j_image": os.environ.get("MFT_NEO4J_IMAGE"),
+        "bolt_port": os.environ.get("LME_BOLT"), "lme_variant": os.environ.get("LONGMEMEVAL_VARIANT"),
         "dataset": "xiaowu0162/longmemeval", "dataset_snapshot": os.environ.get("MFT_DATASET_SNAPSHOT"),
         "episodic_state_counts": counts(os.environ.get("MFT_GRAPH_COUNTS")),
     },

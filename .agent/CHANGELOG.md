@@ -1,5 +1,11 @@
 # archolith-bench Changelog
 
+## 2026-07-02 — LongMemEval Framework Consolidation
+
+**refactor(lme):** Consolidated LongMemEval test harnesses into `scripts/longmemeval/` with centralized config, dispatcher, analysis layer, and runbook. All hardcoded values (ports, credentials, paths, models) moved to `config.sh` with environment-variable overrides. Promoted analysis harnesses (answer-accuracy matrix, MSC sweep, oracle ablation, retrieval quality) from session tmp dir into the framework. Added stratification documentation (6 question types, sampling trap warning) and campaign findings (node-only strongest config, frontier oracle selectivity, brief-construction bottleneck).
+
+**docs:** New `scripts/longmemeval/README.md` runbook covers graph lifecycle, config reference, stratification rules, and troubleshooting. Pointer added to `.agent/README.md`.
+
 ## 2026-06-21 — Optional Suite Install Path
 
 **docs(packaging):** Documented the launch-supported source checkout path for optional filter/audit dependencies: install `../archolith-filter` and `../archolith-mcp-audit` editable before `pip install -e ".[all]"`.

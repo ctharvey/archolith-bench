@@ -27,14 +27,24 @@ archolith-bench industry --launch-only                # generate launch benchmar
 
 ## LongMemEval Framework
 
-Memory-specific A/B testing for menhir's recall and ingest. See `scripts/longmemeval/README.md` for the full runbook.
+Memory-specific A/B testing for menhir's recall and ingest, consolidated under
+`scripts/longmemeval/` (one `config.sh`, one `lme.sh` dispatcher, one runbook). See
+`scripts/longmemeval/README.md` for the full runbook and `lme.sh -h` for all verbs.
 
 Quickstart:
 ```bash
+./scripts/longmemeval/lme.sh -h                 # all commands
+./scripts/longmemeval/lme.sh status             # read-only graph/queue state
 ./scripts/longmemeval/lme.sh build 500          # persistent graph (~1 day for oracle)
-./scripts/longmemeval/lme.sh recall-ab main 30  # A/B against that graph
-./scripts/longmemeval/lme.sh matrix             # analysis: accuracy × config × type
+./scripts/longmemeval/lme.sh recall-ab main 30  # recall-only A/B against that graph
+./scripts/longmemeval/lme.sh matrix             # analysis: accuracy × config × question-type
 ```
+
+**⚠️ Stratification (load-bearing):** the dataset is grouped by `question_type`, so a bare
+`--limit N` samples only `temporal-reasoning` (the hardest type) — a fair run MUST sweep all 6
+types via `--subset`. The `matrix`/`msc`/`ablation` verbs already do; see the runbook's
+Stratification section. Every value in `config.sh` is env-overridable; nothing is hardcoded in
+the scripts. OpenAI key is read at runtime from `menhir/.env`, never committed.
 
 ## Headline Numbers Policy
 

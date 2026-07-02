@@ -39,7 +39,7 @@ LME_PORT_ABL="${LME_PORT_ABL:-8114}"                   # analysis/ablation_sweep
 LME_PORT_RQ="${LME_PORT_RQ:-8109}"                     # analysis/lib/retrieval_quality.py
 
 # ---- Models ----
-LME_EXTRACT_MODEL="${LME_EXTRACT_MODEL:-gpt-4-1-nano}"
+LME_EXTRACT_MODEL="${LME_EXTRACT_MODEL:-gpt-4.1-nano}"
 LME_ANSWER_MODEL="${LME_ANSWER_MODEL:-gpt-4o}"
 LME_JUDGE_MODEL="${LME_JUDGE_MODEL:-gpt-4o-mini}"
 LME_EMBED_MODEL="${LME_EMBED_MODEL:-text-embedding-3-small}"

@@ -25,7 +25,7 @@ LIMIT="${2:-30}"
 MENHIR_PORT="${LME_PORT_RECALL}"
 MENHIR_URL="http://localhost:${MENHIR_PORT}"
 ANSWER_MODEL="${LME_ANSWER_MODEL:-gpt-4o}"
-SCORER="${SCORER:-containment}"
+SCORER="${SCORER:-${LME_SCORER}}"   # framework default is llm-judge (config.sh); containment undercounts (paraphrase)
 JUDGE_MODEL="${LME_JUDGE_MODEL:-gpt-4o-mini}"   # llm-judge grader model (recorded in the manifest)
 RECALL_TOP_K="${LME_RECALL_LIMIT}"              # per-question recall depth
 # MUST match the variant the graph was ingested under, or question_ids (namespaces) won't line up.
@@ -129,7 +129,7 @@ MFT_GRAPH_COUNTS="$(docker exec "${LME_NEO4J_NAME}" cypher-shell -u neo4j -p "${
 export MFT_MENHIR_COMMIT MFT_MENHIR_BRANCH MFT_MENHIR_DIRTY MFT_BENCH_COMMIT MFT_BENCH_BRANCH \
        MFT_NEO4J_IMAGE MFT_DATASET_SNAPSHOT MFT_GRAPH_COUNTS RUN_STARTED VARIANT SRC_DIR SERVE_BIN \
        ANSWER_MODEL SCORER JUDGE_MODEL RECALL_TOP_K LIMIT LONGMEMEVAL_VARIANT LME_NEO4J_NAME LME_BOLT
-"${MENHIR_PY}" - "${MANIFEST}" "${RUN_OUTPUT_DIR}/harness_recall_ab.md" <<'PY'
+"${MENHIR_MAIN_PY}" - "${MANIFEST}" "${RUN_OUTPUT_DIR}/harness_recall_ab.md" <<'PY'
 import json, os, re, sys, datetime
 manifest_path, md_path = sys.argv[1], sys.argv[2]
 def counts(raw):

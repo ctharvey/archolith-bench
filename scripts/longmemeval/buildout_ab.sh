@@ -13,7 +13,7 @@ OPENAI_KEY="$("$KEY_PY" - "$ARCH/menhir/.env" OPENAI_API_KEY <<'PY'
 import sys; from dotenv import dotenv_values; print(dotenv_values(sys.argv[1]).get(sys.argv[2],""))
 PY
 )"
-LOG=/c/Users/thron/.claude/jobs/a039ffc7/tmp/slice_ab.log
+LOG="${LME_BUILDOUT_LOG:-$BENCH/results/lme-slice-ab.log}"; mkdir -p "$(dirname "$LOG")"
 log(){ printf '[slice] %s %s\n' "$(date '+%F %H:%M:%S')" "$*" >> "$LOG"; }
 
 # run_branch <label> <src_dir> <neo4j_name> <bolt> <http> <vol> <port>
@@ -58,7 +58,7 @@ run_branch(){
   # ---- ingest the slice (drains per-item; graph READY on return) ----
   log "$LABEL: ingesting $LIMIT items..."
   LME_NEO4J_CONTAINER="$NAME" LME_NEO4J_PW="$PW" LONGMEMEVAL_VARIANT=oracle \
-    "$BENCH_PY" "$BENCH/scripts/_ingest_lme.py" --limit "$LIMIT" --menhir-url "$URL" \
+    "$BENCH_PY" "$BENCH/scripts/longmemeval/lib/ingest.py" --limit "$LIMIT" --menhir-url "$URL" \
     --manifest "$MANIFEST_INGEST" >>"$LOG" 2>&1
   log "$LABEL: ingest done exit=$?"
 

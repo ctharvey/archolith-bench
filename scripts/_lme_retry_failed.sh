@@ -60,6 +60,10 @@ export MENHIR_API_HOST=127.0.0.1
 export MENHIR_API_PORT="${MENHIR_PORT}"
 # Raise budget so episodes that need more extraction calls don't hit FAILED again.
 export MENHIR_MAX_LLM_CALLS_PER_JOB=30
+# Parallelize enrichment: N episodes extract at once, serialized per namespace (cloud
+# provider, so the single-flight local-model lock does not apply). Override by exporting
+# MENHIR_INGEST_CONCURRENCY before calling.
+export MENHIR_INGEST_CONCURRENCY="${MENHIR_INGEST_CONCURRENCY:-8}"
 export OTEL_SDK_DISABLED=true
 export LANGFUSE_TRACING_ENABLED=false
 export LANGFUSE_PUBLIC_KEY="" LANGFUSE_SECRET_KEY="" LANGFUSE_HOST=""

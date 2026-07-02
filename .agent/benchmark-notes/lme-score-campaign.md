@@ -19,9 +19,13 @@ classifier, and fact-edge retrieval (edge-as-pointer, lens-gated).
   entity — **90% in top-k, 53% at rank-1**. The real gap: **~24% of answers aren't single
   entities** (multi-session counts, synthesized facts) → recall never surfaces them. That is a
   retrieval-coverage problem, not a ranking problem.
-- **One bright spot — the TemporalOracle** (see below): under a *historical* lens it correctly
-  promoted a belief-superseded answer edge to **rank 1**, where the default current lens had
-  buried it.
+- **The TemporalOracle**: under a *historical* lens it correctly promoted a belief-superseded
+  answer edge to **rank 1**, where the default current lens had buried it — an elegant mechanism
+  ("superseded ≠ useless"). **But isolated A/B says it doesn't earn its place:** enabling only
+  `semantic,temporal` (via `MENHIR_FRONTIER_ORACLE_SUBSET`) on temporal-reasoning + knowledge-update
+  scored **0.367 vs node-only 0.400** (full stack 0.333). node > sem_temporal > full_stack — the
+  same story as the ablation. The GPS #1 promotion was a correct mechanism on one question that
+  does not generalize to measurable lift. **Node-only relevance ranking remains the champion.**
 
 ## Measurement bugs we fixed (the actual wins)
 
@@ -53,7 +57,8 @@ not retrieval depth. Built a **BriefBuilder** (flag `MENHIR_FRONTIER_BRIEF_BUILD
 
 ## Net
 
-Correctness fixes restored a fair baseline; brief formatting is a second-order effect. **The next
-real lever is retrieval coverage for the ~24% non-entity answers**, not more brief polish —
-plus the lens-conditioned TemporalOracle behavior below, which is the one ranking win worth
-isolating.
+Correctness fixes restored a fair baseline; brief formatting is a second-order effect, and even
+the isolated TemporalOracle can't beat plain node retrieval (0.367 vs 0.400). **The next real
+lever is retrieval coverage for the ~24% non-entity answers** (multi-session counts, synthesized
+facts that map to no single entity) — a candidate-generation problem, not a re-rank or brief
+problem. Node-only relevance ranking remains the champion.

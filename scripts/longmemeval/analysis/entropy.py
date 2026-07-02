@@ -1,5 +1,14 @@
 """D0 — Retrieval Entropy instrument. Deterministic, GPT-free.
 
+MATH / FRAMING (be honest about this — it is NOT Shannon entropy):
+This measures how far the memory is from a QUERY-SUFFICIENT STATE — the smallest bundle of
+evidence that still lets you answer the question. Inspired by (not claiming the formal property
+of) a *minimal sufficient statistic*: the greatest data reduction that preserves all information
+needed for the inference. FLOOR = the size/spread of that minimal set (intrinsic complexity of
+the answer's evidence); DELIVERED = grow the set by retrieval rank until sufficient, i.e. a
+*greedy set-cover* walk. Lower = closer to query-sufficient. See
+`menhir-frontier/.agent/plans/aggregation-as-consolidation.md` ("query-sufficient state").
+
 The campaign's binding constraint was the absence of an objective function that wasn't
 downstream of an LLM. This measures the ORGANIZATION of memory itself: the minimal-sufficient
 evidence footprint for each question, in two columns.

@@ -15,6 +15,7 @@
 #   lme.sh msc <config>                # minimal-sufficient-context sweep (analysis)
 #   lme.sh ablation                    # per-oracle ablation (analysis)
 #   lme.sh presence                    # retrieval quality (analysis)
+#   lme.sh brief-ab [--score]          # BriefBuilder A/B (flat vs +Timeline); --score spends OpenAI
 #   lme.sh probe <question_id>         # single-question recall ranking trace
 #   lme.sh -h|--help                   # show this help
 
@@ -23,7 +24,7 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
 usage(){
-  sed -n '2,19p' "${BASH_SOURCE[0]}" | sed 's/^# //'
+  sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# //'
   exit "${1:-0}"
 }
 
@@ -74,6 +75,10 @@ case "$COMMAND" in
     ;;
   presence)
     MENHIR_URL="http://localhost:${LME_PORT_RQ}" "${MENHIR_FRONTIER_PY}" "${_LONGMEMEVAL_DIR}/analysis/lib/retrieval_quality.py"
+    ;;
+  brief-ab)
+    [ "${2:-}" = "--score" ] && export RUN_SCORE=1
+    "${_LONGMEMEVAL_DIR}/analysis/brief_ab.sh"
     ;;
   probe)
     if [ -z "${2:-}" ]; then echo "usage: lme.sh probe <question_id>" >&2; exit 1; fi

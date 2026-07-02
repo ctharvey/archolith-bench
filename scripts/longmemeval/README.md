@@ -209,6 +209,19 @@ With N=15/type (90 total), expect ±~0.13 standard error on the score. Report pe
 - **MSC sweep**: accuracy vs k (1, 2, 3, 5, 10). If plateau at k=5, brief construction is the bottleneck, not retrieval.
 - **Ablation**: marginal effects of oracle components (oracle ranking, intent lens, evidence anchor, etc.). Warden gate zeros the score on anecdotal evidence.
 - **Retrieval quality**: gold-rank histogram (rank at which the answer's tokens first appear in top-k) — no answer-model cost.
+- **Brief A/B** (`lme.sh brief-ab [--score]`): does the frontier BriefBuilder brief beat the flat
+  relevance brief? Serves menhir-frontier twice over the pre-built graph
+  (`MENHIR_FRONTIER_BRIEF_BUILDER` off vs on), collects `/api/context` briefs each time (free),
+  then answers + judges both. **The recall-only harness can't measure this** — it feeds
+  `/api/recall`, never `/api/context` where the BriefBuilder lives. Collection is free; add
+  `--score` to spend OpenAI (answer + judge). Needs `tiktoken` in the menhir venv, else
+  build_context runs in heuristic mode and halves the token budget, squeezing out the Timeline.
+
+  The BriefBuilder keeps the relevance-ranked list as the brief and **appends** a temporal
+  Timeline below it (an earlier Timeline-*first* design measured −0.10 by burying the answer;
+  append measured neutral, +0.03 within noise). The Timeline is retained because it is still the
+  right container for genuinely temporal/supersession questions — it just must not displace
+  relevance order. Toggle the feature with `MENHIR_FRONTIER_BRIEF_BUILDER` (default off).
 
 ### Campaign Findings (2026-07-02)
 

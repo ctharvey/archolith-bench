@@ -37,6 +37,7 @@ LME_PORT_MATRIX="${LME_PORT_MATRIX:-8112}"             # analysis/answer_matrix.
 LME_PORT_MSC="${LME_PORT_MSC:-8113}"                   # analysis/msc_sweep.sh
 LME_PORT_ABL="${LME_PORT_ABL:-8114}"                   # analysis/ablation_sweep.sh
 LME_PORT_RQ="${LME_PORT_RQ:-8109}"                     # analysis/lib/retrieval_quality.py
+LME_PORT_BRIEF="${LME_PORT_BRIEF:-8118}"               # analysis/brief_ab.sh (BriefBuilder A/B)
 
 # ---- Models ----
 LME_EXTRACT_MODEL="${LME_EXTRACT_MODEL:-gpt-4.1-nano}"
@@ -52,6 +53,8 @@ LONGMEMEVAL_VARIANT="${LONGMEMEVAL_VARIANT:-oracle}"
 LME_LIMIT="${LME_LIMIT:-30}"
 LME_RECALL_LIMIT="${LME_RECALL_LIMIT:-10}"            # recall top-k (menhir_client default is 10)
 LME_PER_TYPE="${LME_PER_TYPE:-15}"                    # stratified sample size per question type
+LME_BRIEF_PER_TYPE="${LME_BRIEF_PER_TYPE:-10}"       # brief_ab: questions per type
+LME_BRIEF_TYPES="${LME_BRIEF_TYPES:-temporal-reasoning,knowledge-update,multi-session}"  # brief_ab: categories
 
 # ---- Backup and results ----
 LME_BACKUP_DIR="${LME_BACKUP_DIR:-C:/Users/thron/menhir-lme-backup}"

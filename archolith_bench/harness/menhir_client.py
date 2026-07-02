@@ -32,6 +32,7 @@ class StubMenhirClient:
         *,
         occurred_at: str | None = None,
         session_id: str | None = None,
+        source: str | None = None,
         wait: bool = True,
     ) -> None:
         """Append a formatted snippet to the group's list."""
@@ -126,9 +127,16 @@ class HttpMenhirClient:
         *,
         occurred_at: str | None = None,
         session_id: str | None = None,
+        source: str | None = None,
         wait: bool = True,
     ) -> None:
         """Ingest a snippet as a menhir episode in the group's namespace silo.
+
+        ``source`` sets the episode provenance label menhir maps to an evidence kind
+        (domain/truth/kinds.py). A user's own utterance is external testimony, so pass
+        ``source="user"`` for user turns — that becomes a Guard-5 external anchor, so the
+        EvidenceAnchorWarden admits facts the user stated. Omit (default "remote-api" ->
+        agent_inference) for assistant/system turns, which are not anchors.
 
         By default uses ``wait=true`` so the episode is fully enriched before
         the call returns (back-compat for Mode-B per-item driver). Pass
@@ -144,6 +152,8 @@ class HttpMenhirClient:
             return
         url = self._base_url.rstrip("/") + self._ingest_path
         payload: dict = {"episode": f"{role}: {content}", "namespace": group_id}
+        if source is not None:
+            payload["source"] = source
         if occurred_at is not None:
             payload["occurred_at"] = occurred_at
         if session_id is not None:

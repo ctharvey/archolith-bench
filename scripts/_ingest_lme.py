@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -47,8 +48,8 @@ from archolith_bench.harness.longmemeval import LongMemEvalMemoryAdapter  # noqa
 from archolith_bench.harness.menhir_client import HttpMenhirClient  # noqa: E402
 
 # Throwaway lme Neo4j (must match _lme_build_db.sh).
-NEO4J_CONTAINER = "menhir-lme-neo4j"
-NEO4J_PW = "lmedata123"
+NEO4J_CONTAINER = os.getenv("LME_NEO4J_CONTAINER", "menhir-lme-neo4j")
+NEO4J_PW = os.getenv("LME_NEO4J_PW", "lmedata123")
 
 
 def _parse_lme_date(date_str: str | None) -> str | None:
@@ -90,6 +91,10 @@ def _ingest_turn(
                 content,
                 occurred_at=occurred_at,
                 session_id=session_id,
+                # A user's own utterance is external testimony -> "user" is a Guard-5 anchor kind,
+                # so facts the user stated survive the EvidenceAnchorWarden. Assistant/system turns
+                # stay unanchored (default "remote-api" -> agent_inference).
+                source=("user" if role.strip().lower() == "user" else None),
                 wait=False,
             )
             return
@@ -108,7 +113,7 @@ def _cypher(query: str) -> list[list[str]]:
         proc = subprocess.run(
             ["docker", "exec", NEO4J_CONTAINER, "cypher-shell", "-u", "neo4j", "-p", NEO4J_PW,
              "--format", "plain", query],
-            capture_output=True, text=True, timeout=60,
+            capture_output=True, text=True, timeout=300,
         )
     except Exception:
         return []
@@ -175,8 +180,10 @@ def _drain(ns: str, admin: httpx.Client, menhir_url: str, *,
     while time.time() - t0 < timeout_s:
         qd = _queue_depth(admin, menhir_url)
         last = _ns_state_counts(ns)
-        # enriching==-1 means cypher unavailable -> fall back to queue_depth alone.
-        in_flight = last["enriching"] if last["enriching"] >= 0 else 0
+        # enriching==-1 means cypher timed out / Neo4j temporarily unreachable.
+        # Treat unknown as "1 in-flight" so we keep polling rather than settling early.
+        # Only settle when cypher confirms enriching==0.
+        in_flight = last["enriching"] if last["enriching"] >= 0 else 1
         if qd == 0 and in_flight == 0:
             settled += 1
             if settled >= idle_polls:

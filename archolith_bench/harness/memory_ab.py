@@ -13,6 +13,7 @@ menhir+Neo4j (never production — `assert_not_production` guards the target).
 
 from __future__ import annotations
 
+import os
 from collections.abc import Sequence
 from contextlib import nullcontext
 from statistics import mean
@@ -183,7 +184,9 @@ def run_memory_ab(
     chat_base_url: str = PROXY_URL,
     api_key: str = API_KEY,
     model: str = MODEL,
-    recall_limit: int = 10,
+    # MSC sweep knob: override the recall top-k via env so accuracy-vs-context can be
+    # measured without a CLI change. Default 10 preserves prior behavior when unset.
+    recall_limit: int = int(os.getenv("LME_RECALL_LIMIT", "10")),
     pricing: PricingModel | None = None,
     reset_memory: bool = True,
     reset_confirmed: bool = False,

@@ -58,7 +58,15 @@ not retrieval depth. Built a **BriefBuilder** (flag `MENHIR_FRONTIER_BRIEF_BUILD
 ## Net
 
 Correctness fixes restored a fair baseline; brief formatting is a second-order effect, and even
-the isolated TemporalOracle can't beat plain node retrieval (0.367 vs 0.400). **The next real
-lever is retrieval coverage for the ~24% non-entity answers** (multi-session counts, synthesized
-facts that map to no single entity) — a candidate-generation problem, not a re-rank or brief
-problem. Node-only relevance ranking remains the champion.
+the isolated TemporalOracle can't beat plain node retrieval (0.367 vs 0.400). Every read-time
+lever landed neutral-to-negative — you cannot re-rank or re-format your way to information
+candidate generation never assembled. Node-only relevance ranking remains the champion.
+
+## Current direction: aggregation is a consolidation problem, not a retrieval problem
+
+The hardest slice (multi-session counting — "how many bikes" → 4) is being tackled **upstream at
+write/consolidation time**, not at read time: maintain quantitative state (stated running totals
+as supersedable `(subject, measure) → value` facts; event-log folds for un-stated totals) so the
+answer is a lookup, not a fuzzy count. Rationale, failure-mode census, and the first test:
+**`menhir-frontier/.agent/plans/aggregation-as-consolidation.md`**. (Research docs incoming will
+steer specifics.)

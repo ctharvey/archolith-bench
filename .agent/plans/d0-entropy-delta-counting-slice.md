@@ -92,6 +92,43 @@ value slot, measured into existence.
 - **Arm A does NOT collapse:** retrieval can't privilege even a perfectly-placed state fact — the
   problem is ranking/sufficiency, not consolidation. Redirect there before any perception work.
 
+## RESULT — Arm A (oracle) run 2026-07-02: representation ceiling CONFIRMED (with a proxy caveat)
+
+Ran step 1 (baseline DELIVERED, never before measured) + Arm A on all 14 counting qids via the
+instrument's own functions. Wrote the gold state fact with `record_counter` (auto-derived
+subject/counter, MENTIONS-linked to `has_answer` episodes, embedded), diffed DELIVERED, cleaned up.
+
+```
+                reached   median rank   median memories   median tokens
+baseline         12/14        2.0             2.0              133
+arm A (oracle)   14/14        1.0             1.0               21.5
+```
+- **12/14 collapse to a single-node lookup (rank 1, 1 memory).** 0 regressions.
+- **Both previously-censored Qs (unreachable in top-20) recovered** (852ce960 →rank 2, c960da58 →1).
+- **Token footprint 133 → 21.5 (~6×).** The state fact replaces a multi-episode reach with one node.
+- Biggest collapses were the dispersed ones (rank 6/7 → 1: `3a704032`, `46a3abf7`; rank 5 → 1: bikes-$
+  `gpt4_d84a3211`).
+
+**Finding 1 — the counter surface is good enough; CurrentValueKind NOT yet justified.** Despite rough
+auto-derived measures (`"how many times items of clothing need to pick: 3"`), the counter View ranked
+**#1 in 12/14**. The watch-item's predicted under-ranking did not materialize, so a count-aligned
+`CurrentValueKind` is not earned by this data. Defer it.
+
+**Finding 2 — the honest caveat: the sufficiency proxy is lenient.** D0 sufficiency = "retrieval
+touches ONE entity mentioned by a `has_answer` episode" = *distance to first gold-provenance touch*,
+NOT assembling the correct count/dedup. So: (a) baseline was already median rank 2 (5 Qs were already
+rank 1 — e.g. the bikes case `89941a93`), meaning this proxy does NOT capture the harder failures;
+(b) reaching a superseded gold-adjacent entity ("three bikes") counts as sufficient even though it's
+the wrong value. **D0-retrieval measures whether the answer's evidence is privileged in retrieval —
+it does NOT measure current-vs-superseded correctness or perception accuracy.** Those are separate
+axes (belief-gate; Arm B).
+
+**Verdict:** representation ceiling is real on the retrieval-footprint axis — a single query-sufficient
+state fact becomes the rank-1 / 1-node / ~21-token sufficient hit, recovering the unreachable ones.
+Green-light **Arm B (perception detector)**, with expectations scoped by Finding 2: the remaining
+value is in *perceiving* the right (current, not superseded) total, which this proxy can't score —
+pair Arm B with an end-answer or current-value check, not D0-retrieval alone.
+
 ## Guardrails
 - API-rate protocol: Arm A + all D0 runs are **GPT-free** (embeddings only for the View surface,
   optional). Only Arm B's detector calls an LLM — stop on 429, report.

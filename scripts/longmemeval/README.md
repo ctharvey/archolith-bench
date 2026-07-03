@@ -22,6 +22,7 @@ Measurement tools isolating specific aspects:
 - **Retrieval quality**: deterministic gold-presence-at-rank (no answer-model spend)
 - **D0 retrieval entropy** (`analysis/entropy.sh [floor|delivered|both]`): distance-from-query-sufficient-state, GPT-free; FLOOR = evidence dispersion, DELIVERED = retriever walk to first gold hit
 - **Perception gate tuning** (`analysis/perception_tune.py`, env `PT_*`): live threshold/veto sweep of menhir-frontier's perception boundary over the counting + held-out slices (dataset+LLM, no graph)
+- **Acquisition window** (`analysis/acquisition_window.py`, env `AW_*`): Lever A σ WINDOW measurement — extract acquisitions → timeline → read-time windowed count (rolling vs calendar) vs gold (dataset+LLM, no graph)
 - **Arm C capstone** (`analysis/capstone.sh run|delta|cleanup`): the honest end-to-end — baseline D0 → gated perception writes real Views into the graph (`perception_write.py`) → post D0 → delta report (`perception_delta.py`, counting collapse + held-out Goodhart guard). Writes are source-tagged `perception-capstone`; `cleanup` removes them exactly.
 
 ## Stratification ⚠️ Load-Bearing

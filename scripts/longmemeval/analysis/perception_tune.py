@@ -3,7 +3,11 @@
 Design of record: `menhir-frontier/.agent/for-review/HANDOFF-2026-07-02-perception-boundary.md`
 (step 5) + this repo's `.agent/plans/d0-entropy-delta-counting-slice.md` (Arm B: the demand + the
 false-positive risk). Steps 1-4 (the gate) are BUILT in `menhir.services.perception`; this is the
-one live-only piece: set the single knob (`threshold`) to a precision target.
+one live-only piece: set the single knob (`threshold`) to a precision target. It also measures
+**Lever B** (broadened triangulation): with `PT_CROSS=1` the sweep injects a holistic second
+derivation (`extract_stated_total`) as gate veto-4, so a confidently-wrong itemized SUM
+(`gpt4_d84a3211`: bike_spend=225 vs gold 185, unanimous) is turned WRONG -> ABSTAIN. `PT_CROSS=0`
+reproduces the prior baseline. Target: that qid flips to abstain, held-out FP unchanged.
 
 WHAT IT MEASURES (dataset + LLM only — NO graph, NO writes). For each namespace we run the real
 k-sample extractor (gpt-4o-mini, temp>0) ONCE, then replay the deterministic `gate` at several
@@ -22,7 +26,8 @@ API-RATE PROTOCOL: on a 429 we STOP immediately and report — never keep hammer
 
 Env: OPENAI_API_KEY (else read from menhir/.env), PT_MODEL=gpt-4o-mini, PT_TEMP=0.7, PT_K=5,
      PT_THRESHOLDS=0.6,0.8,1.0, PT_COUNT_LIMIT=14, PT_HELDOUT_LIMIT=12, PT_EMBED=1 (dedup on),
-     PT_OUT (~/perception-tune.json). Reuses entropy._items/_evidence_prefixes for the same slice.
+     PT_CROSS=1 (Lever B cross-check on; 0 = prior baseline), PT_OUT (~/perception-tune.json).
+     Reuses entropy._items/_evidence_prefixes for the same slice.
 """
 
 from __future__ import annotations
@@ -39,7 +44,9 @@ _FRONTIER_SRC = os.path.join(
     os.path.dirname(__file__), "..", "..", "..", "..", "menhir-frontier", "src")
 sys.path.insert(0, os.path.abspath(_FRONTIER_SRC))
 
-from menhir.services.perception import Episode, extract_once, gate  # noqa: E402
+from menhir.services.perception import (  # noqa: E402
+    Episode, extract_once, extract_stated_total, gate,
+)
 
 # reuse the D0 instrument's dataset loader + gold-evidence logic (same slice, same _norm).
 sys.path.insert(0, os.path.dirname(__file__))
@@ -52,6 +59,7 @@ THRESHOLDS = [float(x) for x in os.getenv("PT_THRESHOLDS", "0.6,0.8,1.0").split(
 COUNT_LIMIT = int(os.getenv("PT_COUNT_LIMIT", "14"))
 HELDOUT_LIMIT = int(os.getenv("PT_HELDOUT_LIMIT", "12"))
 EMBED_ON = os.getenv("PT_EMBED", "1") == "1"
+CROSS_ON = os.getenv("PT_CROSS", "1") == "1"  # Lever B holistic cross-check (veto-4); 0 = prior baseline
 EMBED_MODEL = os.getenv("PT_EMBED_MODEL", "text-embedding-3-small")
 OUT = os.getenv("PT_OUT", os.path.expanduser("~/perception-tune.json"))
 MAX_TURN_CHARS = 2000
@@ -196,7 +204,8 @@ def main():
     counting = [it for it in items if _is_count_answer(it["answer"])][:COUNT_LIMIT]
     heldout = [it for it in items if not _is_count_answer(it["answer"])][:HELDOUT_LIMIT]
     print(f"slice: {len(counting)} counting (gold numeric), {len(heldout)} held-out non-counting; "
-          f"k={K}, temp={TEMP}, model={MODEL}, dedup={'on' if embed else 'off'}")
+          f"k={K}, temp={TEMP}, model={MODEL}, dedup={'on' if embed else 'off'}, "
+          f"cross_check={'on' if CROSS_ON else 'off'}")
 
     records = []
     t0 = time.time()
@@ -206,13 +215,25 @@ def main():
             eps = _episodes(it)
             samples = [extract_once(eps, llm) for _ in range(K)]  # k temp>0 extractions
             golds = _gold_values(it["answer"]) if tag == "counting" else []
+
+            # Lever B: a holistic second derivation of each measure's total, memoized per (qid, measure)
+            # so the threshold sweep replays it for free — one extra LLM call per distinct measure, not
+            # per threshold (the plan's k=1 cost guard). None (no basis) => no veto, precision unchanged.
+            cross_cache: dict[str, float | None] = {}
+
+            def cross_check(measure: str, _eps=eps) -> float | None:
+                if measure not in cross_cache:
+                    cross_cache[measure] = extract_stated_total(_eps, measure, llm)
+                return cross_cache[measure]
             rec = {"qid": qid, "tag": tag, "qtype": it["question_type"],
                    "answer": it["answer"], "golds": golds, "n_eps": len(eps), "by_threshold": {}}
             for th in THRESHOLDS:
-                decisions = gate(samples, threshold=th, embed=embed)
+                decisions = gate(samples, threshold=th, embed=embed,
+                                 cross_check=cross_check if CROSS_ON else None)
                 committed = [{"subject": d.subject, "measure": d.measure, "reducer": d.reducer,
                               "value": d.value, "agreement": round(d.agreement, 3),
-                              "triangulated": d.triangulated} for d in decisions if d.committed]
+                              "triangulated": d.triangulated, "cross_total": d.cross_total}
+                             for d in decisions if d.committed]
                 rec["by_threshold"][str(th)] = {
                     "committed": committed,
                     "verdict": _score_counting(decisions, golds) if tag == "counting"
@@ -224,7 +245,7 @@ def main():
                   f"@{THRESHOLDS[-1]}={v10}")
 
     json.dump({"config": {"model": MODEL, "temp": TEMP, "k": K, "thresholds": THRESHOLDS,
-                          "embed": bool(embed)}, "records": records},
+                          "embed": bool(embed), "cross_check": CROSS_ON}, "records": records},
               open(OUT, "w"), indent=2)
 
     # ---- sweep report ----

@@ -129,6 +129,43 @@ Green-light **Arm B (perception detector)**, with expectations scoped by Finding
 value is in *perceiving* the right (current, not superseded) total, which this proxy can't score —
 pair Arm B with an end-answer or current-value check, not D0-retrieval alone.
 
+## RESULT — Arm B (perception) run 2026-07-02: the blocker is the FOLD, not fuzzy perception
+
+Query-blind detector (gpt-4o-mini, temp 0) over each Q's user turns → extract persistent
+quantitative self-totals → score vs gold. Plus a precision probe on 12 held-out non-counting Qs.
+
+- **Perception: 5/14 correct value (all 5 also subject-correct).** Hits: pages=220, to-watch=25,
+  pre-approval=$400k, **bikes=4**, playlists=20 — every one a total the user *stated*.
+- **The 9 misses are not perception failures — they are the wrong MOVE.** The detector returned `[]`
+  or individual items (never a fabricated total) on questions whose answer is never stated as one
+  number but must be **summed/counted over events**: bike-spend $185 (sum of purchases), 3 tanks
+  (count of separately-mentioned items), citrus/plants/projects counts. Those are **move-2 (event-log
+  fold)** questions, not move-1 (stated total). A stated-total detector *correctly abstains* on them.
+- So the honest split of the 14: **~5 stated-total (move 1) — solved end-to-end** (perceive → Arm A
+  representation → rank-1 lookup); **~9 need the deterministic fold (move 2)**, which is NOT fuzzy
+  perception. **The feared ~8% perception ceiling was misplaced for stated totals; the real remaining
+  work is deterministic (the fold), not probabilistic.**
+
+**Superseded-vs-current, caught in the act:** to-watch extracted BOTH 25 (gold/current) and 20
+(prior). The reconcile must pick latest — exactly what `record_counter` supersession does IF fed in
+temporal order. Confirms Finding 2's separate axis is live.
+
+**Precision probe (make-or-break risk): moderate over-extraction, filterable — not catastrophic.**
+6/12 non-counting namespaces emitted a total (23 total). Most emissions were *plausible* durable
+self-state (points balance 50k, gift-card $500, mortgage pre-approval) — correct-but-irrelevant to a
+non-counting query, not false positives. The genuine over-extraction: single possessions as `value=1`
+"counts" (iPhone 12 = 1) and occasional transient costs (detailing $20). Both are **filterable**
+(require value > 1 for a count; exclude one-off amounts) and/or absorbed by supersession. The
+aggregation plan's "wrong current-state fact out-ranks truth" risk is real but bounded here.
+
+**Roadmap update (evidence-based):**
+- Move 1 (stated total) is a **high-precision, solved path for ~5/14** — the perception it needs is
+  reliable; ship it (a real consolidation detector) with a `value>1` / no-transient filter.
+- **The next lever is move 2 — the deterministic event-log fold** (count acquisitions, sum durations
+  over date-grounded episodes), which addresses the ~9 and is exact where perception is fuzzy. This
+  is the higher-leverage build, and it is NOT gated on model quality.
+- `CurrentValueKind` still not needed (Finding 1 holds). Move-2 fold reuses the SAME counter View.
+
 ## Guardrails
 - API-rate protocol: Arm A + all D0 runs are **GPT-free** (embeddings only for the View surface,
   optional). Only Arm B's detector calls an LLM — stop on 429, report.

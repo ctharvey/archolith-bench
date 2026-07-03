@@ -15,11 +15,14 @@ Compares main vs frontier branch **ingest code** by building two fresh graphs fr
 Workflow: `buildout-ab` (self-contained; does not use the persistent graph)
 
 ### Analysis Harnesses
-Four measurement tools isolate specific aspects:
+Measurement tools isolating specific aspects:
 - **Answer matrix**: accuracy across 3 menhir configs × 6 question types (measures retrieval + generation separately)
 - **MSC sweep**: minimal-sufficient-context (k vs accuracy curve) reveals the brief-construction bottleneck
 - **Ablation sweep**: add-one-in breakdown of oracle components' marginal effects
 - **Retrieval quality**: deterministic gold-presence-at-rank (no answer-model spend)
+- **D0 retrieval entropy** (`analysis/entropy.sh [floor|delivered|both]`): distance-from-query-sufficient-state, GPT-free; FLOOR = evidence dispersion, DELIVERED = retriever walk to first gold hit
+- **Perception gate tuning** (`analysis/perception_tune.py`, env `PT_*`): live threshold/veto sweep of menhir-frontier's perception boundary over the counting + held-out slices (dataset+LLM, no graph)
+- **Arm C capstone** (`analysis/capstone.sh run|delta|cleanup`): the honest end-to-end — baseline D0 → gated perception writes real Views into the graph (`perception_write.py`) → post D0 → delta report (`perception_delta.py`, counting collapse + held-out Goodhart guard). Writes are source-tagged `perception-capstone`; `cleanup` removes them exactly.
 
 ## Stratification ⚠️ Load-Bearing
 

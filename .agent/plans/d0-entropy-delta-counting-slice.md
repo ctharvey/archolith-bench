@@ -239,6 +239,37 @@ Net: the productive levers remain deterministic/structural — **(1) restore the
 commit path** (recovers `c960da58` + likely other stated totals), **(2) σ WINDOW** for acquisition
 counts, **(3) broader triangulation** for confident SUM bias. None is a threshold knob.
 
+## RESULT — Arm C (capstone) 2026-07-03: the honest end-to-end, zero pollution, censored→rank-1
+
+The full chain, measured for the first time with REAL (non-oracle) perception: baseline D0 →
+`perceive_and_fold` (k=5, **threshold 1.0**, cross-check ON, gpt-4o-mini) writes real embedded
+counter Views with real MENTIONS provenance into the live graph → post D0 → delta. Tooling now
+reusable: `analysis/capstone.sh run|delta|cleanup` + `perception_write.py` + `perception_delta.py`
+(writes source-tagged `perception-capstone`; cleaned up after).
+
+**Writes: 6 Views / 26 namespaces. Both counting commits CORRECT** (`7527f7e2`=$800, `c960da58`=20);
+4 held-out commits all true-but-irrelevant. **Zero wrong-state Views written anywhere.**
+
+```
+COUNTING (14)                       baseline              post
+  c960da58  (written, stated=20)    CENSORED (>top-20) →  rank 1, 1 mem, 24 tok   ← the headline
+  7527f7e2  (written, $800)         rank 1, 42 tok     →  rank 1, 27 tok
+  12 abstained namespaces           byte-identical (control held perfectly)
+  medians                           reached 12/14, 133 tok → 13/14, 116 tok
+HELD-OUT (12, Goodhart guard)       ALL 12 UNCHANGED — including the 4 written namespaces.
+```
+
+- **The collapse is real with honest perception**: a previously *unreachable* question became a
+  rank-1 / 1-memory / 24-token lookup — the Arm-A representation ceiling reproduced end-to-end
+  through the precision gate.
+- **The Goodhart guard passed for real**: 4 true-but-irrelevant Views written into held-out
+  namespaces cost NOTHING at retrieval (gold support reached at identical ranks). The "wrong View
+  out-ranks truth" risk did not materialize — partly because the gate only writes TRUE facts.
+- **The honest gap is recall, by design**: 2/14 collapsed vs Arm A's 14/14 oracle — the gate abstains
+  on everything uncertain, so the A→C gap IS the remaining perception/fold work, priced in retrieval
+  terms per question (σ WINDOW/Lever A, itemization accuracy). Precision was the constraint;
+  it held at 100%.
+
 ### Move-1 restore — BUILT + verified 2026-07-02 (recovers `c960da58` at zero precision cost)
 
 Implemented the move-1 stated-total commit path in `menhir.services.perception`: `extract_once` now

@@ -173,3 +173,50 @@ aggregation plan's "wrong current-state fact out-ranks truth" risk is real but b
   namespaced, so cleanup is `MATCH (x {group_id:'lme-<qid>', is_view:true}) DETACH DELETE x`.
 - Never run a non-benchmark server against the shared graph (turns on the mutating scheduler).
 ```
+
+## RESULT — Perception gate tuning (handoff step 5) 2026-07-02: the knob is insufficient; the failure is BIAS
+
+Ran the built perception gate (`menhir.services.perception`, steps 1-4) live over the 14 counting +
+12 held-out non-counting namespaces. Real k=5 gpt-4o-mini extractor (temp 0.7) + real
+text-embedding-3-small dedup; the deterministic `gate` replayed at thresholds 0.6/0.8/1.0 over the
+SAME samples (sweep is free after extraction). Tool: `scripts/longmemeval/analysis/perception_tune.py`
+(dataset+LLM only, NO graph writes — it scores what the gate WOULD commit vs gold). 690s, no 429.
+
+```
+self-consistency threshold ALONE:            + deterministic value>1 count-floor:
+thresh  correct  wrong  abstain  heldout_FP   correct  wrong  abstain  heldout_FP
+ 0.60     5/14     5      4         8/12         5/14     2      7         5/12
+ 0.80     3/14     4      7         6/12         3/14     1     10         3/12
+ 1.00     1/14     4      9         4/12         1/14     1     12         2/12
+```
+
+**No threshold reaches the precision target (wrong=0 AND heldout_FP=0) by self-consistency alone.**
+The reason is the load-bearing finding:
+
+- **Self-consistency catches VARIANCE, not BIAS.** The dangerous residual — `bike_spend` summed to a
+  unanimous **225** (gold 185, agreement 1.0 across all 5 samples) — is *confidently* wrong. A
+  confidence score derived from agreement would stamp it HIGH-confidence: anti-correlated with
+  correctness on exactly the case that matters. (This is why we did NOT add a confidence value.)
+- **The dominant error is `distinct_count`=1 over-extraction** — a single mentioned possession written
+  as a "count of 1" (plants split into `peace_lilies=1/succulents=1/snake_plants=1` instead of
+  `plants=3`; `power_banks=1`, `coffee_makers=1` in held-out). Exactly the Arm-B-predicted
+  `value>1` filterable case.
+- **The `value>1` count-floor is a free precision win** (right table): wrong 4→1, heldout_FP 4→2 at
+  thresh 1.0, with CORRECT unchanged. Deterministic, calibration-free, zero recall cost.
+  **PRODUCTIONIZED** as a conjunctive veto in `perception.gate` (`min_count=2`, SUM exempt).
+- **After the floor, the ONLY dangerous wrong current-state View across all 26 namespaces is the one
+  confident-SUM-bias** (`bike_spend` 225). The other two residual "held-out FP" are TRUE facts
+  (`car_accessories_spend=500`, `hindu_festivals_attended=2`) materialized in a non-counting
+  namespace — correct-but-irrelevant, not wrong-state (matches Arm B's categorization).
+
+**Verdict:** the conjunctive-veto architecture is right; **you raise precision by adding orthogonal
+deterministic vetoes, not by scalarizing them into a confidence.** The count-floor is added. The two
+remaining levers are (a) **aggregate keying in the extractor prompt** (recover the plants/playlists
+cases the floor now safely abstains on — recall left on the table, not a wrong write), and (b)
+**broader triangulation coverage** — the only thing that constrains confident SUM bias, and it only
+fires when a stated total exists (bike-spend had none). Neither is a knob.
+
+**Also landed:** gate evidence (`agreement`, `k`, `reason`, `triangulated`) now persists as a
+provenance **receipt** on the committed View (`view_audit_*` props via `record_counter(audit=...)`) —
+kept OUT of the signature (never supersedes) and OUT of the embedding/surface (never ranks). A
+receipt, not a confidence signal.

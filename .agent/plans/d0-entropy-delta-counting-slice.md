@@ -220,3 +220,44 @@ fires when a stated total exists (bike-spend had none). Neither is a knob.
 provenance **receipt** on the committed View (`view_audit_*` props via `record_counter(audit=...)`) —
 kept OUT of the signature (never supersedes) and OUT of the embedding/surface (never ranks). A
 receipt, not a confidence signal.
+
+**Post-hoc provenance check — the two floored cases are NOT "aggregate keying" (diagnosis revised):**
+- `c960da58` (gold 20 playlists): the has_answer turn literally states *"I have 20 playlists"* — a
+  **move-1 STATED TOTAL**. The current perception build **structurally drops it**: `extract_once`
+  folds *events* and peels assertions to a triangulation-only `stated_total`, then discards any group
+  with no fold events — so a pure stated total (no itemized events) can never commit. This is the
+  move-1 path the aggregation roadmap called "solved for ~5/14"; the event-fold (move-2) build
+  quietly dropped it. **Bounded next build: let a stated total commit as the value when there are no
+  (or insufficient) fold events** — same View, gated by self-consistency across k samples, triangulated
+  against items when both exist, and (being an explicit user assertion) exempt from the count-floor.
+- `3a704032` (gold 3 plants): three *acquisitions in the last month* (peace lily + succulent "two
+  weeks ago", snake plant "from my sister last month") among owned-but-not-acquired distractors
+  (fern, spider, basil). Needs **σ WINDOW** (relative-window resolution) + an acquisition event kind —
+  a real fold feature, not a prompt tweak. Correctly abstained by the floor; waits on σ WINDOW.
+
+Net: the productive levers remain deterministic/structural — **(1) restore the move-1 stated-total
+commit path** (recovers `c960da58` + likely other stated totals), **(2) σ WINDOW** for acquisition
+counts, **(3) broader triangulation** for confident SUM bias. None is a threshold knob.
+
+### Move-1 restore — BUILT + verified 2026-07-02 (recovers `c960da58` at zero precision cost)
+
+Implemented the move-1 stated-total commit path in `menhir.services.perception`: `extract_once` now
+keeps a group with a stated total even when it has no fold events, retaining the assertion as a
+provenance-bearing `Event` (LWW-latest wins) with `reducer="stated"`; `gate` commits the stated value
+directly (count-floor-exempt — an explicit user claim); the sink folds the single assertion under SUM.
+Prompt strengthened so "I have 20 playlists" / "I own 3 bikes" extract as an assertion, not a single
+`item`. Re-ran the identical live sweep (`perception-tune-move1.json`):
+
+```
+                     threshold 1.0 (precision-conservative)
+                  correct  wrong  heldout_FP
+count-floor only    1/14     1        2
++ move-1            2/14     1        2      <- c960da58 abstain -> CORRECT (playlists=20, 'stated')
+```
+
+**+1 correct at zero precision cost** at the conservative operating point; the broadened assertion
+detection did NOT inflate held-out FP. (Low-threshold wobble, e.g. correct 5→4 at 0.6, is temp-0.7
+run-to-run sampling noise on a 14-Q slice — not a signal; the deterministic recovery at 1.0 is the
+robust one.) The bike-spend case (`gpt4_d84a3211`) stays wrong — the confident move-2 SUM/bias hard
+case, needing lever (3) triangulation (no stated total available). Levers (2) σ WINDOW and (3) remain.
+Commits: `menhir-frontier` move-1 + this run's tooling.

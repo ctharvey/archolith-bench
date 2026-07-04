@@ -18,11 +18,10 @@ maximizes exact+symbol recall is the recommended ``hybrid_alpha``.
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass, field
 
 from . import metrics as M
-from .models import R1Fixture, R1Query
+from .models import R1Fixture
 from .retriever import Retriever, StubRetriever
 
 ALPHA_SWEEP: tuple[float, ...] = (0.0, 0.25, 0.5, 0.75, 1.0)

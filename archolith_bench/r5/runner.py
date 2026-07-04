@@ -29,7 +29,6 @@ from menhir.domain.structural_expansion import ExpansionConfig, StructuralNeighb
 from menhir.domain.structure_temporal import (
     StructureTemporalOracle,
     StructureTemporalQuery,
-    changed_in_window,
 )
 
 CONDITIONS: tuple[str, ...] = ("A_structure_only", "B_structure_temporal")
@@ -87,10 +86,7 @@ class R5BenchRunner:
         if condition == "A_structure_only":
             # structure-only: the blast radius in structural order, no time signal -> all the
             # anchor's dependencies, deterministically ordered, with no preference for changed.
-            deps = changed_in_window(  # reuse expansion; window wide-open so nothing is filtered
-                fx.anchor, fx.neighbor_fn(), [], window_start=None, window_end=None, config=fx.config
-            )
-            # no changes passed -> empty; structure-only must rank the raw radius instead:
+            # structure-only ranks the raw radius (time-blind), not a change-filtered window:
             from menhir.domain.structural_expansion import expand_structural
             radius = expand_structural([fx.anchor], fx.neighbor_fn(), config=fx.config)
             return [c.id for c in radius.candidates]  # depth/discovery order, time-blind

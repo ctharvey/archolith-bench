@@ -10,6 +10,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    name: ruff (bench package + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: python -m pip install "ruff>=0.4"
+      # Scoped to the bench package + tests; scripts/ carry separate pre-existing
+      # lint debt and are out of scope for this gate.
+      - name: Ruff check
+        run: python -m ruff check archolith_bench tests
+
   test:
     name: tests (py${{ matrix.python-version }})
     runs-on: ubuntu-latest

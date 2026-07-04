@@ -4,7 +4,7 @@
 
 **ci:** Added `.github/workflows/ci.yml` — the first CI for the bench (closes the deferred-verification "CI can run archolith-bench" cross-cutting item / R0 sub-task). A `test` job runs the offline bench suite on Python 3.11 + 3.12 (installs `archolith-maintenance` from its public GitHub repo — not on PyPI — then `pip install -e ".[dev]"` and `pytest tests/`, 338 passing); a `lint` job runs `ruff check archolith_bench tests`.
 
-**test:** Added `tests/conftest.py` collection guard — skips the R3/R5 ladder benches (which import the separate, CI-uninstallable `menhir` repo) when `menhir` is absent, while running them unchanged when a menhir checkout is on `PYTHONPATH`.
+**test:** Added `tests/conftest.py` collection guard — skips modules that need dependencies absent from the public base install: the R3/R5 ladder benches (import the separate `menhir` repo) and the suite smoke test (imports the optional private `archolith_mcp_audit` / `archolith_filter` extras). All run unchanged when those deps are present locally.
 
 **chore(lint):** Cleared the 7 pre-existing ruff violations in the bench package (unused imports in `r1`/`r3`/`r5`; one dead `changed_in_window` call + its import in `r5/runner.py`) so the scoped lint gate is green. The `scripts/` lint debt is left as a separate follow-up.
 

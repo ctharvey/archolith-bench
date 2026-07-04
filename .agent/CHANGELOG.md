@@ -1,5 +1,11 @@
 # archolith-bench Changelog
 
+## 2026-07-04 — Continuous Integration (GitHub Actions)
+
+**ci:** Added `.github/workflows/ci.yml` — the first CI for the bench (closes the deferred-verification "CI can run archolith-bench" cross-cutting item / R0 sub-task). Runs the offline bench suite on Python 3.11 + 3.12: installs `archolith-maintenance` from its public GitHub repo (not on PyPI), then `pip install -e ".[dev]"` and `pytest tests/` (338 passing).
+
+**test:** Added `tests/conftest.py` collection guard — skips the R3/R5 ladder benches (which import the separate, CI-uninstallable `menhir` repo) when `menhir` is absent, while running them unchanged when a menhir checkout is on `PYTHONPATH`.
+
 ## 2026-07-02 — LongMemEval Framework Consolidation
 
 **refactor(lme):** Consolidated LongMemEval test harnesses into `scripts/longmemeval/` with centralized config, dispatcher, analysis layer, and runbook. All hardcoded values (ports, credentials, paths, models) moved to `config.sh` with environment-variable overrides. Promoted analysis harnesses (answer-accuracy matrix, MSC sweep, oracle ablation, retrieval quality) from session tmp dir into the framework. Added stratification documentation (6 question types, sampling trap warning) and campaign findings (node-only strongest config, frontier oracle selectivity, brief-construction bottleneck).

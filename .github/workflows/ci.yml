@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      # archolith-maintenance is not published to PyPI; install it from its
+      # public GitHub repo so it satisfies the archolith-bench dependency.
+      - name: Install archolith-maintenance (git dependency)
+        run: python -m pip install "archolith-maintenance @ git+https://github.com/Archolith/archolith-maintenance.git"
+
+      - name: Install archolith-bench (editable, dev extras)
+        run: python -m pip install -e ".[dev]"
+
+      # The R3/R5 ladder benches import the menhir repo (private deps, not
+      # installable in CI); tests/conftest.py skips them when menhir is absent.
+      # This runs the offline bench mechanism suite (metrics, ranking ladders,
+      # fixture validators, cost/token models).
+      - name: Run offline bench suite
+        run: python -m pytest tests/ -q

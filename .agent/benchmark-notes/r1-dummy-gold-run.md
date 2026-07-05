@@ -144,3 +144,63 @@ Still owed before the real `hybrid_alpha` call (both **corpus-gated**, not doabl
 Then re-run on the live graph; only if the source-aware-floor win holds do we set `hybrid_alpha`.
 The recalibrated gate makes the win *visible*; it does **not** auto-promote — the
 "do NOT auto-set hybrid_alpha from this" caveat above still stands.
+
+## Update — LIVE re-run with recalibrated gate + new vehicle (2026-07-05) — DOES NOT GRADUATE
+
+Ran the whole loop against the live dummy (prod clone restarted on bolt 7687 after an OOM;
+23,841 entities / 11,702 code symbols intact). Fresh mine `fixtures/local/r1_dummy_gold_v2.json`
+(155 queries: 40 symbol / 30 exact / 25 scope / 60 paraphrase) with the **new paraphrase vehicle**,
+then `run_r1_dummy.py` (candidate_k=50, k=5) through the **recalibrated** `evaluate_win_gate`.
+**This supersedes the projected "GRADUATES" in the section above** — that was arithmetic on the
+prior (broken-fixture) numbers, not a live run.
+
+```
+condition        recall@5  exact  symbol  stale  wrong_scope  latency_ms
+A_current           0.813  1.000   0.710  0.000        0.034     785
+E_hybrid_a0         0.806  1.000   0.700  0.000        0.081     249
+E_hybrid_a0.25      0.710  1.000   0.550  0.000        0.034     654
+E_hybrid_a0.5       0.529  0.900   0.420  0.000        0.030     635
+E_hybrid_a0.75      0.019  0.000   0.030  0.000        0.000     601
+E_hybrid_a1         0.013  0.000   0.020  0.000        0.000     577
+```
+
+Per-family recall@5 (the part that matters):
+```
+family                       A_current  E_hybrid_a0  E_hybrid_a0.25
+exact_error_string              1.000       1.000        1.000
+symbol_name_query               0.975       0.975        0.975
+wrong_repo_same_topic           1.000       1.000        1.000
+paraphrased_debug_question      0.533       0.517        0.267   <- the only headroom family
+```
+
+### Verdict: DOES NOT GRADUATE — and this time it is real, not a gate artifact
+
+- **The recalibration works (validated live).** The gate correctly marked `exact_string_recall`
+  **saturated** (1.0 -> exempt) and tested only `symbol_recall` (`eligible_metrics=['symbol_recall']`,
+  `saturated_metrics=['exact_string_recall']`). No more impossible `exact > 1.0`. The mechanical fix
+  from commit `26d301b` is confirmed against the real corpus.
+- **But R1 loses on the metric that has headroom.** `E_hybrid_a0` symbol_recall **0.700 < baseline
+  0.710**, and it **regresses wrong_scope 0.034 -> 0.081**. Every higher alpha collapses. So no E
+  config graduates — for a genuine reason, not the old saturation bug.
+- **The source-aware floor is neutral-to-negative on the semantic-gap family.** On
+  `paraphrased_debug_question` (the ONLY family with real headroom now), `E_hybrid_a0` = **0.517 vs
+  baseline 0.533** — slightly worse. This is the **opposite** of the earlier 40-query run
+  (0.550 -> 0.600, +0.05). The two runs bracket zero (+0.05 / -0.016 on N=40/60), so the floor's
+  effect is **within noise, not a robust win**.
+- **Why symbol/scope no longer move:** with the vehicle fix they fell back to the **raw identifier**
+  (only 22 unique classes have a rich summary to paraphrase; **0** same-name-in-2-projects pairs do),
+  so `symbol_name_query` (0.975) and `wrong_repo_same_topic` (1.000) now **saturate** — the baseline
+  fused RRF already nails a verbatim class name. Identifier is the correct vehicle for scope (raw
+  name in both projects -> scope must disambiguate), but it means only the paraphrase family tests
+  the floor, and the floor doesn't win there.
+
+**Conclusion: `hybrid_alpha` stays UNSET.** With the gate honest and the symbol/scope families fixed,
+R1's attributed-hybrid source-aware floor does **not** earn graduation on the dummy corpus — it is
+neutral-to-negative on the one family that could show a win. This joins the oracle-stack LongMemEval
+verdict: read-time levers are neutral-to-negative; the leverage is upstream at write/consolidation
+time. To revisit R1, the paraphrase family needs to be the whole test (drop the saturating verbatim
+symbol/scope families, or find rich-summary class/scope nodes) and scaled to ~150-200 for a stable
+estimate — but the current signal says do not tune `hybrid_alpha`.
+
+_Artifacts (regenerable, not committed): `fixtures/local/r1_dummy_gold_v2.json`,
+`results/r1_dummy_run_v2.json`._

@@ -6,23 +6,32 @@ the live menhir graph (23k+ real Entity nodes with `structure_project`/`symbol_k
 `symbol_signature`), so we can derive GOLD LABELS mechanically for the three families
 the R1 win gate actually needs, with real recall headroom:
 
-  symbol_name_query   query a distinctive class name; gold = that one node (globally
-                      unique name) -> drives `symbol_recall`.
-  exact_error_string  query a distinctive underscore identifier (function/method name);
-                      gold = that node -> drives `exact_string_recall`.
-  wrong_repo_same_topic  a symbol name that exists in EXACTLY two projects; query scoped
-                      to project A, gold = the project-A node, the project-B node is a
-                      real wrong-scope distractor -> drives `wrong_scope_injection_rate`.
+  symbol_name_query   DESCRIBE a distinctive class (LLM paraphrase of its body, no
+                      identifier overlap) so the source-aware floor must rescue the gold;
+                      gold = that one node (globally unique name) -> drives `symbol_recall`
+                      with real headroom. Raw-identifier fallback when no LLM client / the
+                      body is too thin (saturates -> exempt under the recalibrated gate);
+                      the `vehicle` field records which was used. (Needs a client, i.e.
+                      run with --paraphrase; the de-CamelCased spacing vehicle is removed.)
+  exact_error_string  query a distinctive underscore identifier (function/method name)
+                      VERBATIM; gold = that node -> drives `exact_string_recall` (saturates
+                      -- a floor/no-regression guard, exempt from the gate's must-beat).
+  wrong_repo_same_topic  a symbol name that exists in EXACTLY two projects; query = a
+                      paraphrase of project A's node body (identifier removed, so the scope
+                      warden -- not lexical match -- must pick A), gold = the project-A node,
+                      the project-B node is a real wrong-scope distractor -> drives
+                      `wrong_scope_injection_rate`. Raw-identifier fallback as above.
 
   paraphrased_debug_question  (opt-in, --paraphrase N, needs OPENAI_API_KEY) an LLM rewrites a
                       node's own summary into a natural question that SHARES NO identifier
                       words with the node -> lexically distant, semantically dead-on. gold =
                       that uuid; target_symbol = its name (so a successful semantic-gap rescue
                       moves `symbol_recall`, where the dummy has real headroom). This is the
-                      family that actually exercises R1's source-aware floor; the structural
-                      families above are either lexically trivial (baseline saturates) or lost
-                      in the corpus once paraphrased. See `.agent/benchmark-notes/
-                      r1-dummy-gold-run.md`.
+                      family that most directly exercises R1's source-aware floor; the
+                      symbol/scope families now share this same paraphrase vehicle (with a
+                      raw-identifier fallback), so they get semantic-gap headroom too, while
+                      exact stays verbatim as a saturating floor guard. See
+                      `.agent/benchmark-notes/r1-dummy-gold-run.md`.
 
 NOT mined (honest scope): `stale_semantic_neighbor` / `historical_only_vs_current_truth`
 (the clone's `conflict_status` has no `superseded`/historical marker, only
@@ -51,8 +60,6 @@ import os
 import re
 from pathlib import Path
 
-from neo4j import GraphDatabase
-
 DUMMY_URI = "bolt://localhost:7687"
 DUMMY_AUTH = ("neo4j", "menhirdummy123")
 MENHIR_ENV = Path(r"C:\Users\thron\IdeaProjects\projects\archolith\menhir\.env")
@@ -69,10 +76,27 @@ def _is_identifierish(name: str) -> bool:
     return bool(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name))
 
 
-def _query_text(name: str) -> str:
-    """Turn a CamelCase / snake_case identifier into a natural-ish lookup query."""
-    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", name).replace("_", " ").strip()
-    return spaced if len(spaced) >= 3 else name
+_MIN_PARAPHRASE_BODY = 50  # a body shorter than this is too thin to paraphrase faithfully
+
+
+def _describe_query(name: str, body: str, client) -> tuple[str, str]:
+    """Query text + vehicle for a symbol / scope family.
+
+    Primary vehicle (client present, body >= _MIN_PARAPHRASE_BODY): an LLM paraphrase
+    of the node body sharing no identifier words -- lexically distant, so the
+    source-aware floor (symbol_name_query) or the scope warden (wrong_repo_same_topic)
+    must do the work and the gold keeps real recall headroom. Fallback (no client /
+    thin body / leaked paraphrase): the raw identifier -- the baseline saturates on it,
+    which the recalibrated win gate now exempts (a floor guard, not a headroom metric).
+    The de-CamelCased spacing vehicle is REMOVED: r1-dummy-gold-run.md showed it strips
+    the lexical signal AND leaves the single gold node unretrievable in a 23.8k graph.
+    Returns ``(query_text, vehicle)`` -- vehicle is ``paraphrase`` or ``identifier``.
+    """
+    if client is not None and body and len(body) >= _MIN_PARAPHRASE_BODY:
+        q = _paraphrase(client, name, body)
+        if q:
+            return q, "paraphrase"
+    return name, "identifier"
 
 
 def _load_openai_key() -> str:
@@ -152,10 +176,12 @@ def mine(session, n_symbols: int, n_exact: int, n_scope: int, n_paraphrase: int 
         uuid = r["uuid"]
         text = f"{name}\n{r['body']}"
         add_memory(uuid, name, r["project"], text, symbols=[name])
+        q_text, vehicle = _describe_query(name, r["body"], client)
         queries.append({
-            "id": f"sym_{taken:03d}", "text": _query_text(name),
+            "id": f"sym_{taken:03d}", "text": q_text,
             "family": "symbol_name_query", "support_ids": [uuid],
             "intent": "current", "project": r["project"], "target_symbol": name,
+            "vehicle": vehicle,
         })
         taken += 1
 
@@ -215,10 +241,11 @@ def mine(session, n_symbols: int, n_exact: int, n_scope: int, n_paraphrase: int 
         # Query scoped to project A; A's node is gold, B's node is the wrong-scope distractor.
         add_memory(a["uuid"], name, a["project"], f"{name}\n{a['body']}", symbols=[name])
         add_memory(b["uuid"], name, b["project"], f"{name}\n{b['body']}", symbols=[name])
+        q_text, vehicle = _describe_query(name, a["body"], client)
         queries.append({
-            "id": f"scope_{taken:03d}", "text": _query_text(name),
+            "id": f"scope_{taken:03d}", "text": q_text,
             "family": "wrong_repo_same_topic", "support_ids": [a["uuid"]],
-            "intent": "current", "project": a["project"],
+            "intent": "current", "project": a["project"], "vehicle": vehicle,
             "note": f"wrong-scope distractor in {b['project']}",
         })
         taken += 1
@@ -288,6 +315,8 @@ def main(argv: list[str] | None = None) -> int:
         from openai import OpenAI
 
         client = OpenAI(api_key=_load_openai_key())
+
+    from neo4j import GraphDatabase
 
     driver = GraphDatabase.driver(DUMMY_URI, auth=DUMMY_AUTH)
     try:

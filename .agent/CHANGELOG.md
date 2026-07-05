@@ -1,5 +1,15 @@
 # archolith-bench Changelog
 
+## 2026-07-05 — R1 gold miner: paraphrase vehicle for symbol/scope families
+
+**fix(r1-miner):** `scripts/mine_r1_gold.py` no longer de-CamelCases identifiers for the `symbol_name_query` / `wrong_repo_same_topic` families (r1-dummy-gold-run.md showed `PricingModel` -> "Pricing Model" stripped the lexical signal AND left the single gold node unretrievable in the 23.8k-node graph). Both families now route their query text through the same LLM paraphrase vehicle as `paraphrased_debug_question` (identifier removed, so the source-aware floor / scope warden must do the work and the gold keeps real `symbol_recall` / scope headroom), with a raw-identifier fallback when there is no LLM client or the node body is too thin. Each query records a `vehicle` field (`paraphrase` | `identifier`). `exact_error_string` stays verbatim (a saturating floor guard, exempt under the recalibrated gate).
+
+**refactor:** the `neo4j` import moved into `main()` (lazy) so the module and its pure helpers import without neo4j installed — required to test the miner offline / in CI.
+
+**test:** Added `tests/test_mine_r1_gold.py` (first tests for the miner) — 7 offline cases over the query-vehicle routing (paraphrase vs identifier fallbacks, leak / thin-body guards, and `mine()` family routing) with a scripted fake session + fixed-reply fake client. Offline suite: 340 passed.
+
+**note:** this is the CODE half of r1-dummy-gold-run.md step 3; the graph re-mine (+ paraphrase scale-up, step 2) and the real `hybrid_alpha` call remain corpus-gated.
+
 ## 2026-07-05 — Corpus sourcing survey (data phase)
 
 **docs(benchmark-notes):** Added `benchmark-notes/corpus-sourcing-survey.md` — surveyed public corpora for the corpus-gated R1 `hybrid_alpha` tuning + R2 facet graduation data phase. Verdict: no off-the-shelf corpus qualifies as a drop-in (the phase is a union of code semantic-gap + temporal supersession + cross-repo scope + facet/belief labels, grounded in the agent's OWN repo graph — every public corpus covers only one axis and none is grounded in our repos). Per-axis mapping (CodeSearchNet/CoSQA/CoIR; SituatedQA/TimeQA/PAT-Questions/"Supersede"; RepoBench-R/CORE-Bench/CodeScaleBench; LongMemEval/LoCoMo/BEAM) with fit verdicts. Also confirmed the fixtures already exist as drafts (`facet_r2_draft.json` 50/20, `r1_dummy_gold.json` 135 queries), so the remaining work is graph-gated validation, not authoring; public corpora contribute methodology (CoSQA/CoIR paraphrasing, SituatedQA timestamp-flips), not gold.

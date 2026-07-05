@@ -133,8 +133,13 @@ all-saturated, and saturated-regression paths. Offline suite green (333 passed).
 
 Still owed before the real `hybrid_alpha` call (both **corpus-gated**, not doable offline):
 - **Step 2:** scale the `paraphrased_debug_question` family to ~150-200 queries for a stable estimate.
-- **Step 3:** fix/replace the de-CamelCased `symbol_name_query` + `wrong_repo_same_topic` families
-  (the mined query text drops the lexical signal AND the single gold node never enters top-50).
+- **Step 3 — CODE half DONE 2026-07-05:** `mine_r1_gold.py` no longer de-CamelCases identifiers
+  for `symbol_name_query` / `wrong_repo_same_topic`; both families now route their query text
+  through the same LLM paraphrase vehicle as `paraphrased_debug_question` (identifier removed, so
+  the source-aware floor / scope warden must do the work and the gold keeps real headroom), with a
+  raw-identifier fallback + a `vehicle` field recording which was used. Still owed (corpus-gated):
+  a graph re-mine with the new vehicle to confirm the gold now enters top-k and the families move
+  `symbol_recall` / `wrong_scope_injection_rate`.
 
 Then re-run on the live graph; only if the source-aware-floor win holds do we set `hybrid_alpha`.
 The recalibrated gate makes the win *visible*; it does **not** auto-promote — the

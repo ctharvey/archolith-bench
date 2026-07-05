@@ -8,6 +8,8 @@
 
 **refactor(r1):** `scripts/run_r1_dummy.py` now drives a `ProgressReporter` across its async condition x query recall loop — the ~10-minute dummy run shows `[R1 recall] 45/155  29%  ...  eta ...` instead of silence.
 
+**docs:** `.agent/workflows/bench-progress.md` — usage + adoption guide (the three primitives, async example, the "don't pipe through tail" note, API reference); pointer added under README "How to Run".
+
 ## 2026-07-05 — R2 facet ladder: real-embedder run (F graduates)
 
 **feat(facet):** `scripts/run_facet_bench.py` gained `--embedder {stub,openai}`; the new `OpenAIEmbeddingScorer` (text-embedding-3-small + cosine, cached by text, ~70 embeddings, no graph) implements the `EmbeddingScorer` protocol and replaces the offline lexical stub in conditions B/C/E. The package stays offline/CI-pure — the real embedder lives in the script behind the flag.

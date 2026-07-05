@@ -25,6 +25,13 @@ archolith-bench proxy --all --arms direct,proxy_only  # run against live proxy
 archolith-bench industry --launch-only                # generate launch benchmark coverage matrix
 ```
 
+### Progress on long runs
+Long bench loops (R1/facet ladders, live recall) print a live heartbeat via
+`archolith_bench/progress.py` — `ProgressReporter` / `track` / `run_ladder`. Progress goes
+to **stderr**, so run the script directly (don't pipe stdout through `tail` — it buffers to
+EOF and hides everything). Full usage + adoption guide:
+[`.agent/workflows/bench-progress.md`](workflows/bench-progress.md).
+
 ## LongMemEval Framework
 
 Memory-specific A/B testing for menhir's recall and ingest, consolidated under

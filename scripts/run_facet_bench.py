@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -31,6 +32,71 @@ from archolith_bench.facet.models import FacetFixture  # noqa: E402
 from archolith_bench.facet.runner import BASELINE_CONDITIONS, FacetBenchmarkRunner  # noqa: E402
 
 DEFAULT_FIXTURE = REPO_ROOT / "fixtures" / "facet_demo.json"
+MENHIR_ENV = Path(r"C:\Users\thron\IdeaProjects\projects\archolith\menhir\.env")
+
+
+def _load_openai_key() -> str:
+    """OPENAI_API_KEY from the env, falling back to menhir/.env."""
+    key = os.environ.get("OPENAI_API_KEY")
+    if not key and MENHIR_ENV.exists():
+        from dotenv import dotenv_values
+
+        key = dotenv_values(str(MENHIR_ENV)).get("OPENAI_API_KEY")
+    if not key:
+        raise SystemExit("--embedder openai needs OPENAI_API_KEY (env or menhir/.env)")
+    return key
+
+
+def _cosine(a: list[float], b: list[float]) -> float:
+    import math
+
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a)) or 1.0
+    nb = math.sqrt(sum(y * y for y in b)) or 1.0
+    return dot / (na * nb)
+
+
+class OpenAIEmbeddingScorer:
+    """Real EmbeddingScorer: OpenAI text-embedding-3-small + cosine, cached by text.
+
+    Implements the ``archolith_bench.facet.baselines.EmbeddingScorer`` protocol so it
+    drops into conditions B/C/E in place of the offline LexicalEmbeddingStub. Only
+    constructed when ``--embedder openai`` is passed, so the package stays offline /
+    CI-pure. Every distinct text is embedded once and reused across queries/modes.
+    """
+
+    name = "openai-text-embedding-3-small"
+
+    def __init__(self, model: str = "text-embedding-3-small") -> None:
+        from openai import OpenAI
+
+        self._client = OpenAI(api_key=_load_openai_key())
+        self._model = model
+        self._cache: dict[str, list[float]] = {}
+
+    def _embed(self, texts: list[str]) -> list[list[float]]:
+        need = [t for t in dict.fromkeys(texts) if t not in self._cache]
+        if need:
+            resp = self._client.embeddings.create(
+                model=self._model, input=[t or " " for t in need]
+            )
+            for text, item in zip(need, resp.data):
+                self._cache[text] = item.embedding
+        return [self._cache[t] for t in texts]
+
+    def score(self, query_text: str, memories) -> dict[str, float]:
+        if not memories:
+            return {}
+        qv = self._embed([query_text])[0]
+        mvs = self._embed([m.text for m in memories])
+        return {m.id: _cosine(qv, mv) for m, mv in zip(memories, mvs)}
+
+
+def _build_embedder(kind: str):
+    """None -> runner uses its offline LexicalEmbeddingStub; 'openai' -> real model."""
+    if kind == "openai":
+        return OpenAIEmbeddingScorer()
+    return None
 
 
 def _print_table(artifact: dict) -> None:
@@ -57,6 +123,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("fixture", nargs="?", default=str(DEFAULT_FIXTURE), help="path to a facet fixture JSON")
     parser.add_argument("--out", default="results/facet_run.json", help="where to write the full JSON artifact")
     parser.add_argument("--no-traces", action="store_true", help="omit per-candidate explanation traces from the artifact")
+    parser.add_argument("--embedder", choices=["stub", "openai"], default="stub",
+                        help="conditions B/C/E embedder: offline stub (default) or real OpenAI model")
     args = parser.parse_args(argv)
 
     fixture_path = Path(args.fixture)
@@ -65,7 +133,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     fixture = FacetFixture.from_file(fixture_path)
-    artifact = FacetBenchmarkRunner(fixture).run(include_traces=not args.no_traces)
+    runner = FacetBenchmarkRunner(fixture, embedder=_build_embedder(args.embedder))
+    artifact = runner.run(include_traces=not args.no_traces)
     _print_table(artifact)
 
     out_path = Path(args.out)

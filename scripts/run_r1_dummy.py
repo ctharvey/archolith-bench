@@ -103,6 +103,7 @@ async def _run(fixture, k: int, candidate_k: int) -> dict:
     from menhir.services.recall_service import RecallService
     from menhir.services.scoring_service import ScoringService
 
+    from archolith_bench.progress import ProgressReporter
     from archolith_bench.r1.runner import ALPHA_SWEEP, ConditionResult, aggregate_metrics, evaluate_win_gate
 
     settings = MemorySettings.from_env()
@@ -118,6 +119,9 @@ async def _run(fixture, k: int, candidate_k: int) -> dict:
         conditions[f"E_hybrid_a{alpha:g}"] = RetrievalTuningConfig(enable_bm25=True, hybrid_alpha=alpha)
 
     results: dict[str, ConditionResult] = {}
+    # Live heartbeat on stderr: this loop is len(conditions) x len(queries) real recalls
+    # (~10 min on the dummy), so without progress it looks hung.
+    progress = ProgressReporter(len(conditions) * len(fixture.queries), label="R1 recall")
     for name, tuning in conditions.items():
         ranked_by_query: dict[str, list[str]] = {}
         latencies: list[float] = []
@@ -129,9 +133,10 @@ async def _run(fixture, k: int, candidate_k: int) -> dict:
             )
             latencies.append((perf_counter() - t0) * 1000.0)
             ranked_by_query[q.id] = _map_ids([r.uuid for r in result.results], gold_ids)
+            progress.advance(detail=name)
         metrics = aggregate_metrics(fixture, ranked_by_query, latencies, k)
         results[name] = ConditionResult(condition=name, metrics=metrics, per_query=ranked_by_query)
-        print(f"  ran {name}")
+    progress.close()
 
     neo4j.close()
     if hasattr(gc, "aclose"):

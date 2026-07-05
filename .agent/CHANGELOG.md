@@ -1,5 +1,13 @@
 # archolith-bench Changelog
 
+## 2026-07-05 — Reusable bench progress harness
+
+**feat(progress):** New `archolith_bench/progress.py` — a stdlib-only, reusable run-progress reporter for the long bench loops (a live R1 recall run over 6 conditions x 155 queries printed nothing for ~10 minutes and looked hung). `ProgressReporter` emits a throttled, flushed heartbeat to **stderr** (stays visible when stdout is piped / `tee`'d, keeps the JSON + table clean on stdout), TTY-aware (`\r` live line on a terminal, one line per tick when piped), with rate + ETA + an optional per-tick `detail` (e.g. the current condition). Convenience wrappers: `track(iterable, ...)` (tqdm-style, sync) and `run_ladder(conditions, items, run_one, ...)` (the common conditions x items loop). Works in async loops via `ProgressReporter.advance()`. Named `progress` to avoid colliding with the existing `archolith_bench.harness` external-adapter package.
+
+**test:** `tests/test_progress.py` — 11 offline cases (format_duration, throttling, disabled-silent, single-final-line, zero-total safety, non-TTY line-per-tick, `track`, `run_ladder`) with StringIO streams.
+
+**refactor(r1):** `scripts/run_r1_dummy.py` now drives a `ProgressReporter` across its async condition x query recall loop — the ~10-minute dummy run shows `[R1 recall] 45/155  29%  ...  eta ...` instead of silence.
+
 ## 2026-07-05 — R2 facet ladder: real-embedder run (F graduates)
 
 **feat(facet):** `scripts/run_facet_bench.py` gained `--embedder {stub,openai}`; the new `OpenAIEmbeddingScorer` (text-embedding-3-small + cosine, cached by text, ~70 embeddings, no graph) implements the `EmbeddingScorer` protocol and replaces the offline lexical stub in conditions B/C/E. The package stays offline/CI-pure — the real embedder lives in the script behind the flag.

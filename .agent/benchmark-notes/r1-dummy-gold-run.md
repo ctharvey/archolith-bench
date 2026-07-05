@@ -118,3 +118,24 @@ but it is not yet a confident "ship hybrid_alpha=0" decision. To make it one:
 3. fix/replace the symbol_name + scope families,
 then re-run and, only if the source-aware-floor win holds, set `hybrid_alpha` to the best
 surviving config in `src/menhir/domain/retrieval_tuning.py`.
+
+## Update — win gate recalibrated (2026-07-05)
+
+**Step 1 above is DONE.** `archolith_bench/r1/runner.evaluate_win_gate` no longer demands
+`exact > 1.0`: improvement metrics saturated at the baseline (>= `SATURATION_CEILING`, default
+1.0) are exempt from the must-beat test but still may not regress, and graduation now requires a
+strict win on every UNSATURATED improvement metric (on this corpus just `symbol_recall`) with no
+saturated / stale / scope regression. On this run's numbers the gate now **GRADUATES** on
+`E_hybrid_a0` (symbol 0.300 -> 0.325, exact held at 1.0, stale/scope 0) and recommends
+`hybrid_alpha=0.0`. The gate output gained `eligible_metrics` / `saturated_metrics` so the
+exemption is auditable; 3 new unit tests in `tests/test_r1_runner.py` cover the saturated-metric,
+all-saturated, and saturated-regression paths. Offline suite green (333 passed).
+
+Still owed before the real `hybrid_alpha` call (both **corpus-gated**, not doable offline):
+- **Step 2:** scale the `paraphrased_debug_question` family to ~150-200 queries for a stable estimate.
+- **Step 3:** fix/replace the de-CamelCased `symbol_name_query` + `wrong_repo_same_topic` families
+  (the mined query text drops the lexical signal AND the single gold node never enters top-50).
+
+Then re-run on the live graph; only if the source-aware-floor win holds do we set `hybrid_alpha`.
+The recalibrated gate makes the win *visible*; it does **not** auto-promote — the
+"do NOT auto-set hybrid_alpha from this" caveat above still stands.

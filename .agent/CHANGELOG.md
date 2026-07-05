@@ -1,5 +1,13 @@
 # archolith-bench Changelog
 
+## 2026-07-05 — R1 win gate recalibration (ignore saturated metrics)
+
+**fix(r1):** `evaluate_win_gate` no longer requires beating a metric already saturated at the baseline. The old gate demanded a strict win on BOTH `exact_string_recall` AND `symbol_recall`, but on the real dummy-gold corpus `exact_string_recall` saturates at 1.0 (graphiti's internal RRF already fuses BM25 + cosine), so `1.0 > 1.0` could never fire regardless of a real win on the headroom metrics. Now: improvement metrics at/above `SATURATION_CEILING` (default 1.0) are exempt from the must-beat test but still may not regress; graduation requires a strict win on every UNSATURATED improvement metric with no saturated/stale/scope regression. If every improvement metric is saturated the gate refuses to graduate and records a `reason`. Gate output gained `eligible_metrics` / `saturated_metrics` / `saturation_ceiling` so the exemption is auditable. On the dummy-gold numbers the gate now graduates `E_hybrid_a0` (symbol 0.300→0.325) and recommends `hybrid_alpha=0.0`.
+
+**test:** Added 3 `tests/test_r1_runner.py` cases (saturated-metric graduation, all-saturated refusal, saturated-metric-regression block). Existing gate tests unchanged and green (all use a contested baseline). Offline suite: 333 passed.
+
+**docs:** `benchmark-notes/r1-dummy-gold-run.md` step 1 (recalibrate the gate) marked DONE; steps 2–3 (scale paraphrase family, fix symbol/scope families) + the real `hybrid_alpha` call remain corpus-gated.
+
 ## 2026-07-04 — Continuous Integration (GitHub Actions)
 
 **ci:** Added `.github/workflows/ci.yml` — the first CI for the bench (closes the deferred-verification "CI can run archolith-bench" cross-cutting item / R0 sub-task). A `test` job runs the bench suite on Python 3.11 + 3.12; a `lint` job runs `ruff check archolith_bench tests`. The sibling packages `archolith-maintenance` (required) and `archolith-filter` / `archolith-mcp-audit` (the optional audit/filter integrations) are installed from their public GitHub repos (none are on PyPI), so the suite smoke test runs too.

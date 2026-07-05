@@ -10,10 +10,15 @@ The runner is retriever-agnostic: hand it ``{condition: Retriever}``. Build the
 stub conditions with ``build_stub_conditions`` (CI), or wire ``MenhirLiveRetriever``
 instances for the live run. Metrics are computed identically for every condition.
 
-Win gate (R1 headline): an E config GRADUATES if it beats A_current on BOTH
-``exact_string_recall`` and ``symbol_recall`` WITHOUT regressing ``stale_hit_rate``
-or ``wrong_scope_injection_rate`` (within tolerance). The graduating alpha that
-maximizes exact+symbol recall is the recommended ``hybrid_alpha``.
+Win gate (R1 headline, recalibrated 2026-07-05): an E config GRADUATES if it
+strictly beats A_current on every UNSATURATED improvement metric (``exact_string_recall``
+/ ``symbol_recall`` whose baseline is below the saturation ceiling, so there is headroom
+to beat) WITHOUT regressing a saturated improvement metric, ``stale_hit_rate``, or
+``wrong_scope_injection_rate`` (within tolerance). A metric already saturated at the
+baseline (e.g. ``exact_string_recall`` = 1.0 on the real corpus, where graphiti's internal
+RRF already fuses BM25 + cosine) is EXEMPT from the must-beat test -- requiring a win on a
+metric with no headroom was a gate-calibration artifact that could never fire. The graduating
+alpha that maximizes exact+symbol recall is the recommended ``hybrid_alpha``.
 """
 
 from __future__ import annotations
@@ -27,6 +32,15 @@ from .retriever import Retriever, StubRetriever
 ALPHA_SWEEP: tuple[float, ...] = (0.0, 0.25, 0.5, 0.75, 1.0)
 BASELINE_CONDITION = "A_current"
 DEFAULT_K = 5
+
+# Higher-is-better recall metrics eligible to earn graduation. A metric already at
+# or above SATURATION_CEILING at the baseline has no headroom to beat, so it is exempt
+# from the "must beat" test (but still may not regress). Recalibrated 2026-07-05: the
+# real dummy-gold corpus saturates exact_string_recall at 1.0 (graphiti's internal RRF
+# already fuses BM25 + cosine), which the old "beat exact AND symbol" gate could never
+# clear -- see archolith-bench/.agent/benchmark-notes/r1-dummy-gold-run.md.
+IMPROVEMENT_METRICS: tuple[str, ...] = ("exact_string_recall", "symbol_recall")
+SATURATION_CEILING: float = 1.0
 
 
 def build_stub_conditions(
@@ -145,36 +159,56 @@ def aggregate_metrics(
 
 
 def evaluate_win_gate(
-    results: dict[str, ConditionResult], regress_tolerance: float = 0.0
+    results: dict[str, ConditionResult],
+    regress_tolerance: float = 0.0,
+    saturation_ceiling: float = SATURATION_CEILING,
 ) -> dict:
     """Decide whether any E (hybrid) config beats the A_current baseline.
 
-    Graduation: E beats A on BOTH exact_string_recall and symbol_recall AND does
-    not regress stale_hit_rate / wrong_scope_injection_rate by more than
-    ``regress_tolerance``. The graduating alpha maximizing exact+symbol recall is
-    recommended.
+    Graduation (recalibrated): E strictly beats A on every UNSATURATED improvement
+    metric (those in ``IMPROVEMENT_METRICS`` whose baseline is below
+    ``saturation_ceiling``) AND does not regress a SATURATED improvement metric,
+    ``stale_hit_rate``, or ``wrong_scope_injection_rate`` by more than
+    ``regress_tolerance``. A metric already saturated at the baseline is exempt from
+    the must-beat test (no headroom), so the gate no longer demands the impossible
+    ``exact > 1.0``; the graduating alpha maximizing exact+symbol recall is recommended.
     """
     if BASELINE_CONDITION not in results:
         return {"graduates": False, "reason": f"missing {BASELINE_CONDITION} baseline"}
     base = results[BASELINE_CONDITION].metrics
     e_names = [n for n in results if n.startswith("E_")]
 
+    # Split the improvement metrics into those with headroom (eligible to earn a win)
+    # and those already maxed at the baseline (exempt from must-beat, must not regress).
+    eligible = [k for k in IMPROVEMENT_METRICS if base[k] < saturation_ceiling]
+    saturated = [k for k in IMPROVEMENT_METRICS if base[k] >= saturation_ceiling]
+
     evaluated: list[dict] = []
     winners: list[dict] = []
     for name in e_names:
         m = results[name].metrics
+        # Per-metric flags kept for artifact readability / backward compatibility.
         beats_exact = m["exact_string_recall"] > base["exact_string_recall"]
         beats_symbol = m["symbol_recall"] > base["symbol_recall"]
+        # Must strictly beat every metric that has headroom; if none has headroom
+        # (all saturated) there is nothing to demonstrate a win on -> cannot graduate.
+        beats_eligible = bool(eligible) and all(m[k] > base[k] for k in eligible)
+        # A saturated metric may not slip (e.g. don't drop exact from 1.0 to win symbol).
+        no_saturated_regression = all(
+            m[k] >= base[k] - regress_tolerance for k in saturated
+        )
         stale_ok = m["stale_hit_rate"] <= base["stale_hit_rate"] + regress_tolerance
         scope_ok = (
             m["wrong_scope_injection_rate"]
             <= base["wrong_scope_injection_rate"] + regress_tolerance
         )
-        wins = beats_exact and beats_symbol and stale_ok and scope_ok
+        wins = beats_eligible and no_saturated_regression and stale_ok and scope_ok
         entry = {
             "condition": name,
             "beats_exact": beats_exact,
             "beats_symbol": beats_symbol,
+            "beats_eligible": beats_eligible,
+            "no_saturated_regression": no_saturated_regression,
             "no_stale_regression": stale_ok,
             "no_scope_regression": scope_ok,
             "wins": wins,
@@ -198,10 +232,12 @@ def evaluate_win_gate(
         )
         recommended = winners[0]["condition"]
 
-    return {
+    gate = {
         "graduates": bool(winners),
         "recommended_condition": recommended,
         "recommended_hybrid_alpha": _alpha_of(recommended),
+        "eligible_metrics": eligible,
+        "saturated_metrics": saturated,
         "baseline": {
             "exact_string_recall": base["exact_string_recall"],
             "symbol_recall": base["symbol_recall"],
@@ -210,7 +246,14 @@ def evaluate_win_gate(
         },
         "evaluated": evaluated,
         "regress_tolerance": regress_tolerance,
+        "saturation_ceiling": saturation_ceiling,
     }
+    if not eligible:
+        gate["reason"] = (
+            f"no unsaturated improvement metric: every metric in {list(IMPROVEMENT_METRICS)} "
+            f"is >= {saturation_ceiling} at baseline, so there is no headroom to earn a win"
+        )
+    return gate
 
 
 def _alpha_of(condition: str | None) -> float | None:

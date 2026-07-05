@@ -86,6 +86,55 @@ def test_gate_reports_missing_baseline() -> None:
     assert "missing" in gate["reason"]
 
 
+def test_gate_ignores_saturated_metric_and_graduates_on_headroom() -> None:
+    # Real dummy-gold shape: exact_string_recall saturates at 1.0 (graphiti's internal
+    # RRF already fuses BM25 + cosine), so only symbol_recall has headroom. The
+    # recalibrated gate graduates on the metric with headroom instead of demanding the
+    # impossible exact > 1.0. See benchmark-notes/r1-dummy-gold-run.md.
+    results = {
+        "A_current": _cr("A_current", exact=1.0, symbol=0.30, stale=0.0, scope=0.0),
+        "E_hybrid_a0": _cr("E_hybrid_a0", exact=1.0, symbol=0.325, stale=0.0, scope=0.0),
+    }
+    gate = evaluate_win_gate(results)
+    assert gate["graduates"] is True
+    assert gate["recommended_condition"] == "E_hybrid_a0"
+    assert gate["recommended_hybrid_alpha"] == 0.0
+    assert gate["eligible_metrics"] == ["symbol_recall"]
+    assert gate["saturated_metrics"] == ["exact_string_recall"]
+    entry = next(e for e in gate["evaluated"] if e["condition"] == "E_hybrid_a0")
+    assert entry["beats_eligible"] is True
+    assert entry["no_saturated_regression"] is True
+
+
+def test_gate_does_not_graduate_when_all_improvement_metrics_saturated() -> None:
+    # No headroom on either improvement metric -> refuse to graduate and explain why,
+    # instead of silently passing/failing on an impossible comparison.
+    results = {
+        "A_current": _cr("A_current", exact=1.0, symbol=1.0, stale=0.0, scope=0.0),
+        "E_hybrid_a0": _cr("E_hybrid_a0", exact=1.0, symbol=1.0, stale=0.0, scope=0.0),
+    }
+    gate = evaluate_win_gate(results)
+    assert gate["graduates"] is False
+    assert gate["recommended_condition"] is None
+    assert gate["eligible_metrics"] == []
+    assert "no unsaturated improvement metric" in gate["reason"]
+
+
+def test_gate_blocks_when_saturated_metric_regresses() -> None:
+    # symbol improves, but the saturated exact metric slips below 1.0 -> blocked
+    # (a win must not be bought by regressing an already-maxed metric).
+    results = {
+        "A_current": _cr("A_current", exact=1.0, symbol=0.30, stale=0.0, scope=0.0),
+        "E_hybrid_a0.5": _cr("E_hybrid_a0.5", exact=0.9, symbol=0.5, stale=0.0, scope=0.0),
+    }
+    gate = evaluate_win_gate(results)
+    assert gate["graduates"] is False
+    entry = next(e for e in gate["evaluated"] if e["condition"] == "E_hybrid_a0.5")
+    assert entry["beats_eligible"] is True
+    assert entry["no_saturated_regression"] is False
+    assert entry["wins"] is False
+
+
 # --- end-to-end stub run ---------------------------------------------------
 
 

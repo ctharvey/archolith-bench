@@ -41,10 +41,16 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      # archolith-maintenance is not published to PyPI; install it from its
-      # public GitHub repo so it satisfies the archolith-bench dependency.
-      - name: Install archolith-maintenance (git dependency)
-        run: python -m pip install "archolith-maintenance @ git+https://github.com/Archolith/archolith-maintenance.git"
+      # These sibling packages are public but not on PyPI; install them from
+      # GitHub. archolith-maintenance is a required dependency; archolith-filter
+      # and archolith-mcp-audit are the optional audit/filter integrations that
+      # the suite smoke test exercises (installing them un-skips it — see
+      # tests/conftest.py).
+      - name: Install sibling packages (git; public, not on PyPI)
+        run: |
+          python -m pip install "archolith-maintenance @ git+https://github.com/Archolith/archolith-maintenance.git"
+          python -m pip install "git+https://github.com/Archolith/archolith-filter.git"
+          python -m pip install "git+https://github.com/Archolith/archolith-mcp-audit.git"
 
       - name: Install archolith-bench (editable, dev extras)
         run: python -m pip install -e ".[dev]"
@@ -52,6 +58,6 @@ jobs:
       # The R3/R5 ladder benches import the menhir repo (private deps, not
       # installable in CI); tests/conftest.py skips them when menhir is absent.
       # This runs the offline bench mechanism suite (metrics, ranking ladders,
-      # fixture validators, cost/token models).
+      # fixture validators, cost/token models) plus the audit/filter smoke test.
       - name: Run offline bench suite
         run: python -m pytest tests/ -q

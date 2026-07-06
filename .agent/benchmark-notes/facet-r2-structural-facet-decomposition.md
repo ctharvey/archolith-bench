@@ -69,4 +69,40 @@ with **graph-derived** (not gold) structural facets. If anchoring coverage is hi
 holds and `CandidateSource.FACET` is wireable; if it's sparse, facet retrieval only helps the
 well-anchored slice. Fixture hardening (Risk #1) is still owed in parallel.
 
-_Artifacts (regenerable, not committed): `results/facet_r2_derived.json` (improved extraction)._
+## Live production measurement — ANCHORED_TO coverage (2026-07-05)
+
+Ran the graph-gated half against the **prod-clone dummy** (Neo4j 7687, 23.8k entities, read-only):
+does production actually supply structural facets via the code graph, and for how many memories?
+
+```
+ANCHORED_TO edges                     11,706   (all memory -> structural, confirmed)
+  distinct source memories             1,300
+  distinct structural targets            612   (all have structure_path; symbol_kind = 0)
+memory nodes (non-structural)          5,314
+  anchored (>=1 ANCHORED_TO)           1,300   -> 24.5% coverage
+  avg anchors when anchored              9.0   (max 215; 750 memories have >=3)
+```
+
+Findings:
+- **ANCHORED_TO gives memories their FILE facets** — targets are file/path nodes (`structure_path`),
+  not symbols. So the exact `file` facet the text extractor could never recover (recall 0.00) **is**
+  available from the graph — via anchoring. Symbol facets are reachable one hop further
+  (`file -[:DEFINES]-> symbol`) or from the improved text extraction.
+- **But only 24.5% of memories are anchored.** The anchored quarter is richly anchored (avg 9 files,
+  750 with >=3); the other **75.5% carry no structural anchors at all**.
+
+### What this means for wiring `CandidateSource.FACET`
+
+Hybrid mode's gold-structural stand-in is **realistic for the ~1/4 of memories that are
+file-anchored** — those genuinely get exact `file` facets from the graph, so F's scope/support
+discipline works on them. For the unanchored 75.5%, there are no structural facets to gate on and F
+degrades to the extracted-mode behavior (which does not graduate). So **`CandidateSource.FACET` is a
+bounded win: it helps the code-anchored slice, not the whole corpus.** The lever to grow that win is
+**ingest-time anchoring coverage** (more memories getting `ANCHORED_TO` edges), not a better facet
+engine or extractor — the engine already works where the anchors exist.
+
+Owed next: decide whether to (a) wire FACET for the anchored slice now (bounded but real), and/or
+(b) invest in raising anchoring coverage at ingest; plus ctharvey's fixture hardening (Risk #1).
+
+_Artifacts (regenerable, not committed): `results/facet_r2_derived.json` (improved extraction).
+Live query artifacts not persisted (read-only against the dummy 7687)._

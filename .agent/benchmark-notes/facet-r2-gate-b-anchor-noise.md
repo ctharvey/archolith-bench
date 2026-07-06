@@ -74,9 +74,38 @@ not by itself justify wiring FACET active; that decision hinges on whether facet
 generation surfaces topically-related memories (operation/object overlap) that vector recall
 misses — measured separately, and on the live A/B (gate c).
 
+## Crux — FACET's net-new over a REAL embedding baseline (`scripts/_gate_c_topical_lift.py`)
+
+Gate (b) said the win is scope/belief = the ScopeWarden's job. So the Phase-4 go/no-go
+reduces to: does facet candidate **generation** by topical (operation/object) overlap
+recover relevant memories the vector recall MISSES? Method (gold mode, to isolate facet
+families): baselines rank the corpus; gold ranked outside top-k by BOTH BM25 and embedding
+is "vector-missed"; then check whether FULL-facet F recovers each vector-missed gold into
+top-k via a NON-scope (op/obj/structural) match (from the meet-point explanation trace —
+scope_only "recovery" is a tie-break flood artifact and is discounted).
+
+| embedder | gold | vector-missed (both baselines) | recovered by F via non-scope match |
+|---|---|---|---|
+| stub (lexical) | 23 | 4 | 4 (op/obj + symbol convergence) |
+| **openai (real)** | 23 | **1** | **1** (q15→m37, object+symbol) |
+
+**Against a real embedding baseline, FACET's net-new recall is ~1 gold / 23 (~4%)** — the
+real embedder already finds 3 of the 4 the lexical stub missed. And that 1 recovery leans
+on *symbol* convergence, which is anchor-noise-degraded on the real graph (gate-b), so the
+real-graph net-new is ~0–1.
+
+**Verdict (Phase-4 go/no-go): active wiring is NOT justified by recall.** FACET's net-new
+over (real embedding recall + ScopeWarden scope discipline) is marginal on this fixture.
+The gated approach did its job — it surfaced a negative result before low-value complexity
+went into the hot recall path. Recommendation: keep FACET **shadow-only** (Phases 1–3, the
+observe-only stack already shipped); let the live shadow keep measuring, and revisit only if
+a larger/different corpus shows real topical lift. Caveat: n=1 net-new is within the noise of
+a 52-memory fixture — the signal is "marginal", not "exactly one".
+
 ## Reproduce
 
 ```
 python scripts/_gate_b_anchor_sweep.py                    # stub embedder
 python scripts/_gate_b_anchor_sweep.py --embedder openai  # real baselines
+python scripts/_gate_c_topical_lift.py --embedder openai  # net-new over real embeddings
 ```

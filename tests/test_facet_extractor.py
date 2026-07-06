@@ -16,6 +16,18 @@ def test_extract_files_symbols_tests() -> None:
     assert "test_recall_floor" not in fs.symbol
 
 
+def test_extract_snake_and_screaming_symbols() -> None:
+    # snake_case + SCREAMING_SNAKE identifiers mentioned bare (not only as `foo(` calls)
+    # are recovered — the common case in prose about code that PascalCase/call rules miss.
+    ex = FacetExtractor()
+    fs = ex.extract(
+        "The source_aware_floor uses weighted_rrf; FLOOR_EXEMPT_SOURCES bypasses it."
+    )
+    assert "source_aware_floor" in fs.symbol
+    assert "weighted_rrf" in fs.symbol
+    assert "FLOOR_EXEMPT_SOURCES" in fs.symbol
+
+
 def test_extract_operations_lemmatized() -> None:
     ex = FacetExtractor()
     assert "fix" in ex.extract("we fixed the bug").operation

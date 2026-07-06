@@ -1,5 +1,11 @@
 # archolith-bench Changelog
 
+## 2026-07-05 — R2 facet: structural-facet extraction decomposed (symbols improved; files need the graph)
+
+**feat(facet):** Added snake_case + SCREAMING_SNAKE identifier rules to the deterministic `FacetExtractor` (it previously caught only PascalCase + `foo(` calls, missing bare `source_aware_floor` / `weighted_rrf` / `FLOOR_EXEMPT_SOURCES`). Symbol-extraction recall on the draft fixture rose **0.11 -> 0.55**, lifting extracted-mode F recall@5 **0.275 -> 0.425**. 60 facet tests green (added `test_extract_snake_and_screaming_symbols`).
+
+**bench(facet):** Diagnosed the Chunk F structural bottleneck (the owed "real derived structural facets" piece). It decomposes cleanly: **symbol facets are text-improvable** (above), but **`file` facets have recall 0.00 — the gold paths are not in the memory prose at all**, so a text extractor fundamentally cannot recover them; in production they come from the code graph's `ANCHORED_TO` edges. Extracted mode still does not graduate (recall_loss 0.425) precisely because file facets are absent, while hybrid mode (gold/graph structural) graduates. Conclusion: hybrid's gold-structural stand-in is the *correct* model for graph-anchored facts; the remaining owed question is **production `ANCHORED_TO` coverage** (graph-gated), not better extraction. Full analysis in `benchmark-notes/facet-r2-structural-facet-decomposition.md`.
+
 ## 2026-07-05 — Reusable bench progress harness
 
 **feat(progress):** New `archolith_bench/progress.py` — a stdlib-only, reusable run-progress reporter for the long bench loops (a live R1 recall run over 6 conditions x 155 queries printed nothing for ~10 minutes and looked hung). `ProgressReporter` emits a throttled, flushed heartbeat to **stderr** (stays visible when stdout is piped / `tee`'d, keeps the JSON + table clean on stdout), TTY-aware (`\r` live line on a terminal, one line per tick when piped), with rate + ETA + an optional per-tick `detail` (e.g. the current condition). Convenience wrappers: `track(iterable, ...)` (tqdm-style, sync) and `run_ladder(conditions, items, run_one, ...)` (the common conditions x items loop). Works in async loops via `ProgressReporter.advance()`. Named `progress` to avoid colliding with the existing `archolith_bench.harness` external-adapter package.

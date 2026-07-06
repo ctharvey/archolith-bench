@@ -26,6 +26,11 @@ _TEST_RE = re.compile(r"\b(?:test_\w+|\w+_test)\b")
 _PASCAL_RE = re.compile(r"\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\b")
 # A callable reference: word( ... — captures the function name.
 _CALL_RE = re.compile(r"\b([a-z_][a-z0-9_]+)\s*\(")
+# snake_case identifiers mentioned bare (not just as calls): weighted_rrf,
+# source_aware_floor, search_scored. Underscore is a strong code-token signal in prose.
+_SNAKE_RE = re.compile(r"\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b")
+# SCREAMING_SNAKE constants: FLOOR_EXEMPT_SOURCES, SOURCE_PRIORS.
+_SCREAM_RE = re.compile(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b")
 # Backtick `code` spans and 'quoted' / "quoted" string literals → object candidates.
 _BACKTICK_RE = re.compile(r"`([^`]+)`")
 _QUOTED_RE = re.compile(r"[\"']([^\"']{2,})[\"']")
@@ -112,6 +117,9 @@ class FacetExtractor:
             # Drop bare keywords that happen to be followed by "(".
             if name not in {"if", "for", "while", "return", "print", "def"}:
                 symbols.add(name)
+        # snake_case + SCREAMING_SNAKE identifiers mentioned bare (not only as calls).
+        symbols.update(_SNAKE_RE.findall(text))
+        symbols.update(_SCREAM_RE.findall(text))
         # test names are their own facet; don't double-count them as symbols.
         symbols -= tests
         facets.symbol = set(sorted(symbols)[: self.config.max_symbols])

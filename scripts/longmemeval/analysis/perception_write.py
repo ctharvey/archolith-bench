@@ -45,7 +45,8 @@ THRESHOLD = float(os.getenv("PC_THRESHOLD", "1.0"))
 COUNT_LIMIT = int(os.getenv("PC_COUNT_LIMIT", "14"))
 HELDOUT_LIMIT = int(os.getenv("PC_HELDOUT_LIMIT", "12"))
 OUT = os.getenv("PC_OUT", os.path.expanduser("~/perception-write.json"))
-SOURCE = "perception-capstone"
+SOURCE = os.getenv("PC_SOURCE", "perception-capstone")
+SCOPE = os.getenv("PC_SCOPE", "counting+heldout")  # or "all" (the full stratified sample)
 
 
 class _Neo4jShim:
@@ -87,14 +88,20 @@ def main():
     views = ViewRepository(_Neo4jShim(driver))
 
     items = entropy._items()
-    counting = [it for it in items if pt._is_count_answer(it["answer"])][:COUNT_LIMIT]
-    heldout = [it for it in items if not pt._is_count_answer(it["answer"])][:HELDOUT_LIMIT]
-    print(f"Arm C write: {len(counting)} counting + {len(heldout)} held-out namespaces; "
+    if SCOPE == "all":
+        # the full stratified eval sample — every namespace, tagged by whether it's a count question
+        groups = [("all", items)]
+    else:
+        counting = [it for it in items if pt._is_count_answer(it["answer"])][:COUNT_LIMIT]
+        heldout = [it for it in items if not pt._is_count_answer(it["answer"])][:HELDOUT_LIMIT]
+        groups = [("counting", counting), ("heldout", heldout)]
+    n_total = sum(len(g) for _, g in groups)
+    print(f"perception consolidation: scope={SCOPE} ({n_total} namespaces); "
           f"k={K}, threshold={THRESHOLD}, cross-check ON, model={MODEL}, source={SOURCE}")
 
     results, t0 = [], time.time()
     try:
-        for tag, group in (("counting", counting), ("heldout", heldout)):
+        for tag, group in groups:
             for it in group:
                 qid = str(it["question_id"]); ns = f"lme-{qid}"
                 eps = _graph_user_episodes(driver, ns)

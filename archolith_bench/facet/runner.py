@@ -24,6 +24,7 @@ changes what the retriever sees, never the ground truth.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 
 from . import metrics as M
@@ -72,23 +73,29 @@ class FacetBenchmarkRunner:
         weights: MeetPointWeights | None = None,
         extractor: FacetExtractor | None = None,
         k: int = DEFAULT_K,
+        corpus_transform: Callable[[list[Memory]], list[Memory]] | None = None,
     ) -> None:
         self.fixture = fixture
         self.embedder = embedder or LexicalEmbeddingStub()
         self.reranker = MeetPointReranker(weights)
         self.extractor = extractor or FacetExtractor(_infer_extractor_config(fixture))
         self.k = k
+        # Optional post-mode corpus transform (e.g. anchor-noise / hygiene, gate b). None ==
+        # today's behavior. Correctness is still judged against the untouched gold corpus.
+        self.corpus_transform = corpus_transform
         self.gold_by_id = fixture.memories_by_id
 
     # -- corpus views -------------------------------------------------------
     def _corpus_for_mode(self, mode: str) -> list[Memory]:
         if mode == "gold":
-            return self.fixture.memories
-        if mode == "extracted":
-            return [self.extractor.extract_memory(m) for m in self.fixture.memories]
-        if mode == "hybrid":
-            return [self.extractor.extract_memory_hybrid(m) for m in self.fixture.memories]
-        raise ValueError(f"unknown facet mode: {mode}")
+            corpus = self.fixture.memories
+        elif mode == "extracted":
+            corpus = [self.extractor.extract_memory(m) for m in self.fixture.memories]
+        elif mode == "hybrid":
+            corpus = [self.extractor.extract_memory_hybrid(m) for m in self.fixture.memories]
+        else:
+            raise ValueError(f"unknown facet mode: {mode}")
+        return self.corpus_transform(corpus) if self.corpus_transform else corpus
 
     # -- per-condition rankers ---------------------------------------------
     def _rank(

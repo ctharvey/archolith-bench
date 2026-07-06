@@ -101,8 +101,36 @@ bounded win: it helps the code-anchored slice, not the whole corpus.** The lever
 **ingest-time anchoring coverage** (more memories getting `ANCHORED_TO` edges), not a better facet
 engine or extractor — the engine already works where the anchors exist.
 
-Owed next: decide whether to (a) wire FACET for the anchored slice now (bounded but real), and/or
-(b) invest in raising anchoring coverage at ingest; plus ctharvey's fixture hardening (Risk #1).
+### Diagnostic — is there an anchorable gap? (does raising coverage have headroom?)
+
+Of the **4,014 unanchored** memory nodes (3,906 PERSISTENT / 108 SESSION), how many *could*
+anchor but didn't — i.e. reference code?
+
+```
+unanchored memories                       4,014
+  reference a code file in text (CONTAINS)   171   <- the anchorable gap
+  MENTIONS a structural node                   0
+```
+
+(Caveat: a first pass with a `=~` regex returned 0 — a broken-escaping artifact through the
+docker/bash layers; it returned 0 even on anchored memories, while `CONTAINS '.py'` found 137
+there. The `CONTAINS` numbers above are the truthful ones.)
+
+So the anchorable gap is **only ~171 memories** — even if every one were anchored, coverage rises
+24.5% -> ~28%. The other ~3,843 unanchored memories reference no code and have zero structural
+MENTIONS: they are **genuine non-code memories** (conversational / factual / preference) that
+*should not* anchor.
+
+### Decision (data-backed)
+
+- **Option B (raise ingest-time anchoring coverage) is effectively dead** — the 24.5% is already
+  ~the whole code-relevant slice; there is no corpus-scaling headroom (a ~3.5pp ceiling), so a
+  write-path investment isn't justified.
+- **Option A (wire `CandidateSource.FACET` gated, for the anchored slice) is the call** — it is a
+  real, bounded win on the memories that carry structural facts, fails safe on the rest (emits no
+  candidates), and is additive/gated. Still owed before/around it: ctharvey's fixture hardening
+  (Risk #1), and building the production FACET candidate emitter (ANCHORED_TO -> facets -> facet
+  index -> meet-point -> the reserved `CandidateSource.FACET` seam), shipped default-off.
 
 _Artifacts (regenerable, not committed): `results/facet_r2_derived.json` (improved extraction).
 Live query artifacts not persisted (read-only against the dummy 7687)._

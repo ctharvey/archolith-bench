@@ -14,10 +14,29 @@ from archolith_bench.facet.runner import (
 )
 
 FIXTURE = Path(__file__).resolve().parent.parent / "fixtures" / "facet_demo.json"
+DRAFT = Path(__file__).resolve().parent.parent / "fixtures" / "facet_r2_draft.json"
 
 
 def _runner() -> FacetBenchmarkRunner:
     return FacetBenchmarkRunner(FacetFixture.from_file(FIXTURE))
+
+
+def test_regular_mode_keeps_scope_discipline_without_structural_facets() -> None:
+    """The dominant facet win (wrong-scope suppression) is scope/belief-driven, not
+    structural: with file/symbol/test stripped (the regular-memory fashion), F still
+    injects fewer wrong-scope memories than the best baseline — proving facets help
+    corpus-wide, not only on the structurally-anchored slice."""
+    fixture = FacetFixture.from_file(DRAFT)
+    for m in fixture.memories:
+        m.facets.file, m.facets.symbol, m.facets.test = set(), set(), set()
+    for q in fixture.queries:
+        q.facets.file, q.facets.symbol, q.facets.test = set(), set(), set()
+    gold = FacetBenchmarkRunner(fixture).run(include_traces=False)["modes"]["gold"]
+    f_scope = gold["F_facet_meet"]["metrics"]["wrong_scope_injection_rate"]
+    best_baseline_scope = min(
+        gold[c]["metrics"]["wrong_scope_injection_rate"] for c in BASELINE_CONDITIONS
+    )
+    assert f_scope < best_baseline_scope
 
 
 def test_run_emits_all_conditions_and_modes() -> None:

@@ -99,6 +99,24 @@ def _build_embedder(kind: str):
     return None
 
 
+def _strip_structural(fixture: FacetFixture) -> FacetFixture:
+    """Return a copy with file/symbol/test facets removed on every memory + query.
+
+    Simulates REGULAR (unanchored) memories: the facet system keeps only the
+    interpretive (operation/object/actor/evidence) + scope (repo/project/namespace) +
+    belief/time facets that any memory carries, with no code-anchoring. Tests whether
+    the facet fashion helps corpus-wide, not just on the structural (anchored) slice.
+    """
+    import copy
+
+    fx = copy.deepcopy(fixture)
+    for m in fx.memories:
+        m.facets.file, m.facets.symbol, m.facets.test = set(), set(), set()
+    for q in fx.queries:
+        q.facets.file, q.facets.symbol, q.facets.test = set(), set(), set()
+    return fx
+
+
 def _print_table(artifact: dict) -> None:
     metric_keys = ("recall_at_5", "precision_at_5", "mrr", "ndcg_at_5", "stale_hit_rate",
                    "wrong_scope_injection_rate", "support_sufficiency", "false_neighbor_rate",
@@ -125,6 +143,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-traces", action="store_true", help="omit per-candidate explanation traces from the artifact")
     parser.add_argument("--embedder", choices=["stub", "openai"], default="stub",
                         help="conditions B/C/E embedder: offline stub (default) or real OpenAI model")
+    parser.add_argument("--facet-scope", choices=["all", "regular"], default="all",
+                        help="'regular' strips file/symbol/test facets (regular-memory fashion: "
+                             "interpretive + scope + belief only, no code anchoring)")
     args = parser.parse_args(argv)
 
     fixture_path = Path(args.fixture)
@@ -133,6 +154,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     fixture = FacetFixture.from_file(fixture_path)
+    if args.facet_scope == "regular":
+        fixture = _strip_structural(fixture)
     runner = FacetBenchmarkRunner(fixture, embedder=_build_embedder(args.embedder))
     artifact = runner.run(include_traces=not args.no_traces)
     _print_table(artifact)

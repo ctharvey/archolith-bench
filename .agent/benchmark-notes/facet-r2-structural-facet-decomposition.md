@@ -132,5 +132,40 @@ MENTIONS: they are **genuine non-code memories** (conversational / factual / pre
   (Risk #1), and building the production FACET candidate emitter (ANCHORED_TO -> facets -> facet
   index -> meet-point -> the reserved `CandidateSource.FACET` seam), shipped default-off.
 
+## Does the win depend on structural facets at all? (empirical, 2026-07-05)
+
+The "bounded to 24.5%" claim assumes the facet win *needs* file/symbol facets. Tested it directly:
+re-ran the gold ladder with **file/symbol/test facets stripped from every memory + query** (the
+`run_facet_bench.py --facet-scope regular` mode) — i.e. facets reduced to interpretive
+(operation/object/actor/evidence) + scope (repo/project/namespace) + belief/time, what *any* memory
+carries with no code anchoring. Real embedder.
+
+```
+gold, structural STRIPPED     recall  stale  wrong_scope  support
+A_bm25                         0.850  0.270        0.400    0.800
+C_hybrid                       0.875  0.230        0.400    0.850
+F_facet_meet                   0.850  0.120        0.070    0.850   -> GRADUATES (wrong_scope +0.31)
+```
+
+**F still graduates with zero structural facets** — wrong_scope 0.40 -> 0.07, stale 0.27 -> 0.12, no
+recall loss. And versus the all-facets F (recall 0.850 / stale 0.150 / wrong_scope 0.070), stripping
+structure changed **almost nothing**. So on this fixture the dominant facet win (wrong-scope + stale
+suppression) is **entirely scope/belief-driven and structural-independent** — the file/symbol
+convergence bonus adds ~nothing on top.
+
+### Revised conclusion — the win is corpus-wide, not bounded to 24.5%
+
+The earlier "bounded win" framing was too pessimistic: it only bounds the *structural-precision*
+bonus. The **dominant** facet contribution — scope/stale discipline via `repo/project/namespace` +
+`belief_bucket` — needs no anchoring and applies to **~all** memories (scope facets are ~0.71
+metadata-derivable, vs 0.00 for file facets from text). So facets have real value **corpus-wide**,
+not just on the anchored slice; structural precision is a minor anchored-slice add-on. (Caveat: the
+draft fixture is code-themed, so its "regular" memories still carry rich scope/interpretive facets;
+a conversational corpus with weaker interpretive facets would lean even harder on the scope facets —
+which are the reliable, metadata-derived ones. Fixture hardening / a conversational fixture is owed
+to confirm the corpus-wide claim beyond this fixture. Also note: menhir's ScopeWarden/CurrentnessWarden
+already own this scope/stale discipline, so in production the net-new facet value is candidate
+GENERATION by overlap, with the wardens keeping the discipline — see the integration plan.)
+
 _Artifacts (regenerable, not committed): `results/facet_r2_derived.json` (improved extraction).
 Live query artifacts not persisted (read-only against the dummy 7687)._

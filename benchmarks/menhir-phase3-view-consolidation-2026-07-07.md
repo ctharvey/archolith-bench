@@ -91,11 +91,34 @@ Two secondary corrections in the same commit:
 - Report model label: the LLM under test is menhir's **server-side** personal-memory model, not
   the harness `--model`.
 
+## Expanded scenario suite (2026-07-07, offline-verified)
+
+Beyond the core 4-case flow, `archolith_bench/harness/phase3_scenarios.py` adds a declarative
+suite of consumer stress scenarios (`Scenario` = scripted `Post` phases + typed assertions,
+with a `gate` vs **characterization** split). Gate scenarios fold into the run's exit code;
+characterization scenarios document menhir's current behavior on genuinely-uncertain paths and
+never fail the verdict.
+
+| Scenario | Kind | Checks |
+|----------|------|--------|
+| `ambiguous-correction` | gate | two Views == 25 -> a bare `20, not 25` touches NEITHER (F2 abstain) |
+| `currency-worded-sum` | gate | `50 dollars and 75 dollars` folds to `bike_spend = 125` |
+| `multi-namespace` | gate | identical fixtures in two namespaces capture independently |
+| `count-vs-spend` | characterization | `2 bikes for $125` -> count(2) and spend(125) do not merge |
+| `negative-correction` | characterization | `Not 25 anymore, it is 20` supersedes only via the connective rule |
+
+The two characterization scenarios are marked non-gate because whether menhir extracts a
+separate count from one sentence, and whether the connective rule recognizes the negative
+phrasing, are exactly what the benchmark is there to *measure*. Offline-tested against a per-
+namespace fake modeling the F1/F2 behavior; **live characterization run is pending** (real LLM
+spend — see Reproduce).
+
 ## Verification
 
 - menhir route tests: **21/21** (`tests/test_api_routes.py`, incl. `TestPhase3` +7).
-- archolith-bench: **379 passed** full suite; driver tests **9/9** (`tests/test_menhir_phase3.py`,
-  incl. namespace-scoped `turn_key` regression).
+- archolith-bench: **389 passed** full suite; core driver tests **9/9**
+  (`tests/test_menhir_phase3.py`, incl. namespace-scoped `turn_key` regression) + scenario suite
+  **8/8** (`tests/test_phase3_scenarios.py`, incl. gate/characterization split).
 
 ## Reproduce
 

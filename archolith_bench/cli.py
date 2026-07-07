@@ -827,6 +827,9 @@ def _run_phase3_harness(args: argparse.Namespace, adapter) -> None:  # noqa: ANN
         assert_not_production,
         phase3_result_to_dict,
         run_phase3,
+        run_scenario_suite,
+        scenario_result_to_dict,
+        suite_verdict,
         write_phase3_evidence,
     )
 
@@ -861,6 +864,11 @@ def _run_phase3_harness(args: argparse.Namespace, adapter) -> None:  # noqa: ANN
             # the harness --model (an upstream chat model) is not the model under test here.
             model="menhir-personal-memory (server-side)",
         )
+        # Expanded consumer scenarios (ambiguous/negative correction, currency SUM, count-vs-spend,
+        # multi-namespace). Gate scenarios fold into the exit code; characterization ones do not.
+        scenario_results = run_scenario_suite(
+            client, base_namespace=f"phase3-scn-{result.namespace[-8:]}", k=3,
+        )
     finally:
         client.close()
 
@@ -875,12 +883,27 @@ def _run_phase3_harness(args: argparse.Namespace, adapter) -> None:  # noqa: ANN
           f"wrong_view_writes={m['wrong_view_writes']} silent_abstentions={m['silent_abstentions']} "
           f"duplicate_writes={m['duplicate_writes_on_rerun']}")
 
+    scenarios_gate_pass = suite_verdict(scenario_results)
+    print(f"\n  scenario suite ({len(scenario_results)}): "
+          f"gate={'PASS' if scenarios_gate_pass else 'FAIL'}")
+    for sr in scenario_results:
+        tag = "gate" if sr.gate else "characterization"
+        status = "PASS" if sr.passed else ("FAIL" if sr.gate else "DIVERGES")
+        print(f"  [{status}] {sr.scenario_id} ({tag}) — {sr.description}")
+        for ar in sr.assertions:
+            if not ar.passed:
+                print(f"        - {ar.label}: {ar.detail}")
+
     suffix = "json" if args.format == "json" else "md"
     out_path = args.out or (args.output_dir / f"harness_{adapter.benchmark_id}.{suffix}")
     write_phase3_evidence(result, out_path, output_format=args.format)
     print(f"  Evidence written to {out_path}")
 
     result_data = phase3_result_to_dict(result)
+    result_data["scenario_suite"] = {
+        "gate_passed": scenarios_gate_pass,
+        "scenarios": [scenario_result_to_dict(sr) for sr in scenario_results],
+    }
     _publish_cli_evidence(
         args,
         title=f"Harness evidence: {adapter.name}",
@@ -891,6 +914,7 @@ def _run_phase3_harness(args: argparse.Namespace, adapter) -> None:  # noqa: ANN
         environment_caveats=[
             "Phase 3 is a live black-box integration test against a throwaway menhir + Neo4j.",
             "The producer (host lifecycle triage) is frozen; fixtures encode its verdicts.",
+            "Characterization scenarios document current behavior and do not gate.",
             "Public launch copy requires current tracked launch evidence.",
         ],
         metric_rows=[
@@ -901,7 +925,7 @@ def _run_phase3_harness(args: argparse.Namespace, adapter) -> None:  # noqa: ANN
         artifact=result_data,
     )
 
-    if not result.verdict:
+    if not result.verdict or not scenarios_gate_pass:
         sys.exit(1)
 
 

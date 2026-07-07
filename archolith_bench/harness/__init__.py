@@ -53,6 +53,17 @@ from .menhir_phase3 import (
     run_phase3,
     write_phase3_evidence,
 )
+from .phase3_scenarios import (
+    Assertion,
+    Post,
+    Scenario,
+    ScenarioResult,
+    default_scenarios,
+    run_scenario,
+    run_scenario_suite,
+    scenario_result_to_dict,
+    suite_verdict,
+)
 from .scoring import LLMJudgeScorer
 
 # Registry of available real-harness adapters, keyed by benchmark_id (the one roof).
@@ -112,15 +123,24 @@ __all__ = [
     "MemoryCheckpoint",
     "MemoryQAAdapter",
     "MenhirClient",
+    "Assertion",
     "MenhirPhase3Adapter",
     "MtebAdapter",
     "Phase3Case",
     "Phase3MenhirClient",
     "Phase3Result",
+    "Post",
+    "Scenario",
+    "ScenarioResult",
     "default_phase3_cases",
+    "default_scenarios",
     "is_phase3",
     "phase3_result_to_dict",
     "run_phase3",
+    "run_scenario",
+    "run_scenario_suite",
+    "scenario_result_to_dict",
+    "suite_verdict",
     "write_phase3_evidence",
     "checkpoint_path_for",
     "NO_MEMORY",

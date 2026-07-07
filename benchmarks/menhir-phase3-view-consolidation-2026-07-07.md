@@ -109,9 +109,23 @@ never fail the verdict.
 
 The two characterization scenarios are marked non-gate because whether menhir extracts a
 separate count from one sentence, and whether the connective rule recognizes the negative
-phrasing, are exactly what the benchmark is there to *measure*. Offline-tested against a per-
-namespace fake modeling the F1/F2 behavior; **live characterization run is pending** (real LLM
-spend — see Reproduce).
+phrasing, are exactly what the benchmark is there to *measure*.
+
+### Live characterization results (2 runs against throwaway menhir)
+
+All **3 gate scenarios PASS** both runs (ambiguous-correction abstains, currency-SUM folds to
+125, multi-namespace independent); overall **verdict PASS**, safety invariants clean. Both
+characterization scenarios **DIVERGE** consistently — two real, reproducible consumer gaps the
+benchmark documented (verdict unaffected):
+
+| Scenario | Live behavior | Gap |
+|----------|---------------|-----|
+| `count-vs-spend` | `2 bikes for $125 total` yields only the spend View (run 1) or abstains on both (run 2); no separate `count=2` View | menhir does not co-extract a count and a SUM from one compound sentence |
+| `negative-correction` | `Not 25 anymore, it is 20` does NOT supersede; movies stays 25 | the correction resolver's connective rule does not recognize the `Not X anymore, it is Y` phrasing |
+
+These are **consumer** gaps (extraction / correction-binding), not producer work — candidates for
+future menhir consumer improvements, out of scope while the producer is frozen. Offline smoke uses
+a fake modeling the happy F1/F2 path; the live run above is the source of truth for current behavior.
 
 ## Offline smoke (CI-safe)
 

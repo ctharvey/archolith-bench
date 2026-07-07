@@ -37,6 +37,7 @@ class FakePhase3Client:
         self.correction_applied = False
         self.runs = 0
         self.reset_calls = 0
+        self.posted_turn_keys: list[str] = []
 
     def reset_phase3(self, namespace: str) -> dict:
         self.reset_calls += 1
@@ -46,7 +47,10 @@ class FakePhase3Client:
         self.runs = 0
         return {"namespace": namespace, "nodes_deleted": 0, "turn_evidence_deleted": 0}
 
-    def post_turn_evidence(self, namespace: str, text: str, *, triage_reason=None, **_) -> dict:
+    def post_turn_evidence(self, namespace: str, text: str, *, triage_reason=None,
+                           turn_key=None, **_) -> dict:
+        if turn_key is not None:
+            self.posted_turn_keys.append(turn_key)
         if "not 25" in text or text.lower().startswith("actually"):
             self.correction_posted = True
         self.dirty = True
@@ -138,7 +142,7 @@ def test_happy_path_passes_all_cases():
     client = FakePhase3Client()
     result = run_phase3(client, reset_confirmed=True, menhir_url="http://localhost:9",
                         model="fake")
-    assert client.reset_calls == 1
+    assert client.reset_calls == 2  # reset at start + teardown at end
     assert result.verdict is True
     assert {c.case_id: c.passed for c in result.cases} == {
         "phase3-movies-stated": True,
@@ -193,6 +197,16 @@ def test_report_writers_markdown_and_json(tmp_path):
     assert data["benchmark_id"] == "menhir-phase3"
     assert data["metrics"]["wrong_view_writes"] == 0
     assert len(data["cases"]) == 4
+
+
+def test_turn_keys_are_namespace_scoped():
+    # Regression: menhir MERGEs :TurnEvidence on a global turn_key; without namespace scoping,
+    # a re-run with the same fixture prompts binds to the prior run's node and the new namespace
+    # captures nothing. Every posted turn_key must be prefixed with this run's namespace.
+    client = FakePhase3Client()
+    result = run_phase3(client, reset_confirmed=True, menhir_url="http://localhost:9")
+    assert client.posted_turn_keys, "expected evidence posts to carry explicit turn_keys"
+    assert all(tk.startswith(result.namespace + ":") for tk in client.posted_turn_keys)
 
 
 def test_result_to_dict_is_json_serializable():

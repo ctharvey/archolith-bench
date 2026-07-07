@@ -849,7 +849,9 @@ def _run_phase3_harness(args: argparse.Namespace, adapter) -> None:  # noqa: ANN
             k=3,
             reset_confirmed=args.confirm_menhir_reset,
             menhir_url=args.menhir_url,
-            model=args.model,
+            # Phase 3 runs the consolidation LLM SERVER-SIDE (menhir's personal-memory model);
+            # the harness --model (an upstream chat model) is not the model under test here.
+            model="menhir-personal-memory (server-side)",
         )
     finally:
         client.close()

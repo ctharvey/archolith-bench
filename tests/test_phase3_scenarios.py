@@ -184,3 +184,41 @@ def test_scenario_result_serializable():
     client = ScenarioFakeClient()
     results = run_scenario_suite(client, base_namespace="scn-json")
     json.dumps([scenario_result_to_dict(r) for r in results])  # must not raise
+
+
+def test_stub_phase3_client_drives_core_flow_and_suite():
+    # The shipped StubPhase3Client (used by the CLI --offline path) must satisfy BOTH the core
+    # run_phase3 flow and the scenario suite with a passing verdict — the CI-safe smoke contract.
+    from archolith_bench.harness import (
+        StubPhase3Client,
+        default_phase3_cases,
+        run_phase3,
+    )
+
+    client = StubPhase3Client()
+    result = run_phase3(client, cases=default_phase3_cases(), reset_confirmed=True,
+                        menhir_url="offline-stub", model="offline-stub")
+    assert result.verdict is True
+    assert result.metrics["wrong_view_writes"] == 0
+    assert result.metrics["silent_abstentions"] == 0
+    assert result.metrics["duplicate_writes_on_rerun"] == 0
+    assert result.metrics["watermark_debounce_hit"] is True
+
+    suite = run_scenario_suite(client, base_namespace="stub-suite")
+    assert suite_verdict(suite) is True
+
+
+def test_cli_offline_menhir_phase3_smoke(tmp_path):
+    # End-to-end CLI smoke of the --offline path: no menhir, no network, exit 0.
+    from archolith_bench.cli import main
+
+    out = tmp_path / "phase3_offline.json"
+    try:
+        main(["harness", "menhir-phase3", "--offline-fixture", "stub",
+              "--format", "json", "--out", str(out)])
+    except SystemExit as exc:  # main() sys.exits(1) only on a verdict failure
+        assert exc.code in (None, 0), f"offline smoke should pass, exited {exc.code}"
+    data = json.loads(out.read_text(encoding="utf-8"))
+    assert data["verdict"] == "pass"
+    assert data["scenario_suite"]["gate_passed"] is True
+    assert len(data["scenario_suite"]["scenarios"]) == 5

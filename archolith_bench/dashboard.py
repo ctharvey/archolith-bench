@@ -289,7 +289,7 @@ def _feed_rows_html(s: RunSnapshot, items_n: int) -> str:
         )
     return (
         "<table class='feed'><thead><tr><th>time</th><th></th><th>arm</th><th>item</th>"
-        f"<th>question &middot; click to expand retrieval &rarr; gold &rarr; response</th>"
+        "<th>question &middot; click to expand retrieval &rarr; gold &rarr; response</th>"
         "</tr></thead><tbody>" + cells + "</tbody></table>"
     )
 

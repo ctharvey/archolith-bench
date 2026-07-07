@@ -20,7 +20,7 @@ namespaces and add a cross-namespace independence check.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from .menhir_client import Phase3MenhirClient

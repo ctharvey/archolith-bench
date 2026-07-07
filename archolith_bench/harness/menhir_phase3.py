@@ -550,9 +550,15 @@ def run_phase3(
 # ---------------------------------------------------------------------------- reporting
 
 
-def phase3_result_to_dict(result: Phase3Result) -> dict[str, Any]:
-    """Serialize a Phase3Result to a stable JSON-compatible dict."""
-    return {
+def phase3_result_to_dict(
+    result: Phase3Result, scenario_suite: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Serialize a Phase3Result to a stable JSON-compatible dict.
+
+    `scenario_suite` (optional) is the expanded scenario suite result — attached so the `--out`
+    evidence file is self-contained (core flow + scenarios in one artifact).
+    """
+    data = {
         "benchmark_id": result.benchmark_id,
         "run_id": result.run_meta.get("namespace"),
         "timestamp": result.run_meta.get("timestamp"),
@@ -567,6 +573,9 @@ def phase3_result_to_dict(result: Phase3Result) -> dict[str, Any]:
         "warnings": result.warnings,
         "run_meta": result.run_meta,
     }
+    if scenario_suite is not None:
+        data["scenario_suite"] = scenario_suite
+    return data
 
 
 def _scorecard_row(cases: list[Phase3CaseResult], kind: str) -> str:
@@ -577,15 +586,20 @@ def _scorecard_row(cases: list[Phase3CaseResult], kind: str) -> str:
 
 
 def write_phase3_evidence(
-    result: Phase3Result, out_path: str | Path, output_format: str = "markdown"
+    result: Phase3Result, out_path: str | Path, output_format: str = "markdown",
+    scenario_suite: dict[str, Any] | None = None,
 ) -> Path:
-    """Write purpose-built Phase 3 evidence (markdown or JSON)."""
+    """Write purpose-built Phase 3 evidence (markdown or JSON).
+
+    `scenario_suite` (optional) folds the expanded scenario-suite result into the SAME artifact
+    so the evidence file is self-contained.
+    """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     if output_format == "json":
         with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(phase3_result_to_dict(result), f, indent=2, ensure_ascii=False)
+            json.dump(phase3_result_to_dict(result, scenario_suite), f, indent=2, ensure_ascii=False)
         return out_path
 
     m = result.metrics
@@ -648,6 +662,26 @@ def write_phase3_evidence(
         lines.append("## Warnings\n\n")
         for w in result.warnings:
             lines.append(f"- {w}\n")
+        lines.append("\n")
+
+    if scenario_suite is not None:
+        gate = "PASS" if scenario_suite.get("gate_passed") else "FAIL"
+        lines.append(f"## Scenario suite (gate: {gate})\n\n")
+        lines.append("| Scenario | Kind | Result |\n|----------|------|--------|\n")
+        for sr in scenario_suite.get("scenarios", []):
+            kind = "gate" if sr.get("gate") else "characterization"
+            if sr.get("passed"):
+                status = "PASS"
+            else:
+                status = "FAIL" if sr.get("gate") else "DIVERGES"
+            lines.append(f"| {sr.get('scenario_id')} | {kind} | {status} |\n")
+        lines.append("\n")
+        for sr in scenario_suite.get("scenarios", []):
+            failed = [a for a in sr.get("assertions", []) if not a.get("passed")]
+            if failed:
+                lines.append(f"- `{sr.get('scenario_id')}` — {sr.get('description')}\n")
+                for a in failed:
+                    lines.append(f"    - {a.get('label')}: {a.get('detail')}\n")
         lines.append("\n")
 
     lines.append("## Reproduction command\n\n")

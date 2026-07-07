@@ -113,12 +113,22 @@ phrasing, are exactly what the benchmark is there to *measure*. Offline-tested a
 namespace fake modeling the F1/F2 behavior; **live characterization run is pending** (real LLM
 spend — see Reproduce).
 
+## Offline smoke (CI-safe)
+
+`archolith-bench harness menhir-phase3 --offline-fixture stub` runs the **full** driver + scenario
+suite + report against a deterministic in-memory `StubPhase3Client` — no menhir, no Neo4j, no
+network. It guards the harness itself (driver call sequence, validators, metrics, report) and is
+collected by the existing CI `pytest tests/` step (`test_cli_offline_menhir_phase3_smoke`). It is
+**not** a substitute for the live run: the stub models the happy consumer and cannot reveal
+server-side extraction defects or the fold-SUM stochasticity.
+
 ## Verification
 
 - menhir route tests: **21/21** (`tests/test_api_routes.py`, incl. `TestPhase3` +7).
-- archolith-bench: **389 passed** full suite; core driver tests **9/9**
-  (`tests/test_menhir_phase3.py`, incl. namespace-scoped `turn_key` regression) + scenario suite
-  **8/8** (`tests/test_phase3_scenarios.py`, incl. gate/characterization split).
+- archolith-bench: **391 passed** full suite; core driver tests **9/9**
+  (`tests/test_menhir_phase3.py`, incl. namespace-scoped `turn_key` regression) + scenario/offline
+  tests **10/10** (`tests/test_phase3_scenarios.py`, incl. gate/characterization split, the shipped
+  `StubPhase3Client`, and the offline CLI smoke). Ruff clean.
 
 ## Reproduce
 

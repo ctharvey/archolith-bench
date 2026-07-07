@@ -345,3 +345,128 @@ class Phase3MenhirClient(HttpMenhirClient):
             return response.json()
         except Exception:
             return {"namespace": namespace, "nodes_deleted": 0, "turn_evidence_deleted": 0}
+
+
+class StubPhase3Client:
+    """Deterministic in-memory Phase 3 backend — a NETWORK-FREE stand-in for CI smoke.
+
+    Models the HAPPY menhir consumer (F1 semantic-family voting + F2 unique-target corrections)
+    so the whole driver + scenario suite + report path runs without a live menhir or Neo4j. It
+    is NOT a substitute for the live benchmark (it cannot reveal server-side extraction defects
+    or the fold-SUM stochasticity) — it exists so `--offline` smoke can guard the harness itself.
+
+    Per-namespace it tracks posted prompts + a dirty/watermark bit, then batch-re-folds every
+    prompt into counter Views on each `fetch_views` (idempotent). Corrections bind to the UNIQUE
+    value-matching View, abstaining when >1 matches. Recognizes the exact fixture prompt strings.
+    """
+
+    def __init__(self) -> None:
+        """Initialize empty per-namespace post + dirty state."""
+        self._posts: dict[str, list[str]] = {}
+        self._dirty: dict[str, bool] = {}
+
+    def new_group(self) -> str:
+        """Return a fresh isolated namespace id."""
+        return uuid.uuid4().hex
+
+    def reset_phase3(self, namespace: str) -> dict[str, Any]:
+        """Drop all state for the namespace."""
+        n = len(self._posts.get(namespace, []))
+        self._posts.pop(namespace, None)
+        self._dirty.pop(namespace, None)
+        return {"namespace": namespace, "nodes_deleted": n, "turn_evidence_deleted": n}
+
+    def post_turn_evidence(self, namespace: str, text: str, *, role: str = "user",
+                           declarant: str = "user", triage_reason=None, turn_key=None,
+                           **_: Any) -> dict[str, Any]:
+        """Record a candidate turn and mark the namespace dirty (new evidence to consolidate)."""
+        self._posts.setdefault(namespace, []).append(text)
+        self._dirty[namespace] = True
+        return {"turn_id": uuid.uuid4().hex, "created": True, "recorded_at": "stub"}
+
+    def phase3_status(self, namespace: str) -> dict[str, Any]:
+        """Report the dirty bit + evidence count."""
+        return {
+            "namespace": namespace,
+            "dirty": bool(self._dirty.get(namespace)),
+            "turn_evidence": len(self._posts.get(namespace, [])),
+        }
+
+    def run_phase3(self, namespace: str, *, k: int = 3, source: str = "perception") -> dict[str, Any]:
+        """Consolidate: clear the dirty bit (watermark debounce) and report derived counts."""
+        selected = bool(self._dirty.get(namespace))
+        self._dirty[namespace] = False
+        views = self._build_views(namespace)
+        return {
+            "namespace": namespace,
+            "phase3_selected": selected,
+            "dirty_after": False,
+            "namespaces_dirty": 1 if selected else 0,
+            "namespaces_processed": 1,
+            "views_written": len(views),
+            "abstained": 0,
+            "corrections_applied": self._corrections_applied(namespace),
+            "llm_calls": 0,
+        }
+
+    def fetch_views(self, namespace: str, *, limit: int = 100) -> dict[str, Any]:
+        """Return current counter Views (batch re-fold; idempotent) + empty receipts."""
+        views = self._build_views(namespace)
+        return {"namespace": namespace, "count": len(views), "views": views, "receipts": []}
+
+    def recall(self, namespace: str, query: str, limit: int = 10) -> list[str]:
+        """Return one snippet per current View (so recall_after > recall_before once Views exist)."""
+        return [f"{v['subject']} {v['counter']} {v['value']}" for v in self._build_views(namespace)]
+
+    def close(self) -> None:
+        """No-op (in-memory)."""
+
+    # ---- deterministic consolidation model ---------------------------------------------------
+
+    def _measures(self, prompt: str) -> list[tuple[str, str, float]]:
+        """(subject, counter, value) a prompt yields — matches the core + scenario fixture strings."""
+        p = prompt.lower()
+        if "movies" in p and "watch list" in p:
+            return [("movies", "movies_watchlist", 25.0)]
+        if "books" in p and "this year" in p:
+            return [("books", "books_read", 25.0)]
+        if "50 dollars and 75 dollars" in p:
+            return [("bike", "bike_spend", 125.0)]
+        if "one bike for $50" in p:
+            return [("bike", "bike_spend", 125.0)]
+        if "2 bikes for $125" in p:  # count and SUM do not merge (reducer is identity)
+            return [("bike", "bikes_count", 2.0), ("bike", "bike_spend", 125.0)]
+        return []
+
+    def _correction(self, prompt: str) -> tuple[float, float] | None:
+        p = prompt.lower()
+        if "20, not 25" in p or "not 25 anymore, it is 20" in p:
+            return (25.0, 20.0)
+        return None
+
+    def _fold(self, namespace: str) -> tuple[dict[str, dict], int]:
+        views: dict[str, dict] = {}
+        corrections: list[tuple[float, float]] = []
+        for prompt in self._posts.get(namespace, []):
+            for subject, counter, value in self._measures(prompt):
+                views[counter] = {"subject": subject, "counter": counter, "value": value,
+                                  "current": True, "history": [], "superseded": []}
+            corr = self._correction(prompt)
+            if corr:
+                corrections.append(corr)
+        applied = 0
+        for old, new in corrections:
+            matches = [v for v in views.values() if v["value"] == old]
+            if len(matches) == 1:  # unique target -> supersede; else abstain
+                v = matches[0]
+                v["superseded"] = [{"value": old, "current": False,
+                                    "valid_at": "t1", "expired_at": "t2"}]
+                v["value"] = new
+                applied += 1
+        return views, applied
+
+    def _build_views(self, namespace: str) -> list[dict[str, Any]]:
+        return list(self._fold(namespace)[0].values())
+
+    def _corrections_applied(self, namespace: str) -> int:
+        return self._fold(namespace)[1]

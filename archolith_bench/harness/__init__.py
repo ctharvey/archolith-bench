@@ -42,7 +42,12 @@ from .memory_ab import (
     assert_not_production,
     run_memory_ab,
 )
-from .menhir_client import HttpMenhirClient, Phase3MenhirClient, StubMenhirClient
+from .menhir_client import (
+    HttpMenhirClient,
+    Phase3MenhirClient,
+    StubMenhirClient,
+    StubPhase3Client,
+)
 from .menhir_phase3 import (
     MenhirPhase3Adapter,
     Phase3Case,
@@ -145,6 +150,7 @@ __all__ = [
     "checkpoint_path_for",
     "NO_MEMORY",
     "StubMenhirClient",
+    "StubPhase3Client",
     "SweBenchAdapter",
     "Task",
     "TaskResult",

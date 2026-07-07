@@ -824,6 +824,7 @@ def _run_phase3_harness(args: argparse.Namespace, adapter) -> None:  # noqa: ANN
     """
     from .harness import (
         Phase3MenhirClient,
+        StubPhase3Client,
         assert_not_production,
         phase3_result_to_dict,
         run_phase3,
@@ -833,36 +834,42 @@ def _run_phase3_harness(args: argparse.Namespace, adapter) -> None:  # noqa: ANN
         write_phase3_evidence,
     )
 
-    if args.offline_fixture is not None:
-        print("ERROR: menhir-phase3 has no offline mode; it needs a live throwaway --menhir-url",
-              file=sys.stderr)
-        sys.exit(1)
-    if not args.menhir_url:
-        print("ERROR: menhir-phase3 needs --menhir-url (a throwaway menhir instance)",
-              file=sys.stderr)
-        sys.exit(1)
-    assert_not_production(args.menhir_url)
-    if not args.confirm_menhir_reset:
-        print("ERROR: menhir-phase3 writes to and tears down a throwaway namespace; "
-              "pass --confirm-menhir-reset", file=sys.stderr)
-        sys.exit(1)
-
-    print(f"Harness: {adapter.name} — live Phase 3 consolidation against {args.menhir_url}")
-    # Menhir's bearer (agent tier) is NOT the upstream LLM key. Prefer the menhir key envs so the
-    # run works against an auth-enabled instance; fall back to API_KEY (empty => auth-disabled OK).
-    menhir_key = os.getenv("MENHIR_AGENT_KEY") or os.getenv("MENHIR_API_KEY") or API_KEY
-    print(f"  auth: {'bearer set' if menhir_key else 'no key (expects an auth-disabled instance)'}")
-    client = Phase3MenhirClient(args.menhir_url, api_key=menhir_key)
+    # Offline smoke: --offline-fixture (any value) runs the FULL driver + scenario suite + report
+    # against a deterministic in-memory stub — no menhir, no Neo4j, no network. CI-safe; it guards
+    # the harness itself, NOT menhir (it cannot reveal server-side extraction defects/stochasticity).
+    offline = args.offline_fixture is not None
+    if offline:
+        print(f"Harness: {adapter.name} — OFFLINE smoke (deterministic stub; not a live menhir run)")
+        client = StubPhase3Client()
+        source_label = "offline-stub"
+    else:
+        if not args.menhir_url:
+            print("ERROR: menhir-phase3 needs --menhir-url (a throwaway menhir instance), "
+                  "or --offline-fixture for a network-free smoke", file=sys.stderr)
+            sys.exit(1)
+        assert_not_production(args.menhir_url)
+        if not args.confirm_menhir_reset:
+            print("ERROR: menhir-phase3 writes to and tears down a throwaway namespace; "
+                  "pass --confirm-menhir-reset", file=sys.stderr)
+            sys.exit(1)
+        print(f"Harness: {adapter.name} — live Phase 3 consolidation against {args.menhir_url}")
+        # Menhir's bearer (agent tier) is NOT the upstream LLM key. Prefer the menhir key envs so the
+        # run works against an auth-enabled instance; fall back to API_KEY (empty => auth-disabled OK).
+        menhir_key = os.getenv("MENHIR_AGENT_KEY") or os.getenv("MENHIR_API_KEY") or API_KEY
+        print(f"  auth: {'bearer set' if menhir_key else 'no key (expects an auth-disabled instance)'}")
+        client = Phase3MenhirClient(args.menhir_url, api_key=menhir_key)
+        source_label = args.menhir_url
     try:
         result = run_phase3(
             client,
             cases=adapter.cases(),
             k=3,
-            reset_confirmed=args.confirm_menhir_reset,
-            menhir_url=args.menhir_url,
+            # Offline stub has no real teardown, so reset is implicitly safe; live requires the flag.
+            reset_confirmed=True if offline else args.confirm_menhir_reset,
+            menhir_url=source_label,
             # Phase 3 runs the consolidation LLM SERVER-SIDE (menhir's personal-memory model);
             # the harness --model (an upstream chat model) is not the model under test here.
-            model="menhir-personal-memory (server-side)",
+            model="offline-stub" if offline else "menhir-personal-memory (server-side)",
         )
         # Expanded consumer scenarios (ambiguous/negative correction, currency SUM, count-vs-spend,
         # multi-namespace). Gate scenarios fold into the exit code; characterization ones do not.
@@ -894,24 +901,27 @@ def _run_phase3_harness(args: argparse.Namespace, adapter) -> None:  # noqa: ANN
             if not ar.passed:
                 print(f"        - {ar.label}: {ar.detail}")
 
-    suffix = "json" if args.format == "json" else "md"
-    out_path = args.out or (args.output_dir / f"harness_{adapter.benchmark_id}.{suffix}")
-    write_phase3_evidence(result, out_path, output_format=args.format)
-    print(f"  Evidence written to {out_path}")
-
-    result_data = phase3_result_to_dict(result)
-    result_data["scenario_suite"] = {
+    scenario_suite_data = {
         "gate_passed": scenarios_gate_pass,
         "scenarios": [scenario_result_to_dict(sr) for sr in scenario_results],
     }
+    suffix = "json" if args.format == "json" else "md"
+    out_path = args.out or (args.output_dir / f"harness_{adapter.benchmark_id}.{suffix}")
+    write_phase3_evidence(result, out_path, output_format=args.format,
+                          scenario_suite=scenario_suite_data)
+    print(f"  Evidence written to {out_path}")
+
+    result_data = phase3_result_to_dict(result, scenario_suite_data)
     _publish_cli_evidence(
         args,
         title=f"Harness evidence: {adapter.name}",
         product="menhir",
         ability="Phase 3 personal-memory View consolidation",
-        fixture_or_live_source=args.menhir_url,
+        fixture_or_live_source=source_label,
         model_provider=args.model,
         environment_caveats=[
+            "OFFLINE stub smoke exercises the harness only — not a live menhir result."
+            if offline else
             "Phase 3 is a live black-box integration test against a throwaway menhir + Neo4j.",
             "The producer (host lifecycle triage) is frozen; fixtures encode its verdicts.",
             "Characterization scenarios document current behavior and do not gate.",

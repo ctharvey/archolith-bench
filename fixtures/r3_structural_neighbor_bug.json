@@ -1,0 +1,53 @@
+{
+  "name": "r3_structural_neighbor_bug",
+  "description": "REAL structural_neighbor_bug fixture from THIS session's unflag_memory fix. The route POST /memory/{uuid}/unflag and the MCP tool existed, so a query 'is unflag_memory wired?' semantically matches the confident-but-WRONG belief 'unflag is fully wired'. The actual current truth is a STRUCTURAL NEIGHBOR in the RPC chain: BackendClient.unflag_memory was missing and unflag_memory was absent from _BACKEND_METHODS, so the internal path returned None (2 tests failed). Provenance: menhir commit b49f3c0/7528c11 (the fix). The currentness core: the 'fully wired' belief was later contradicted by the failing roundtrip tests. Boundary note: surfacing the structural-neighbor cause itself is R1/file-context (F rung); R3 here only suppresses the stale 'it works' belief. intent=current.",
+  "intent": "current",
+  "items": [
+    {
+      "id": "unflag_fully_wired",
+      "statement": "unflag_memory is fully wired end-to-end because the HTTP route and the MCP tool both exist.",
+      "evidence": [
+        {"signal": "embedding_match", "note": "route + tool are the semantically obvious surface for 'is unflag wired'"},
+        {"signal": "source_is_git", "note": "route/tool did exist in the draft"},
+        {"signal": "later_contradicted", "polarity": "contradicts", "note": "test_backend_roundtrip failed: BackendClient.unflag_memory returned None"},
+        {"signal": "is_expired", "note": "belief expired once the internal RPC gap was found"}
+      ],
+      "gold_current": false,
+      "gold_historical": true,
+      "is_noise": false
+    },
+    {
+      "id": "unflag_internal_rpc_gap",
+      "statement": "The real cause was a structural neighbor: BackendClient.unflag_memory was missing and unflag_memory was not in _BACKEND_METHODS, so the internal RPC path returned None.",
+      "evidence": [
+        {"signal": "test_failed", "note": "2 roundtrip tests asserted result is True, got None"},
+        {"signal": "source_is_git", "note": "fixed in b49f3c0/7528c11"},
+        {"signal": "later_confirmed", "note": "11 unflag tests pass after wiring the client method + allowlist"}
+      ],
+      "gold_current": true,
+      "gold_historical": false,
+      "is_noise": false
+    },
+    {
+      "id": "flag_memory_pattern",
+      "statement": "unflag_memory mirrors the existing flag_memory pattern across the stack.",
+      "evidence": [
+        {"signal": "source_is_git", "note": "flag_memory is the template; both now symmetric"},
+        {"signal": "entity_match"}
+      ],
+      "gold_current": true,
+      "gold_historical": false,
+      "is_noise": false
+    },
+    {
+      "id": "stale_unrelated_delete_memory",
+      "statement": "delete_memory has the same missing-client-method bug as unflag did.",
+      "evidence": [
+        {"signal": "embedding_match", "strength": 0.3, "note": "lexically near 'memory' RPC methods but unfounded"}
+      ],
+      "gold_current": false,
+      "gold_historical": false,
+      "is_noise": true
+    }
+  ]
+}

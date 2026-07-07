@@ -284,6 +284,70 @@ def test_agentic_recall_arm_plans_and_runs():
     assert ab.arms["menhir_agentic_recall"].score > ab.arms["no_memory"].score
 
 
+def test_run_memory_ab_recall_only_uses_prebuilt_namespaces():
+    """Recall-only reads stable lme-<question_id> namespaces in place: no ingest, no reset,
+    no --confirm-menhir-reset needed."""
+    from archolith_bench.harness import StubMenhirClient, run_memory_ab
+    from archolith_bench.harness.longmemeval import LongMemEvalMemoryAdapter
+
+    client = StubMenhirClient()
+    # Pre-build the graph once, as _ingest_lme.py leaves it: stable per-question namespaces.
+    prebuilt = {
+        "lme-lme-sample-001": ["user: my dog is named Biscuit"],
+        "lme-lme-sample-002": ["user: I now live in Denver"],
+        "lme-lme-sample-003": ["user: I went hiking with my sister"],
+    }
+    client._groups.update({k: list(v) for k, v in prebuilt.items()})
+
+    def send_fn(client_, base_url, api_key, messages, model, **kwargs):
+        user = messages[-1]["content"]
+        text = "Biscuit" if "Biscuit" in user else ("Denver" if "Denver" in user else "I don't know")
+        return text, 1.0, {"prompt_tokens": max(1, len(user) // 4), "completion_tokens": 2}
+
+    ab = run_memory_ab(
+        LongMemEvalMemoryAdapter(),
+        arms=("no_memory", "menhir_recall"),
+        fixture_path=LME_FIXTURE,
+        client=client,
+        send_fn=send_fn,
+        recall_only=True,  # reads the pre-built graph; no reset_confirmed required
+    )
+    # Recalled the pre-built facts -> menhir_recall beats the no_memory floor.
+    assert ab.arms["menhir_recall"].score > ab.arms["no_memory"].score
+    # The pre-built namespaces survive untouched: recall-only never resets or ingests,
+    # so no fresh per-item group is ever created.
+    assert client._groups == prebuilt
+
+
+def test_run_memory_ab_recall_only_honors_namespace_template():
+    """A custom namespace template is formatted with {question_id} and used verbatim."""
+    from archolith_bench.harness import StubMenhirClient, run_memory_ab
+    from archolith_bench.harness.longmemeval import LongMemEvalMemoryAdapter
+
+    client = StubMenhirClient()
+    client._groups["q::lme-sample-001"] = ["user: my dog is named Biscuit"]
+
+    def send_fn(client_, base_url, api_key, messages, model, **kwargs):
+        user = messages[-1]["content"]
+        return ("Biscuit" if "Biscuit" in user else "I don't know"), 1.0, {
+            "prompt_tokens": 1, "completion_tokens": 1,
+        }
+
+    ab = run_memory_ab(
+        LongMemEvalMemoryAdapter(),
+        arms=("menhir_recall",),
+        fixture_path=LME_FIXTURE,
+        client=client,
+        send_fn=send_fn,
+        recall_only=True,
+        namespace_template="q::{question_id}",
+        limit=1,
+    )
+    assert ab.arms["menhir_recall"].results[0].correct
+    # Only the custom-templated namespace was touched; nothing created or reset.
+    assert client._groups == {"q::lme-sample-001": ["user: my dog is named Biscuit"]}
+
+
 def test_run_memory_ab_checkpoint_resumes_and_skips_done(tmp_path):
     """A second run with the same checkpoint reuses recorded items and re-issues no calls."""
     from archolith_bench.harness import MemoryCheckpoint, StubMenhirClient, run_memory_ab

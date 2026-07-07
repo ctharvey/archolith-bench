@@ -48,6 +48,13 @@ def _add_common_proxy_args(parser: argparse.ArgumentParser) -> None:
                         help="Path to a JSON file overriding provider pricing rates")
 
 
+def _add_evidence_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--publish-evidence", type=Path, default=None,
+                        help="Optional shared evidence artifact output (.md or .json)")
+    parser.add_argument("--public-copy", action="store_true",
+                        help="Mark the shared evidence artifact as allowed for public copy")
+
+
 def _load_pricing(args: argparse.Namespace) -> PricingModel | None:
     """Resolve pricing model from --provider, --pricing-file, or neither.
 
@@ -70,7 +77,109 @@ def _load_pricing(args: argparse.Namespace) -> PricingModel | None:
     return None
 
 
+def _publish_cli_evidence(
+    args: argparse.Namespace,
+    *,
+    title: str,
+    product: str,
+    ability: str,
+    fixture_or_live_source: str,
+    model_provider: str,
+    environment_caveats: list[str],
+    metric_rows: list[dict],
+    artifact: dict,
+) -> None:
+    out_path = getattr(args, "publish_evidence", None)
+    if not out_path:
+        return
+
+    from .core.evidence import EvidenceRecord, current_commit, publish_evidence
+
+    repo_root = Path(__file__).resolve().parents[1]
+    record = EvidenceRecord(
+        title=title,
+        command=getattr(args, "command_text", "archolith-bench"),
+        commit=current_commit(repo_root),
+        product=product,
+        ability=ability,
+        fixture_or_live_source=fixture_or_live_source,
+        model_provider=model_provider,
+        environment_caveats=environment_caveats,
+        public_copy_allowed=bool(getattr(args, "public_copy", False)),
+        metric_rows=metric_rows,
+        artifact=artifact,
+    )
+    path = publish_evidence(record, out_path)
+    print(f"  Shared evidence published to {path}")
+
+
+def _proxy_metric_rows(results: list[dict]) -> list[dict]:
+    rows = []
+    for item in results:
+        summary = item.get("summary", {})
+        quality = item.get("quality", {})
+        rows.append({
+            "scenario": item.get("scenario"),
+            "arm": item.get("arm") or item.get("stack_arm"),
+            "turns": item.get("turns_run"),
+            "savings_ratio": summary.get("overall_savings_ratio"),
+            "direct_tokens": summary.get("total_direct_input_tokens"),
+            "arm_tokens": summary.get("total_proxy_input_tokens"),
+            "quality_score": quality.get("score"),
+        })
+    return rows
+
+
+def _filter_metric_rows(data: dict) -> list[dict]:
+    return [
+        {
+            "category": row.get("category"),
+            "samples": row.get("samples"),
+            "raw_tokens": row.get("total_raw_tokens"),
+            "filtered_tokens": row.get("total_filtered_tokens"),
+            "savings_ratio": row.get("savings_ratio"),
+        }
+        for row in data.get("per_category", [])
+    ]
+
+
+def _audit_metric_rows(data: dict) -> list[dict]:
+    return [
+        {
+            "server": row.get("server"),
+            "before_tokens": row.get("before_tokens"),
+            "after_tokens": row.get("after_tokens"),
+            "token_change_pct": row.get("token_change_pct"),
+            "status": row.get("status"),
+        }
+        for row in data.get("per_server", [])
+    ]
+
+
+def _harness_metric_rows(data: dict) -> list[dict]:
+    rows = [
+        {
+            "arm": arm,
+            "n": result.get("n"),
+            "score": result.get("score"),
+            "input_tokens": result.get("input_tokens"),
+            "output_tokens": result.get("output_tokens"),
+            "cost_usd": result.get("cost_usd"),
+        }
+        for arm, result in data.get("arms", {}).items()
+    ]
+    for arm, delta in data.get("deltas", {}).items():
+        rows.append({
+            "arm": f"delta:{arm}",
+            "score": delta.get("score_delta"),
+            "input_tokens": delta.get("input_token_reduction_pct"),
+            "cost_usd": delta.get("cost_reduction_pct"),
+        })
+    return rows
+
+
 def main(argv: list[str] | None = None) -> None:
+    raw_argv = list(argv) if argv is not None else sys.argv[1:]
     parser = argparse.ArgumentParser(
         prog="archolith-bench",
         description="Unified benchmark suite for the archolith product family",
@@ -89,6 +198,7 @@ def main(argv: list[str] | None = None) -> None:
                          help="Named experiment -- snapshots proxy config, saves to experiments/<name>/")
     proxy_p.add_argument("--config", type=str, default=None,
                          help="JSON proxy config overrides")
+    _add_evidence_args(proxy_p)
 
     # ---- filter subcommand ----
     filter_p = subparsers.add_parser("filter", help="Filter suite: compression-ratio measurement via archolith-filter")
@@ -98,10 +208,12 @@ def main(argv: list[str] | None = None) -> None:
                           help="Output format (default: markdown)")
     filter_p.add_argument("--output-dir", type=Path, default=Path("results"),
                           help="Output directory for results")
+    _add_evidence_args(filter_p)
 
     # ---- stack subcommand ----
     stack_p = subparsers.add_parser("stack", help="Stack suite: four-way comparison (direct/filter/proxy/proxy+filter)")
     _add_common_proxy_args(stack_p)
+    _add_evidence_args(stack_p)
 
     # ---- audit subcommand ----
     audit_p = subparsers.add_parser("audit", help="Audit suite: MCP token-waste before/after comparison")
@@ -113,6 +225,7 @@ def main(argv: list[str] | None = None) -> None:
                          help="Output format (default: report)")
     audit_p.add_argument("--output-dir", type=Path, default=Path("results"),
                          help="Output directory for results")
+    _add_evidence_args(audit_p)
 
     # ---- industry subcommand ----
     industry_p = subparsers.add_parser(
@@ -131,6 +244,7 @@ def main(argv: list[str] | None = None) -> None:
                             help="Output directory for generated registry files")
     industry_p.add_argument("--out", type=Path, default=None,
                             help="Optional explicit output file")
+    _add_evidence_args(industry_p)
 
     # ---- harness subcommand ----
     harness_p = subparsers.add_parser(
@@ -169,12 +283,21 @@ def main(argv: list[str] | None = None) -> None:
                            help="Allow memory benchmarks to reset throwaway Menhir groups after each item")
     harness_p.add_argument("--dry-run-menhir-reset", action="store_true",
                            help="Print Menhir group resets without performing them")
+    harness_p.add_argument("--recall-only", action="store_true",
+                           help="Memory benchmarks: recall against a PRE-BUILT graph in stable "
+                                "per-question namespaces (--namespace-template). Skips ingest AND "
+                                "reset, so no --confirm-menhir-reset is needed. Use after the graph "
+                                "is ingested+enriched once (the LongMemEval Mode-B recall-only A/B).")
+    harness_p.add_argument("--namespace-template", default="lme-{question_id}",
+                           help="Recall-only: namespace per item, formatted with {question_id} "
+                                "(default: lme-{question_id}, matching _ingest_lme.py).")
     harness_p.add_argument("--format", choices=["markdown", "json"], default="markdown",
                            help="Evidence output format (default: markdown)")
     harness_p.add_argument("--output-dir", type=Path, default=Path("results"),
                            help="Output directory for evidence files")
     harness_p.add_argument("--out", type=Path, default=None,
                            help="Optional explicit evidence output file")
+    _add_evidence_args(harness_p)
 
     # ---- dashboard subcommand ----
     dash_p = subparsers.add_parser("dashboard", help="Live view of in-progress memory runs (reads checkpoints)")
@@ -211,12 +334,76 @@ def main(argv: list[str] | None = None) -> None:
                        help="Benchmark the full candidate sweep instead of just the blessed "
                             "keepers (gpt-4.1-nano + qwen3-next-80b)")
     ext_p.add_argument("--out", type=Path, default=None, help="Optional evidence output file")
+    _add_evidence_args(ext_p)
 
     # ---- ports subcommand ----
     ports_p = subparsers.add_parser("ports", help="Index running stack processes by label + port")
     ports_p.add_argument("--all", action="store_true", dest="show_all",
                          help="Show every listening port, not just menhir/neo4j/bench/etc.")
     ports_p.add_argument("--json", action="store_true", dest="as_json", help="Emit JSON")
+
+    # ---- menhir subcommand group ----
+    menhir_p = subparsers.add_parser("menhir", help="Menhir capability evidence runners")
+    menhir_sub = menhir_p.add_subparsers(dest="menhir_command", help="Menhir command")
+    menhir_sub.add_parser("list", help="List Menhir capabilities and evidence gates")
+
+    smoke_p = menhir_sub.add_parser("smoke", help="Run offline-safe Menhir smoke ladders")
+    smoke_p.add_argument("--output-dir", type=Path, default=Path("results/menhir-smoke"))
+    smoke_p.add_argument("--publish-dir", type=Path, default=None,
+                         help="Optional directory for tracked evidence markdown")
+
+    def add_menhir_run_args(p: argparse.ArgumentParser, default_out: str) -> None:
+        p.add_argument("fixture", nargs="?", default=None, help="Optional fixture JSON")
+        p.add_argument("--out", type=Path, default=Path(default_out), help="JSON artifact output")
+        p.add_argument("--publish-evidence", type=Path, default=None,
+                       help="Optional tracked evidence output (.md or .json)")
+        p.add_argument("--public-copy", action="store_true",
+                       help="Mark the evidence as allowed for public copy")
+
+    r1_p = menhir_sub.add_parser("r1", help="Run Menhir R1 hybrid retrieval ladder")
+    add_menhir_run_args(r1_p, "results/r1_run.json")
+    r1_p.add_argument("--k", type=int, default=5)
+
+    r2_p = menhir_sub.add_parser("r2-facet", help="Run Menhir R2 facet retrieval ladder")
+    add_menhir_run_args(r2_p, "results/facet_run.json")
+    r2_p.add_argument("--no-traces", action="store_true")
+    r2_p.add_argument("--facet-scope", choices=["all", "regular"], default="all")
+
+    r3_p = menhir_sub.add_parser("r3-belief", help="Run Menhir R3 belief/currentness ladder")
+    add_menhir_run_args(r3_p, "results/r3_run.json")
+
+    oracle_p = menhir_sub.add_parser("oracle", help="Run Menhir oracle combiner ladder")
+    add_menhir_run_args(oracle_p, "results/oracle_run.json")
+    oracle_p.add_argument("--no-traces", action="store_true")
+
+    intent_p = menhir_sub.add_parser("intent", help="Run Menhir intent routing ladder")
+    add_menhir_run_args(intent_p, "results/intent_run.json")
+
+    l4_p = menhir_sub.add_parser("l4-artifacts", help="Run Menhir L4 institutional artifact ladder")
+    add_menhir_run_args(l4_p, "results/l4_run.json")
+
+    r5_p = menhir_sub.add_parser("r5-structure-temporal", help="Run Menhir R5 structure-temporal ladder")
+    add_menhir_run_args(r5_p, "results/r5_run.json")
+    r5_p.add_argument("--k", type=int, default=3)
+
+    lme_p = menhir_sub.add_parser("longmemeval", help="Run LongMemEval Menhir memory benchmark")
+    lme_p.add_argument("--offline-fixture", type=Path, default=Path("fixtures/longmemeval_sample.json"))
+    lme_p.add_argument("--menhir-url", default=None)
+    lme_p.add_argument("--limit", type=int, default=None)
+    lme_p.add_argument("--subset", default=None)
+    lme_p.add_argument("--model", default=MODEL)
+    lme_p.add_argument("--output-dir", type=Path, default=Path("results"))
+    lme_p.add_argument("--out", type=Path, default=None)
+    lme_p.add_argument("--format", choices=["markdown", "json"], default="markdown")
+    _add_evidence_args(lme_p)
+
+    extract_p = menhir_sub.add_parser("extraction-models", help="Run Menhir extraction model benchmark")
+    extract_p.add_argument("--repeats", type=int, default=1)
+    extract_p.add_argument("--targets-file", type=Path, default=None)
+    extract_p.add_argument("--exclude", default=None)
+    extract_p.add_argument("--all", action="store_true")
+    extract_p.add_argument("--out", type=Path, default=None)
+    _add_evidence_args(extract_p)
 
     # ---- report subcommand ----
     report_p = subparsers.add_parser("report", help="Generate BENCHMARKS.md from results/")
@@ -228,6 +415,7 @@ def main(argv: list[str] | None = None) -> None:
                           help="Output format (default: markdown)")
 
     args = parser.parse_args(argv)
+    args.command_text = "archolith-bench" + (f" {' '.join(raw_argv)}" if raw_argv else "")
 
     if not args.suite:
         parser.print_help()
@@ -251,6 +439,8 @@ def main(argv: list[str] | None = None) -> None:
         _run_extraction_bench(args)
     elif args.suite == "ports":
         _run_ports(args)
+    elif args.suite == "menhir":
+        _run_menhir(args)
     elif args.suite == "report":
         _run_report(args)
     else:
@@ -339,6 +529,26 @@ def _run_proxy(args: argparse.Namespace) -> None:
             pricing=pricing,
             poll_interval_s=args.poll_interval,
         )
+        _publish_cli_evidence(
+            args,
+            title=f"Proxy experiment evidence: {args.experiment}",
+            product="archolith-context",
+            ability="context curation and continuity",
+            fixture_or_live_source=str(args.output_dir / "experiments" / args.experiment),
+            model_provider=args.model,
+            environment_caveats=[
+                "Experiment mode writes detailed per-run artifacts under the experiment directory.",
+                "Public launch copy requires current tracked launch configuration evidence.",
+            ],
+            metric_rows=[],
+            artifact={
+                "experiment": args.experiment,
+                "scenarios": [s.name for s in scenarios],
+                "arms": arm_names,
+                "budgets": budgets,
+                "output_dir": str(args.output_dir),
+            },
+        )
         return
 
     if config_overrides:
@@ -373,6 +583,21 @@ def _run_proxy(args: argparse.Namespace) -> None:
     if len(all_results) > 1:
         print_cross_scenario_summary(all_results)
 
+    _publish_cli_evidence(
+        args,
+        title="Proxy suite evidence",
+        product="archolith-context",
+        ability="context curation and continuity",
+        fixture_or_live_source=str(args.scenario or "scenarios/"),
+        model_provider=args.model,
+        environment_caveats=[
+            "Requires a running archolith-context proxy and upstream provider.",
+            "Public launch copy requires current launch config and HEADLINE-NUMBERS.md approval.",
+        ],
+        metric_rows=_proxy_metric_rows(all_results),
+        artifact={"runs": all_results},
+    )
+
 
 def _run_filter(args: argparse.Namespace) -> None:
     from .suites.filter import print_filter_summary, run_filter_suite
@@ -399,6 +624,21 @@ def _run_filter(args: argparse.Namespace) -> None:
             f.write(f"| **Total** | {data['total_samples']} | {data['total_raw_tokens']:,} "
                     f"| {data['total_filtered_tokens']:,} | **{data['aggregate_savings_ratio']:.1%}** |\n")
         print(f"  Markdown report saved to {md_path}")
+
+    _publish_cli_evidence(
+        args,
+        title="Filter suite evidence",
+        product="archolith-filter",
+        ability="tool-output compression",
+        fixture_or_live_source=str(corpora_dir),
+        model_provider="offline archolith-filter corpus",
+        environment_caveats=[
+            "Corpus provenance must be reviewed before using compression figures in public copy.",
+            "Launch copy requires current tracked aggregate evidence.",
+        ],
+        metric_rows=_filter_metric_rows(data),
+        artifact=data,
+    )
 
 
 def _run_stack(args: argparse.Namespace) -> None:
@@ -456,6 +696,21 @@ def _run_stack(args: argparse.Namespace) -> None:
 
     print_four_way_table(all_arm_results)
 
+    _publish_cli_evidence(
+        args,
+        title="Stack suite evidence",
+        product="archolith-context",
+        ability="context curation and tool-output compression",
+        fixture_or_live_source=str(args.scenario or "scenarios/"),
+        model_provider=args.model,
+        environment_caveats=[
+            "Requires running proxy/filter stack and upstream provider.",
+            "Public launch copy requires current launch config and HEADLINE-NUMBERS.md approval.",
+        ],
+        metric_rows=_proxy_metric_rows(all_arm_results),
+        artifact={"runs": all_arm_results},
+    )
+
 
 def _run_audit(args: argparse.Namespace) -> None:
     from .suites.audit import print_audit_summary, run_audit_comparison
@@ -495,6 +750,21 @@ def _run_audit(args: argparse.Namespace) -> None:
                     f"({result['waste_reduction_pct']:.1f}%)\n")
         print(f"  Markdown report saved to {md_path}")
 
+    _publish_cli_evidence(
+        args,
+        title="MCP audit evidence",
+        product="archolith-mcp-audit",
+        ability="MCP token-waste reduction",
+        fixture_or_live_source=f"before={before_path}; after={after_path}",
+        model_provider="offline audit logs",
+        environment_caveats=[
+            "Fixture audit numbers are not public launch claims.",
+            "Public copy requires real before/after logs from the target environment.",
+        ],
+        metric_rows=_audit_metric_rows(result),
+        artifact=result,
+    )
+
 
 def _run_industry(args: argparse.Namespace) -> None:
     from .core.industry import write_industry_benchmarks
@@ -517,11 +787,122 @@ def _run_industry(args: argparse.Namespace) -> None:
             output_format=args.format,
         )
         print(f"  Written to {args.out}")
-        return
+    else:
+        suffix = "json" if args.format == "json" else "md"
+        default_out = args.output_dir / f"industry_benchmarks.{suffix}"
+        print(f"  Written to {default_out}")
+
+    _publish_cli_evidence(
+        args,
+        title="Industry benchmark registry evidence",
+        product=args.product or "archolith-family",
+        ability="launch benchmark coverage",
+        fixture_or_live_source=str(args.output_dir),
+        model_provider="offline registry",
+        environment_caveats=[
+            "Registry evidence documents coverage state; it is not a performance result.",
+            "Public copy depends on each benchmark row's launch claim rule.",
+        ],
+        metric_rows=[
+            {
+                "product": row.get("product"),
+                "suite": row.get("suite"),
+                "benchmark": row.get("name"),
+                "status": row.get("status"),
+            }
+            for row in data.get("benchmarks", [])
+        ],
+        artifact=data,
+    )
+
+
+def _run_phase3_harness(args: argparse.Namespace, adapter) -> None:  # noqa: ANN001
+    """Drive the Menhir Phase 3 View-consolidation benchmark (live, black-box, throwaway menhir).
+
+    Not an A/B: posts :TurnEvidence, triggers consolidation, and validates Views / abstentions /
+    supersession / idempotence. Requires --menhir-url (throwaway) and --confirm-menhir-reset.
+    """
+    from .harness import (
+        Phase3MenhirClient,
+        assert_not_production,
+        phase3_result_to_dict,
+        run_phase3,
+        write_phase3_evidence,
+    )
+
+    if args.offline_fixture is not None:
+        print("ERROR: menhir-phase3 has no offline mode; it needs a live throwaway --menhir-url",
+              file=sys.stderr)
+        sys.exit(1)
+    if not args.menhir_url:
+        print("ERROR: menhir-phase3 needs --menhir-url (a throwaway menhir instance)",
+              file=sys.stderr)
+        sys.exit(1)
+    assert_not_production(args.menhir_url)
+    if not args.confirm_menhir_reset:
+        print("ERROR: menhir-phase3 writes to and tears down a throwaway namespace; "
+              "pass --confirm-menhir-reset", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Harness: {adapter.name} — live Phase 3 consolidation against {args.menhir_url}")
+    # Menhir's bearer (agent tier) is NOT the upstream LLM key. Prefer the menhir key envs so the
+    # run works against an auth-enabled instance; fall back to API_KEY (empty => auth-disabled OK).
+    menhir_key = os.getenv("MENHIR_AGENT_KEY") or os.getenv("MENHIR_API_KEY") or API_KEY
+    print(f"  auth: {'bearer set' if menhir_key else 'no key (expects an auth-disabled instance)'}")
+    client = Phase3MenhirClient(args.menhir_url, api_key=menhir_key)
+    try:
+        result = run_phase3(
+            client,
+            cases=adapter.cases(),
+            k=3,
+            reset_confirmed=args.confirm_menhir_reset,
+            menhir_url=args.menhir_url,
+            # Phase 3 runs the consolidation LLM SERVER-SIDE (menhir's personal-memory model);
+            # the harness --model (an upstream chat model) is not the model under test here.
+            model="menhir-personal-memory (server-side)",
+        )
+    finally:
+        client.close()
+
+    print(f"\n{adapter.name}: verdict={'PASS' if result.verdict else 'FAIL'}  "
+          f"namespace={result.namespace}")
+    for cr in result.cases:
+        tail = f" — {cr.notes}" if cr.notes else ""
+        print(f"  [{'PASS' if cr.passed else 'FAIL'}] {cr.case_id} ({cr.kind}){tail}")
+    m = result.metrics
+    print(f"  views_current={m['views_current']} superseded={m['views_superseded']} "
+          f"abstentions={m['abstentions']} supersessions={m['supersessions_applied']} "
+          f"wrong_view_writes={m['wrong_view_writes']} silent_abstentions={m['silent_abstentions']} "
+          f"duplicate_writes={m['duplicate_writes_on_rerun']}")
 
     suffix = "json" if args.format == "json" else "md"
-    default_out = args.output_dir / f"industry_benchmarks.{suffix}"
-    print(f"  Written to {default_out}")
+    out_path = args.out or (args.output_dir / f"harness_{adapter.benchmark_id}.{suffix}")
+    write_phase3_evidence(result, out_path, output_format=args.format)
+    print(f"  Evidence written to {out_path}")
+
+    result_data = phase3_result_to_dict(result)
+    _publish_cli_evidence(
+        args,
+        title=f"Harness evidence: {adapter.name}",
+        product="menhir",
+        ability="Phase 3 personal-memory View consolidation",
+        fixture_or_live_source=args.menhir_url,
+        model_provider=args.model,
+        environment_caveats=[
+            "Phase 3 is a live black-box integration test against a throwaway menhir + Neo4j.",
+            "The producer (host lifecycle triage) is frozen; fixtures encode its verdicts.",
+            "Public launch copy requires current tracked launch evidence.",
+        ],
+        metric_rows=[
+            {"metric": key, "value": value}
+            for key, value in m.items()
+            if not isinstance(value, (list, dict))
+        ],
+        artifact=result_data,
+    )
+
+    if not result.verdict:
+        sys.exit(1)
 
 
 def _run_harness(args: argparse.Namespace) -> None:
@@ -532,11 +913,13 @@ def _run_harness(args: argparse.Namespace) -> None:
         LLMJudgeScorer,
         MemoryCheckpoint,
         StubMenhirClient,
+        ab_result_to_dict,
         assert_not_production,
         checkpoint_path_for,
         get_adapter,
         is_external,
         is_memory,
+        is_phase3,
         run_ab,
         run_external_ab,
         run_memory_ab,
@@ -546,7 +929,14 @@ def _run_harness(args: argparse.Namespace) -> None:
     if args.list_adapters:
         print("Available harness adapters:")
         for bid, adapter in sorted(ADAPTERS.items()):
-            kind = "memory" if is_memory(adapter) else ("external-cli" if is_external(adapter) else "in-process")
+            if is_phase3(adapter):
+                kind = "phase3"
+            elif is_memory(adapter):
+                kind = "memory"
+            elif is_external(adapter):
+                kind = "external-cli"
+            else:
+                kind = "in-process"
             print(f"  {bid}  ({adapter.name}) [{kind}]")
         return
 
@@ -559,6 +949,10 @@ def _run_harness(args: argparse.Namespace) -> None:
     except KeyError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
+
+    if is_phase3(adapter):
+        _run_phase3_harness(args, adapter)
+        return
 
     arms = [a.strip() for a in args.arms.split(",") if a.strip()]
     offline = args.offline_fixture is not None
@@ -619,6 +1013,8 @@ def _run_harness(args: argparse.Namespace) -> None:
             fixture_path=args.offline_fixture,
             reset_confirmed=args.confirm_menhir_reset,
             dry_run_reset=args.dry_run_menhir_reset,
+            recall_only=getattr(args, "recall_only", False),
+            namespace_template=getattr(args, "namespace_template", "lme-{question_id}"),
             checkpoint=checkpoint,
             score_fn=score_fn,
         )
@@ -660,6 +1056,22 @@ def _run_harness(args: argparse.Namespace) -> None:
     out_path = args.out or (args.output_dir / f"harness_{adapter.benchmark_id}.{suffix}")
     write_harness_evidence(ab, out_path, output_format=args.format)
     print(f"  Evidence written to {out_path}")
+    ab_data = ab_result_to_dict(ab)
+    _publish_cli_evidence(
+        args,
+        title=f"Harness evidence: {adapter.name}",
+        product="menhir" if is_memory(adapter) else "archolith-family",
+        ability="persistent memory QA" if is_memory(adapter) else "external benchmark A/B",
+        fixture_or_live_source=str(args.offline_fixture) if offline else args.menhir_url or "official benchmark source",
+        model_provider=args.model,
+        environment_caveats=[
+            "Offline fixtures are smoke evidence only.",
+            "External benchmark results are middleware deltas, not standalone model scores.",
+            "Public launch copy requires current tracked launch evidence.",
+        ],
+        metric_rows=_harness_metric_rows(ab_data),
+        artifact=ab_data,
+    )
 
 
 def _offline_send_fn(client, base_url, api_key, messages, model, **kwargs):  # noqa: ANN001
@@ -733,6 +1145,54 @@ def _run_extraction_bench(args: argparse.Namespace) -> None:
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.out).write_text(report + "\n", encoding="utf-8")
         print(f"\nEvidence written to {args.out}")
+    _publish_cli_evidence(
+        args,
+        title="Menhir extraction model evidence",
+        product="menhir",
+        ability="extraction model selection",
+        fixture_or_live_source="built-in extraction corpus",
+        model_provider="provider API targets",
+        environment_caveats=[
+            "Requires provider API keys and current provider availability.",
+            "Provider/model recommendations require fresh tracked evidence before public copy.",
+        ],
+        metric_rows=[
+            {
+                "model": r.label,
+                "mode": r.mode,
+                "episodes_per_s": r.throughput_eps,
+                "call_p50_s": r.call_p50,
+                "call_p95_s": r.call_p95,
+                "valid_json_rate": r.valid_json_rate,
+                "entity_recall": r.mean_entity_recall,
+                "fact_recall": r.mean_fact_recall,
+                "cost_per_1k_episodes": r.cost_per_1k_episodes(),
+                "error": r.error,
+            }
+            for r in results
+        ],
+        artifact={
+            "report": report,
+            "results": [
+                {
+                    "label": r.label,
+                    "model": r.model,
+                    "mode": r.mode,
+                    "base_url": r.base_url,
+                    "episodes": r.episodes,
+                    "input_tokens": r.input_tokens,
+                    "output_tokens": r.output_tokens,
+                    "cached_input_tokens": r.cached_input_tokens,
+                    "wall_clock_s": r.wall_clock_s,
+                    "rate_limit_hits": r.rate_limit_hits,
+                    "rate_limit_wait_s": r.rate_limit_wait_s,
+                    "error": r.error,
+                    "last_call_error": r.last_call_error,
+                }
+                for r in results
+            ],
+        },
+    )
 
 
 def _run_ports(args: argparse.Namespace) -> None:
@@ -744,6 +1204,99 @@ def _run_ports(args: argparse.Namespace) -> None:
         print(json.dumps([{"port": e.port, "pid": e.pid, "label": e.label, "cmd": e.cmd} for e in rows], indent=2))
     else:
         print(render(entries, show_all=args.show_all))
+
+
+def _run_menhir(args: argparse.Namespace) -> None:
+    from .core.capabilities import render_capabilities_markdown
+    from .suites import menhir as menhir_suite
+
+    cmd = getattr(args, "menhir_command", None)
+    if not cmd:
+        print("ERROR: specify a menhir command (use `archolith-bench menhir --help`)", file=sys.stderr)
+        sys.exit(1)
+
+    if cmd == "list":
+        print(render_capabilities_markdown(product="menhir"))
+        return
+    if cmd == "smoke":
+        menhir_suite.run_smoke(args.output_dir, publish_dir=args.publish_dir)
+        return
+    if cmd == "longmemeval":
+        harness_args = argparse.Namespace(
+            benchmark_id="longmemeval-menhir",
+            list_adapters=False,
+            arms="direct,proxy_only,proxy_plus_filter",
+            subset=args.subset,
+            limit=args.limit,
+            model=args.model,
+            offline_fixture=None if args.menhir_url else args.offline_fixture,
+            menhir_url=args.menhir_url,
+            resume=False,
+            scorer="containment",
+            judge_model="gpt-4o-mini",
+            judge_url=None,
+            judge_api_key=None,
+            confirm_menhir_reset=False,
+            dry_run_menhir_reset=False,
+            recall_only=bool(args.menhir_url),
+            namespace_template="lme-{question_id}",
+            format=args.format,
+            output_dir=args.output_dir,
+            out=args.out,
+            publish_evidence=args.publish_evidence,
+            public_copy=args.public_copy,
+            command_text=getattr(args, "command_text", "archolith-bench menhir longmemeval"),
+        )
+        _run_harness(harness_args)
+        return
+    if cmd == "extraction-models":
+        _run_extraction_bench(args)
+        return
+
+    runners = {
+        "r1": ("Menhir R1 hybrid retrieval", "hybrid retrieval tuning", menhir_suite.run_r1),
+        "r2-facet": ("Menhir R2 facet retrieval", "facet retrieval", menhir_suite.run_r2_facet),
+        "r3-belief": ("Menhir R3 belief/currentness", "belief/currentness", menhir_suite.run_r3_belief),
+        "oracle": ("Menhir oracle combiner", "oracle combiner", menhir_suite.run_oracle),
+        "intent": ("Menhir intent routing", "intent-aware retrieval", menhir_suite.run_intent),
+        "l4-artifacts": ("Menhir L4 institutional artifacts", "institutional artifact memory",
+                         menhir_suite.run_l4_artifacts),
+        "r5-structure-temporal": ("Menhir R5 structure-temporal", "structure-temporal blast radius",
+                                  menhir_suite.run_r5_structure_temporal),
+    }
+    if cmd not in runners:
+        print(f"ERROR: unknown menhir command: {cmd}", file=sys.stderr)
+        sys.exit(1)
+
+    title, ability, runner = runners[cmd]
+    fixture = Path(args.fixture) if getattr(args, "fixture", None) else None
+    kwargs: dict[str, object] = {}
+    if cmd == "r1":
+        kwargs["k"] = args.k
+    elif cmd == "r2-facet":
+        kwargs["no_traces"] = args.no_traces
+        kwargs["facet_scope"] = args.facet_scope
+    elif cmd == "oracle":
+        kwargs["no_traces"] = args.no_traces
+    elif cmd == "r5-structure-temporal":
+        kwargs["k"] = args.k
+
+    artifact = runner(fixture, **kwargs)
+    menhir_suite.print_summary(cmd, artifact)
+    menhir_suite.write_json_artifact(artifact, args.out)
+    print(f"\nwrote artifact: {args.out}")
+
+    if args.publish_evidence:
+        path = menhir_suite.publish_menhir_evidence(
+            title=title,
+            command=getattr(args, "command_text", f"archolith-bench menhir {cmd}"),
+            ability=ability,
+            fixture_or_live_source=str(fixture or artifact.get("fixture", "default fixture")),
+            artifact=artifact,
+            out_path=args.publish_evidence,
+            public_copy_allowed=args.public_copy,
+        )
+        print(f"published evidence: {path}")
 
 
 def _run_report(args: argparse.Namespace) -> None:

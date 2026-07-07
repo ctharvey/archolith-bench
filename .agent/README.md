@@ -1,5 +1,9 @@
 # archolith-bench — Project Context
 
+> **menhir R2 facet work lives here** (`archolith_bench/facet/`). For the cross-repo picture — how this
+> ties into menhir's research ladder, what's owed, what not to re-litigate — read the menhir handoff:
+> `menhir/.agent/plans/chain-handoff.md`. Local R2 results + caveats: `.agent/benchmark-notes/facet-r2-demo-run.md`.
+
 ## Purpose
 Unified benchmark suite for the archolith product family. Measures token savings, continuity, compression, and cross-product metrics across proxy, filter, audit, and stack scenarios.
 
@@ -21,6 +25,34 @@ archolith-bench proxy --all --arms direct,proxy_only  # run against live proxy
 archolith-bench industry --launch-only                # generate launch benchmark coverage matrix
 ```
 
+### Progress on long runs
+Long bench loops (R1/facet ladders, live recall) print a live heartbeat via
+`archolith_bench/progress.py` — `ProgressReporter` / `track` / `run_ladder`. Progress goes
+to **stderr**, so run the script directly (don't pipe stdout through `tail` — it buffers to
+EOF and hides everything). Full usage + adoption guide:
+[`.agent/workflows/bench-progress.md`](workflows/bench-progress.md).
+
+## LongMemEval Framework
+
+Memory-specific A/B testing for menhir's recall and ingest, consolidated under
+`scripts/longmemeval/` (one `config.sh`, one `lme.sh` dispatcher, one runbook). See
+`scripts/longmemeval/README.md` for the full runbook and `lme.sh -h` for all verbs.
+
+Quickstart:
+```bash
+./scripts/longmemeval/lme.sh -h                 # all commands
+./scripts/longmemeval/lme.sh status             # read-only graph/queue state
+./scripts/longmemeval/lme.sh build 500          # persistent graph (~1 day for oracle)
+./scripts/longmemeval/lme.sh recall-ab main 30  # recall-only A/B against that graph
+./scripts/longmemeval/lme.sh matrix             # analysis: accuracy × config × question-type
+```
+
+**⚠️ Stratification (load-bearing):** the dataset is grouped by `question_type`, so a bare
+`--limit N` samples only `temporal-reasoning` (the hardest type) — a fair run MUST sweep all 6
+types via `--subset`. The `matrix`/`msc`/`ablation` verbs already do; see the runbook's
+Stratification section. Every value in `config.sh` is env-overridable; nothing is hardcoded in
+the scripts. OpenAI key is read at runtime from `menhir/.env`, never committed.
+
 ## Headline Numbers Policy
 
 **`HEADLINE-NUMBERS.md` is the canonical source for any stat used in marketing copy or README headlines.**
@@ -37,5 +69,5 @@ and defer polish unless it blocks installability, reproducibility, or trust.
 
 ## FOLLOW-UP
 - GitHub remote `archolith/archolith-bench` still needs creating. Add with: `git remote add origin git@github.com:archolith/archolith-bench.git`
-- `archolith-filter` and `archolith-audit` are optional extras (`filter`, `audit`, `all`) so base install remains usable before those sibling packages are published. For source checkouts, install sibling repos editable from `../archolith-filter` and `../archolith-mcp-audit` before `pip install -e ".[all]"`.
+- `archolith-filter` and the `archolith-audit` distribution are optional extras (`filter`, `audit`, `all`) so base install remains usable before those sibling packages are published. For source checkouts, install sibling repos editable from `../archolith-filter` and `../archolith-mcp-audit` before `pip install -e ".[all]"`. The audit distribution imports as `archolith_mcp_audit`.
 - The industry benchmark registry is launch-facing. Candidate benchmarks are gates, not completed evidence, until a tracked artifact exists under `benchmarks/`.

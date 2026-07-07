@@ -1,0 +1,40 @@
+{
+  "name": "r3_floor_history",
+  "description": "REAL belief-drift (same menhir floor story as r3_floor_retroactive) but under HISTORICAL intent: 'what did we believe about the recall floor before the RRF-scale finding?'. This is the control proving intent-sensitivity — the superseded cosine belief that is SUPPRESSED under current intent must be SURFACED as a first-class former belief (HISTORICAL_ONLY) under historical intent. Same provenance as r3_floor_retroactive. intent=historical.",
+  "intent": "historical",
+  "items": [
+    {
+      "id": "floor_is_cosine",
+      "statement": "The recall similarity floor (0.15) is a cosine-similarity threshold; genuine matches typically exceed 0.3.",
+      "evidence": [
+        {"signal": "source_is_git", "note": "the original scoring_service.py code comment"},
+        {"signal": "embedding_match"},
+        {"signal": "is_expired", "note": "expired by the live RRF-scale measurement"}
+      ],
+      "gold_current": false,
+      "gold_historical": true,
+      "is_noise": false
+    },
+    {
+      "id": "floor_is_rank_cut",
+      "statement": "The 0.15 floor gates graphiti's RRF score (rank_const=1), so it behaves as a rank cut, not a cosine cutoff.",
+      "evidence": [
+        {"signal": "test_passed", "note": "probe_rrf_scale.py measured RRF max 2.0"},
+        {"signal": "later_confirmed"}
+      ],
+      "gold_current": true,
+      "gold_historical": false,
+      "is_noise": false
+    },
+    {
+      "id": "stale_unrelated_token_estimator",
+      "statement": "The token estimator validation run used a different sampling window last month.",
+      "evidence": [
+        {"signal": "embedding_match", "strength": 0.2, "note": "weak spurious overlap"}
+      ],
+      "gold_current": false,
+      "gold_historical": false,
+      "is_noise": true
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "name": "r3_warden_chain",
+  "description": "Warden consolidation fixture: one safe candidate plus three that each trip a DIFFERENT warden (superseded -> currentness; loop -> exhaustion; wrong-repo -> scope). Proves each single warden misses the others' cases while the chain catches all without blocking the safe one. Grounded in the R3 fixture families (floor supersession, recency loop, rename/wrong-scope).",
+  "items": [
+    {
+      "id": "safe_current_in_scope",
+      "bucket": "safe_to_assert", "superseded": false,
+      "query_repo": "menhir", "candidate_repo": "menhir",
+      "gold_admit": true
+    },
+    {
+      "id": "superseded_belief",
+      "bucket": "safe_to_assert", "superseded": true, "intent": "current",
+      "query_repo": "menhir", "candidate_repo": "menhir",
+      "gold_admit": false
+    },
+    {
+      "id": "retrieval_loop",
+      "bucket": "safe_to_assert", "retrievals_since_progress": 5,
+      "query_repo": "menhir", "candidate_repo": "menhir",
+      "gold_admit": false
+    },
+    {
+      "id": "wrong_repo_current",
+      "bucket": "safe_to_assert", "superseded": false,
+      "query_repo": "menhir", "candidate_repo": "yawn.dashboard",
+      "gold_admit": false
+    }
+  ]
+}

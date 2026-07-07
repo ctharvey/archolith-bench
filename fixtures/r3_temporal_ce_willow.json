@@ -1,0 +1,47 @@
+{
+  "name": "r3_temporal_ce_willow",
+  "description": "REAL temporal fixture from menhir-temporal-chronostratum-plan.md (the RimWorld CE-willow scrambled-ingestion seed). Four bitemporally-stamped facts; ingestion order != belief order. Demonstrates the clock model: current-belief recall excludes the superseded 'patch fixed it' belief; what-we-knew-at-Wednesday surfaces it as a former belief; as-of-world-Thursday returns what was true in the world then. Dates: Mon 01-05, Wed 01-07, Thu 01-08, Fri 01-09.",
+  "facts": [
+    {
+      "id": "A_crash_started",
+      "statement": "The willow crash started after Combat Extended checked LOS.",
+      "valid_at": "2026-01-05", "created_at": "2026-01-07"
+    },
+    {
+      "id": "B_patch_fixed",
+      "statement": "The CE willow texture-cache patch fixed the crash.",
+      "valid_at": "2026-01-07", "invalid_at": "2026-01-08",
+      "created_at": "2026-01-07", "expired_at": "2026-01-08"
+    },
+    {
+      "id": "C_load_order_cause",
+      "statement": "The patch caused a load-order/compat issue.",
+      "valid_at": "2026-01-08", "created_at": "2026-01-08"
+    },
+    {
+      "id": "D_real_fix",
+      "statement": "The real fix was moving the CE willow patch after the plant texture defs.",
+      "valid_at": "2026-01-09", "created_at": "2026-01-09"
+    }
+  ],
+  "queries": [
+    {
+      "id": "q_current_belief",
+      "lens": "current_belief",
+      "gold_ids": ["A_crash_started", "C_load_order_cause", "D_real_fix"],
+      "note": "the superseded 'patch fixed it' belief (B) must NOT be returned as current"
+    },
+    {
+      "id": "q_knew_wednesday",
+      "lens": "as_known_at", "as_of": "2026-01-07",
+      "gold_ids": ["A_crash_started", "B_patch_fixed"],
+      "note": "what did I believe before the load-order fix -> surfaces the former belief B"
+    },
+    {
+      "id": "q_world_thursday",
+      "lens": "as_of_world", "as_of": "2026-01-08",
+      "gold_ids": ["A_crash_started", "C_load_order_cause"],
+      "note": "what was true in the world Thursday (B already world-invalid, D not yet valid)"
+    }
+  ]
+}

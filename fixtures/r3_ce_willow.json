@@ -1,0 +1,64 @@
+{
+  "name": "r3_ce_willow",
+  "description": "DEMO belief-drift fixture (harness sanity check, NOT a promotion decision). The RimWorld CE-willow story from belief-layer.md: a current cause, a superseded-but-relevant former belief that LOOKS assertable, supporting context, and unsupported noise. Query intent = current. Real fixtures (ce_willow_belief_drift + the other families) are owed.",
+  "intent": "current",
+  "items": [
+    {
+      "id": "load_order_cause",
+      "statement": "The load-order issue caused the remaining compatibility problem after the CE willow patch.",
+      "evidence": [
+        {"signal": "observed_error", "note": "load-order/compat error observed"},
+        {"signal": "later_confirmed", "note": "load-order fix resolved it"},
+        {"signal": "source_is_log"}
+      ],
+      "gold_current": true,
+      "gold_historical": false,
+      "is_noise": false
+    },
+    {
+      "id": "patch_fully_fixed",
+      "statement": "The CE willow patch fully fixed all the issues.",
+      "evidence": [
+        {"signal": "embedding_match", "note": "semantically very close to the query"},
+        {"signal": "entity_match"},
+        {"signal": "test_passed", "note": "original crash looked resolved after the patch"},
+        {"signal": "is_expired", "note": "later evidence expired this belief"}
+      ],
+      "gold_current": false,
+      "gold_historical": true,
+      "is_noise": false
+    },
+    {
+      "id": "patch_addressed_symptom",
+      "statement": "The CE willow patch may have addressed the original texture-cache symptom.",
+      "evidence": [
+        {"signal": "file_changed", "note": "CE willow patch added"},
+        {"signal": "test_passed"}
+      ],
+      "gold_current": true,
+      "gold_historical": false,
+      "is_noise": false
+    },
+    {
+      "id": "former_belief_patch_fixed_crash",
+      "statement": "At one point it appeared the patch fixed the crash.",
+      "evidence": [
+        {"signal": "embedding_match"},
+        {"signal": "later_contradicted", "polarity": "contradicts", "note": "a later failure appeared"}
+      ],
+      "gold_current": false,
+      "gold_historical": true,
+      "is_noise": false
+    },
+    {
+      "id": "unrelated_garden_note",
+      "statement": "Marigold seeds arrived in March, tomatoes started indoors in February.",
+      "evidence": [
+        {"signal": "embedding_match", "strength": 0.2, "note": "weak spurious match"}
+      ],
+      "gold_current": false,
+      "gold_historical": false,
+      "is_noise": true
+    }
+  ]
+}

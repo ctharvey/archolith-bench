@@ -1,0 +1,232 @@
+{
+  "name": "oracle_correlated",
+  "description": "Correlated-evidence trap (R4-R7): one CURRENT truth vs five STALE echoes of the same superseded belief (design note, commit message, test comment, memory summary, copied README), where the stale belief has STRONGER lexical match to the query than the current truth. Tests whether a weighted sum lets a chorus of high-relevance stale echoes bury the one current truth out of top-k, and whether role-separated currentness still surfaces it. NOTE: five separate echoes are five candidates, so this exercises temporal role-separation, NOT the within-candidate source-family cap. DRAFT smoke fixture; lexical semantic stand-in.",
+  "memories": [
+    {
+      "id": "ct_truth",
+      "text": "The willow leafless-immature regression is resolved only by the load-order adjustment in the mod config.",
+      "repo": "menhir",
+      "symbols": [
+        "TreeWillowLeaflessImmature"
+      ],
+      "tests": [
+        "test_willow_growth"
+      ],
+      "valid_at": "2026-04-01",
+      "created_at": "2026-04-01",
+      "belief_bucket": "current",
+      "evidence_kinds": [
+        "user",
+        "test"
+      ],
+      "conflict_group": "willow_fix"
+    },
+    {
+      "id": "echo_designdoc",
+      "text": "Design note: the willow leafless immature patch fully fixes the immature tree bug.",
+      "repo": "menhir",
+      "symbols": [
+        "TreeWillowLeaflessImmature"
+      ],
+      "invalid_at": "2026-04-01",
+      "created_at": "2026-02-10",
+      "superseded": true,
+      "belief_bucket": "historical",
+      "evidence_kinds": [
+        "log"
+      ],
+      "conflict_group": "willow_fix"
+    },
+    {
+      "id": "echo_commit",
+      "text": "Commit message: the willow leafless immature patch fully fixes the immature tree bug.",
+      "repo": "menhir",
+      "symbols": [
+        "TreeWillowLeaflessImmature"
+      ],
+      "invalid_at": "2026-04-01",
+      "created_at": "2026-02-11",
+      "superseded": true,
+      "belief_bucket": "historical",
+      "evidence_kinds": [
+        "git"
+      ],
+      "conflict_group": "willow_fix"
+    },
+    {
+      "id": "echo_testcomment",
+      "text": "Test comment: the willow leafless immature patch fully fixes the immature tree bug.",
+      "repo": "menhir",
+      "symbols": [
+        "TreeWillowLeaflessImmature"
+      ],
+      "invalid_at": "2026-04-01",
+      "created_at": "2026-02-12",
+      "superseded": true,
+      "belief_bucket": "historical",
+      "evidence_kinds": [
+        "test"
+      ],
+      "conflict_group": "willow_fix"
+    },
+    {
+      "id": "echo_memsummary",
+      "text": "Memory summary: the willow leafless immature patch fully fixes the immature tree bug.",
+      "repo": "menhir",
+      "symbols": [
+        "TreeWillowLeaflessImmature"
+      ],
+      "invalid_at": "2026-04-01",
+      "created_at": "2026-02-13",
+      "superseded": true,
+      "belief_bucket": "anergic",
+      "evidence_kinds": [
+        "agent_inference"
+      ],
+      "conflict_group": "willow_fix"
+    },
+    {
+      "id": "echo_readme",
+      "text": "Copied README line: the willow leafless immature patch fully fixes the immature tree bug.",
+      "repo": "menhir",
+      "symbols": [
+        "TreeWillowLeaflessImmature"
+      ],
+      "invalid_at": "2026-04-01",
+      "created_at": "2026-02-14",
+      "superseded": true,
+      "belief_bucket": "historical",
+      "evidence_kinds": [
+        "log"
+      ],
+      "conflict_group": "willow_fix"
+    },
+    {
+      "id": "fill_floor",
+      "text": "Recall applies a source-aware similarity floor so BM25 and facet candidates survive.",
+      "repo": "menhir",
+      "files": [
+        "scoring_service.py"
+      ],
+      "symbols": [
+        "source_aware_floor"
+      ],
+      "valid_at": "2026-03-12",
+      "created_at": "2026-03-12",
+      "belief_bucket": "current",
+      "evidence_kinds": [
+        "git",
+        "test"
+      ]
+    },
+    {
+      "id": "fill_rrf",
+      "text": "Hybrid retrieval fuses vector and BM25 on rank with weighted_rrf.",
+      "repo": "menhir",
+      "files": [
+        "hybrid_retrieval.py"
+      ],
+      "symbols": [
+        "weighted_rrf"
+      ],
+      "valid_at": "2026-03-14",
+      "created_at": "2026-03-14",
+      "belief_bucket": "current",
+      "evidence_kinds": [
+        "git",
+        "test"
+      ]
+    },
+    {
+      "id": "fill_lease",
+      "text": "menhir scheduler_lease force_acquire overwrites the single-leader lease.",
+      "repo": "menhir",
+      "files": [
+        "scheduler_lease.py"
+      ],
+      "symbols": [
+        "force_acquire"
+      ],
+      "valid_at": "2026-04-02",
+      "created_at": "2026-04-02",
+      "belief_bucket": "current",
+      "evidence_kinds": [
+        "git"
+      ]
+    },
+    {
+      "id": "fill_name",
+      "text": "The package is menhir: src/menhir, env vars MENHIR_ prefixed.",
+      "repo": "menhir",
+      "valid_at": "2026-03-01",
+      "created_at": "2026-03-01",
+      "belief_bucket": "current",
+      "evidence_kinds": [
+        "git"
+      ]
+    },
+    {
+      "id": "fill_graph",
+      "text": "menhir stores memory in a Neo4j plus Graphiti graph.",
+      "repo": "menhir",
+      "symbols": [
+        "graphiti_client"
+      ],
+      "valid_at": "2026-03-01",
+      "created_at": "2026-03-01",
+      "belief_bucket": "current",
+      "evidence_kinds": [
+        "git"
+      ]
+    },
+    {
+      "id": "fill_neo",
+      "text": "menhir Neo4j defaults are unsafe beyond localhost.",
+      "repo": "menhir",
+      "files": [
+        "settings.py"
+      ],
+      "symbols": [
+        "neo4j_password"
+      ],
+      "valid_at": "2026-04-02",
+      "created_at": "2026-04-02",
+      "belief_bucket": "current",
+      "evidence_kinds": [
+        "git"
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "id": "q_trap_current",
+      "text": "How is the willow leafless immature bug fixed?",
+      "intent": "current",
+      "as_of_time": "2026-06-01",
+      "symbols": [
+        "TreeWillowLeaflessImmature"
+      ],
+      "support_ids": [
+        "ct_truth"
+      ],
+      "note": "five stale echoes all say 'patch fully fixes the immature tree bug' (higher lexical match than the current truth's 'resolved by the load-order adjustment'). A weighted sum should let the chorus bury ct_truth below rank 5; role-separated currentness should surface it."
+    },
+    {
+      "id": "q_trap_history",
+      "text": "What did we previously believe fixed the willow leafless immature bug?",
+      "intent": "historical",
+      "as_of_time": "2026-06-01",
+      "symbols": [
+        "TreeWillowLeaflessImmature"
+      ],
+      "support_ids": [
+        "echo_designdoc",
+        "echo_commit",
+        "echo_testcomment",
+        "echo_memsummary",
+        "echo_readme"
+      ],
+      "note": "historical intent must PRESERVE the superseded echoes (they are the correct answer to a historical question)."
+    }
+  ]
+}

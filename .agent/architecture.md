@@ -11,7 +11,7 @@ The benchmark is a **CLI tool**, not a service. It runs offline, sending control
 | Layer | Project | What archolith-bench measures |
 |-------|---------|------------------------------|
 | L0–L2 | archolith-filter | Compression ratios across 8 categories of tool output corpora |
-| L3 | archolith-audit | MCP token-waste reduction before/after server-side fixes |
+| L3 | archolith-audit / archolith-mcp-audit | MCP token-waste reduction before/after server-side fixes |
 | L4 | archolith-context (proxy) | Multi-turn token savings, continuity, restart/orientation scores |
 | Stack | All layers | Experimental four-way additive comparison: direct / filter-only / proxy-only / proxy+filter |
 | Launch | All products | Industry benchmark coverage matrix and claim gates |
@@ -25,7 +25,7 @@ The benchmark is a **CLI tool**, not a service. It runs offline, sending control
 | Config | python-dotenv (`.env` file) |
 | Token counting | archolith-maintenance primitive; tiktoken when available |
 | Filter compression | archolith-filter (peer dependency) |
-| Audit comparison | archolith-audit (peer dependency) |
+| Audit comparison | archolith-audit distribution (`archolith_mcp_audit`, source repo `archolith-mcp-audit`) |
 | Packaging | setuptools (pyproject.toml) |
 | Linting | ruff |
 | Testing | pytest |
@@ -212,7 +212,7 @@ All configuration via `.env` file:
 |------------|---------|----------|
 | archolith-context (proxy) | Proxy endpoint for proxy/stack suites | For proxy/stack suites |
 | archolith-filter | Filter compression in filter suite + filter_only arm | Optional extra: `filter` / `all` |
-| archolith-audit | Audit comparison | Optional extra: `audit` / `all` |
+| archolith-audit distribution (`archolith_mcp_audit`) | Audit comparison | Optional extra: `audit` / `all`; source checkout lives at `../archolith-mcp-audit` |
 | archolith-maintenance | Shared token-counting primitive | Yes (pip/editable peer) |
 | httpx | HTTP client for all API calls | Yes (pip) |
 | python-dotenv | `.env` file loading | Yes (pip) |

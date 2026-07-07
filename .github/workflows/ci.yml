@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: ruff (bench package + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: python -m pip install "ruff>=0.4"
+      # Scoped to the bench package + tests; scripts/ carry separate pre-existing
+      # lint debt and are out of scope for this gate.
+      - name: Ruff check
+        run: python -m ruff check archolith_bench tests
+
+  test:
+    name: tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      # These sibling packages are public but not on PyPI; install them from
+      # GitHub. archolith-maintenance is a required dependency; archolith-filter
+      # and archolith-mcp-audit are the optional audit/filter integrations that
+      # the suite smoke test exercises (installing them un-skips it — see
+      # tests/conftest.py).
+      - name: Install sibling packages (git; public, not on PyPI)
+        run: |
+          python -m pip install "archolith-maintenance @ git+https://github.com/Archolith/archolith-maintenance.git"
+          python -m pip install "git+https://github.com/Archolith/archolith-filter.git"
+          python -m pip install "git+https://github.com/Archolith/archolith-mcp-audit.git"
+
+      - name: Install archolith-bench (editable, dev extras)
+        run: python -m pip install -e ".[dev]"
+
+      # The R3/R5 ladder benches import the menhir repo (private deps, not
+      # installable in CI); tests/conftest.py skips them when menhir is absent.
+      # This runs the offline bench mechanism suite (metrics, ranking ladders,
+      # fixture validators, cost/token models) plus the audit/filter smoke test.
+      - name: Run offline bench suite
+        run: python -m pytest tests/ -q

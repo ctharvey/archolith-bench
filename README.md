@@ -1,19 +1,15 @@
 # archolith-bench
 
-Benchmark suite for the [archolith&trade;](https://github.com/archolith/archolith-bench) token-reduction stack.
-Measures proxy context assembly, client-side filtering, and MCP audit savings
-across reproducible multi-turn coding scenarios.
+Benchmark suite for the [archolith&trade;](https://github.com/archolith/archolith-bench) family.
+Measures proxy context assembly, client-side filtering, MCP audit savings, security benchmark
+coverage, and Menhir memory/retrieval behavior across reproducible scenarios.
 
-### Headline numbers (2026-05-30)
+### Evidence status
 
-| Metric | Value | Source |
-|--------|-------|--------|
-| Proxy upstream input reduction | **25.8%** | `proxy_only`, 15K budget, 10-turn code review, DeepSeek upstream |
-| Filter compression | **49.5%** | 12 real session samples, 8 categories |
-| MCP waste reduction | Pending live run | Fixture-only result is not a launch headline |
-
-TODO: refresh the proxy benchmarks before launch and replace the single-scenario
-headline with a broader run across current proxy settings, budgets, and models.
+No launch headline numbers are currently active. Historical and fixture runs remain in
+[`benchmarks/`](benchmarks/) and generated reports for methodology review, but they should not be
+used as public copy until refreshed against the current launch configuration and recorded in
+[`HEADLINE-NUMBERS.md`](HEADLINE-NUMBERS.md).
 
 See [BENCHMARKS.md](BENCHMARKS.md) for full tables and reproduction instructions,
 and [`benchmarks/`](benchmarks/) for tracked evidence summaries.
@@ -136,9 +132,10 @@ SWE-bench, LongBench v2, CyberSecEval, AgentDojo, OWASP security checks, and
 real audit logs.
 
 The base install supports the CLI, report generation, and proxy orchestration. Until
-`archolith-filter` and `archolith-audit` are published to the package index used by your
-environment, `pip install -e ".[all]"` is not a standalone public install command; use the
+`archolith-filter` and the `archolith-audit` distribution are published to the package index used by
+your environment, `pip install -e ".[all]"` is not a standalone public install command; use the
 source checkout workflow above or install those packages from their eventual release artifacts first.
+The audit source repo is `../archolith-mcp-audit`; its Python import package is `archolith_mcp_audit`.
 
 ## Experiment Arms
 

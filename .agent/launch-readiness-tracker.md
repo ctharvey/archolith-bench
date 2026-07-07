@@ -6,7 +6,7 @@ Release posture: fix only Critical and High issues before public release; defer 
 
 ## Launch Sequencing (decided 2026-06-19)
 
-Run pre-launch work in this order so headline numbers reflect the final, post-remediation system:
+Run pre-launch work in this order so any future headline numbers reflect the final, post-remediation system:
 
 1. **Audits** — run code/security audits and remediate findings first.
 2. **Industry benchmarks** — square away the `archolith-bench industry` registry: complete or explicitly defer each candidate and security (CyberSecEval/AgentDojo/OWASP) gate.
@@ -14,12 +14,12 @@ Run pre-launch work in this order so headline numbers reflect the final, post-re
 
 ## Current Decision Log
 
-- Public benchmark copy uses actual upstream input reduction, not internal context-curation savings.
-- Historical proxy evidence is retained, but the `58.6%` value is labeled as internal context-curation savings.
+- Public benchmark copy must not use numeric claims until refreshed evidence is recorded in `HEADLINE-NUMBERS.md`.
+- Historical proxy evidence is retained for methodology review only; no historical proxy value is currently an active headline.
 - `benchmarks/` is the tracked evidence folder for launch-facing benchmark summaries.
 - Raw `results/` and `logs/` remain local runtime output and stay gitignored.
 - `stack` remains visible as an experimental/pending suite, not a launch headline.
-- `archolith-filter` and `archolith-audit` are optional extras so the base package can install before sibling packages are published.
+- `archolith-filter` and the `archolith-audit` distribution are optional extras so the base package can install before sibling packages are published.
 - Optional sibling package path is source-first for launch: install `../archolith-filter` and `../archolith-mcp-audit` editable before `pip install -e ".[all]"`. Standalone `.[all]` remains unavailable to public users until both sibling packages are published to the configured package index.
 - Default upstream is OpenAI-compatible: `https://api.openai.com/v1`, model `gpt-4o-mini`, proxy `http://localhost:9800/v1`.
 - Industry and security benchmark coverage is now tracked through `archolith-bench industry`; candidate entries are launch gates, not completed evidence.
@@ -28,16 +28,14 @@ Run pre-launch work in this order so headline numbers reflect the final, post-re
 
 | Area | Resolution | Evidence |
 |------|------------|----------|
-| Proxy headline math | README now uses `25.8%` actual upstream input reduction; `58.6%` is separated as internal context curation | `README.md`, `HEADLINE-NUMBERS.md`, `BENCHMARKS.md`, `benchmarks/proxy-code-review-2026-05-30.md` |
+| Headline number posture | README and `HEADLINE-NUMBERS.md` no longer expose active numeric claims until refreshed launch evidence exists | `README.md`, `HEADLINE-NUMBERS.md` |
 | Public benchmark evidence | Added tracked evidence summaries under `benchmarks/` | `benchmarks/README.md` |
 | Pytest collection | Default pytest collection limited to `tests/`; archival `experiments/` excluded | `pyproject.toml` |
-| Base installability | Moved `archolith-filter` and `archolith-audit` to optional extras | `pyproject.toml`, `README.md` |
+| Base installability | Kept `archolith-filter` and `archolith-audit` as optional distribution extras | `pyproject.toml`, `README.md` |
 | Optional sibling install path | Source-first workflow documented for full-suite installs; standalone `.[all]` is explicitly not public until sibling packages are published | `README.md`, `AGENTS.md`, `.agent/README.md` |
 | Config defaults | Runtime, README, `.env.example`, and agent docs use OpenAI endpoint defaults | `.env.example`, `archolith_bench/core/api.py`, `README.md`, `.agent/architecture.md` |
 | Repository URL | README matches `pyproject.toml` canonical URL | `README.md`, `pyproject.toml` |
 | Stack suite wording | Stack labeled experimental/pending in docs and generated report output | `README.md`, `BENCHMARKS.md`, `archolith_bench/core/report.py` |
-| Filter headline | Launch-facing value is exact `49.5%` everywhere | `README.md`, `HEADLINE-NUMBERS.md`, `benchmarks/filter-2026-05-30.md` |
-| Audit denominator | Fixture evidence uses `116,700`, matching `audit_comparison.json` | `HEADLINE-NUMBERS.md`, `benchmarks/audit-fixture-2026-06-06.md` |
 | Industry benchmark registry | Added executable product-to-benchmark coverage matrix for RULER, LongBench v2, SWE-bench, BigCodeBench, HELM, MTEB, CyberSecEval, AgentDojo, and OWASP security checks | `archolith_bench/core/industry.py`, `benchmarks/industry-trusted-benchmark-coverage.md` |
 
 ## Remaining Critical / High Work
@@ -54,7 +52,7 @@ Run pre-launch work in this order so headline numbers reflect the final, post-re
 
 - [ ] Re-run proxy benchmarks against the current launch setup: OpenAI endpoint, `gpt-4o-mini`, current proxy config, `proxy_only` and `proxy_plus_filter`, 4K and 15K budgets.
 - [ ] Add refreshed proxy evidence under `benchmarks/` and update `README.md`, `BENCHMARKS.md`, and `HEADLINE-NUMBERS.md` from that evidence.
-- [x] Decide and document the supported install path for `archolith-filter` and `archolith-audit`: source checkout editable installs before `pip install -e ".[all]"`.
+- [x] Decide and document the supported install path for `archolith-filter` and the `archolith-audit` distribution: source checkout editable installs before `pip install -e ".[all]"`.
 - [ ] Either run and track one real before/after audit or keep audit waste reduction marked pending everywhere launch-facing.
 - [ ] Either generate and track real stack-suite evidence or keep `stack` marked experimental/pending everywhere launch-facing.
 - [ ] Generate `benchmarks/industry-trusted-benchmark-coverage.md` after every benchmark-policy change and complete/defer each candidate-before-launch gate.

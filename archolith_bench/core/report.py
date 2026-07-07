@@ -57,6 +57,12 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
     lines: list[str] = []
     lines.append("# archolith-bench — Benchmark Results\n")
     lines.append(f"Generated: {__import__('time').strftime('%Y-%m-%d %H:%M UTC', __import__('time').gmtime())}\n")
+    lines.append(
+        "\n> **Launch-claim status:** this generated report may include historical, fixture, or local "
+        "methodology runs. It is not a source of headline numbers by itself. Public claims must come "
+        "from `HEADLINE-NUMBERS.md`, which currently has no active values until refreshed launch "
+        "evidence exists.\n\n"
+    )
 
     # ---- Filter section ----
     filter_path = results_dir / "filter_results.json"

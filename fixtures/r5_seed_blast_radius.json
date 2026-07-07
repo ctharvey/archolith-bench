@@ -1,0 +1,22 @@
+{
+  "name": "r5_seed_blast_radius",
+  "description": "REAL time-aware blast radius fixture from yawn.seed. A mapping test (LocalDataSourceServiceTest) depends structurally on LocalDataSourceService, CardIngestMapper, RepoSyncService, and a stable util. It last passed 2026-06-01 and failed 2026-06-12. The culprit is the dependency CHANGED IN THE WINDOW: CardIngestMapper (extracted from LocalDataSourceService at c9940ae, 2026-06-09). RepoSyncService changed BEFORE the window (cb2d013, pre-06-01); the util never changed. Structure-only can't tell which sibling changed when; the StructureTemporalOracle surfaces CardIngestMapper. Provenance: yawn.seed git log (c9940ae, cb2d013).",
+  "anchor": "LocalDataSourceServiceTest",
+  "window_start": "2026-06-01",
+  "window_end": "2026-06-12",
+  "culprit": "CardIngestMapper",
+  "max_depth": 1,
+  "graph": {
+    "LocalDataSourceServiceTest": [
+      {"id": "LocalDataSourceService", "relation": "test_of"},
+      {"id": "CardIngestMapper", "relation": "test_of"},
+      {"id": "RepoSyncService", "relation": "test_of"},
+      {"id": "CardDtoUtil", "relation": "callee"}
+    ]
+  },
+  "changes": [
+    {"target": "CardIngestMapper", "changed_at": "2026-06-09", "commit": "c9940ae", "kind": "file"},
+    {"target": "RepoSyncService", "changed_at": "2026-05-20", "commit": "cb2d013", "kind": "file"},
+    {"target": "LocalDataSourceService", "changed_at": "2026-05-20", "commit": "cb2d013", "kind": "file"}
+  ]
+}

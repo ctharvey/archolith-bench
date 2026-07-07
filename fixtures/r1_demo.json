@@ -1,0 +1,185 @@
+{
+  "name": "r1_demo",
+  "description": "DEMO fixture for the R1 hybrid-retrieval ladder (harness sanity check, NOT a promotion decision). Covers all seven families with deliberate low-overlap exact-string/symbol support plus high-overlap distractors so the source-aware path can be distinguished from the fused baseline. The real fixture, grounded in menhir/archolith history with confirmed gold support ids, is a ctharvey pairing task.",
+  "memories": [
+    {
+      "id": "m_npe",
+      "text": "Postmortem note: the failure signature was NullPointerException at PaymentGateway.charge line 42 during settlement.",
+      "repo": "yawn.market",
+      "symbols": ["PaymentGateway.charge"],
+      "exact_strings": ["NullPointerException at PaymentGateway.charge line 42"]
+    },
+    {
+      "id": "m_checkout_generic1",
+      "text": "The checkout flow occasionally crashes and the user sees a generic failure during settlement and payment.",
+      "repo": "yawn.market"
+    },
+    {
+      "id": "m_checkout_generic2",
+      "text": "Settlement and payment failures during checkout are usually transient and resolve on retry of the flow.",
+      "repo": "yawn.market"
+    },
+    {
+      "id": "m_symbol_ingest",
+      "text": "Refactored the nightly job so TcgPlayerDailyScheduler.ensurePartition runs before the price import begins.",
+      "repo": "yawn.market",
+      "symbols": ["TcgPlayerDailyScheduler.ensurePartition"]
+    },
+    {
+      "id": "m_partition_generic1",
+      "text": "The nightly price import job creates a new daily partition before it begins importing rows.",
+      "repo": "yawn.market"
+    },
+    {
+      "id": "m_partition_generic2",
+      "text": "Daily price import begins each night and writes rows into the partitioned snapshots table.",
+      "repo": "yawn.market"
+    },
+    {
+      "id": "m_floor_current",
+      "text": "Current decision: the recall similarity floor behaves as a rank cut on the RRF scale, not a cosine cutoff.",
+      "repo": "menhir",
+      "symbols": ["MIN_SIMILARITY_THRESHOLD"]
+    },
+    {
+      "id": "m_floor_stale",
+      "text": "Old note: the recall similarity floor is a cosine threshold around 0.15 where genuine matches exceed 0.3.",
+      "repo": "menhir",
+      "symbols": ["MIN_SIMILARITY_THRESHOLD"],
+      "stale": true
+    },
+    {
+      "id": "m_alpha_other_repo",
+      "text": "In the dashboard project the hybrid alpha slider blends two retrieval scores for the demo view.",
+      "repo": "yawn.dashboard",
+      "symbols": ["hybrid_alpha"]
+    },
+    {
+      "id": "m_alpha_menhir",
+      "text": "In menhir, hybrid_alpha is a rank-fusion weight blending vector and BM25 passes in recall.",
+      "repo": "menhir",
+      "symbols": ["hybrid_alpha"]
+    },
+    {
+      "id": "m_buried_seed",
+      "text": "Edge case fixed: SeedScopedIngest.resolveColors preserves primaryColor when the upstream source omits it.",
+      "repo": "yawn.seed",
+      "symbols": ["SeedScopedIngest.resolveColors"],
+      "exact_strings": ["preserves primaryColor when the upstream source omits it"]
+    },
+    {
+      "id": "m_seed_generic",
+      "text": "The seed ingest pipeline loads existing colors and merges them with the latest upstream data source.",
+      "repo": "yawn.seed"
+    },
+    {
+      "id": "m_noise_checkout3",
+      "text": "Checkout payment settlement flow notes: the failure during payment was reported by several users on retry.",
+      "repo": "yawn.market"
+    },
+    {
+      "id": "m_noise_checkout4",
+      "text": "During checkout the settlement and payment step can fail and the flow shows a failure to the user.",
+      "repo": "yawn.market"
+    },
+    {
+      "id": "m_noise_partition3",
+      "text": "Nightly price import job notes: the import begins and writes daily rows into the price snapshots partition.",
+      "repo": "yawn.market"
+    },
+    {
+      "id": "m_noise_partition4",
+      "text": "The daily price import partition is created before the nightly import begins writing price rows.",
+      "repo": "yawn.market"
+    },
+    {
+      "id": "m_noise_color3",
+      "text": "Seed ingest notes: existing colors are loaded and the upstream source data merges primaryColor when present.",
+      "repo": "yawn.seed"
+    },
+    {
+      "id": "m_noise_color4",
+      "text": "The seed pipeline preserves colors from the upstream source and loads existing color data each run.",
+      "repo": "yawn.seed"
+    },
+    {
+      "id": "m_noise_floor3",
+      "text": "Recall scoring notes: the similarity floor and the RRF rank cut affect which candidates the recall path keeps.",
+      "repo": "menhir"
+    }
+  ],
+  "queries": [
+    {
+      "id": "q_exact_npe",
+      "family": "exact_error_string",
+      "text": "NullPointerException at PaymentGateway.charge line 42",
+      "support_ids": ["m_npe"],
+      "intent": "current",
+      "repo": "yawn.market",
+      "target_exact_string": "NullPointerException at PaymentGateway.charge line 42"
+    },
+    {
+      "id": "q_exact_seed",
+      "family": "buried_relevant_memory",
+      "text": "where do we preserve primaryColor when the upstream source omits it",
+      "support_ids": ["m_buried_seed"],
+      "intent": "current",
+      "repo": "yawn.seed",
+      "target_exact_string": "preserves primaryColor when the upstream source omits it"
+    },
+    {
+      "id": "q_symbol_partition",
+      "family": "symbol_name_query",
+      "text": "what calls TcgPlayerDailyScheduler.ensurePartition",
+      "support_ids": ["m_symbol_ingest"],
+      "intent": "current",
+      "repo": "yawn.market",
+      "target_symbol": "TcgPlayerDailyScheduler.ensurePartition"
+    },
+    {
+      "id": "q_symbol_resolvecolors",
+      "family": "symbol_name_query",
+      "text": "find the SeedScopedIngest.resolveColors change",
+      "support_ids": ["m_buried_seed"],
+      "intent": "current",
+      "repo": "yawn.seed",
+      "target_symbol": "SeedScopedIngest.resolveColors"
+    },
+    {
+      "id": "q_paraphrase_checkout",
+      "family": "paraphrased_debug_question",
+      "text": "why does the settlement step fail during checkout payment",
+      "support_ids": ["m_npe"],
+      "intent": "current",
+      "repo": "yawn.market",
+      "target_exact_string": "NullPointerException at PaymentGateway.charge line 42",
+      "paraphrase_group": "checkout_crash"
+    },
+    {
+      "id": "q_stale_floor",
+      "family": "historical_only_vs_current_truth",
+      "text": "what is the current behavior of the recall similarity floor",
+      "support_ids": ["m_floor_current"],
+      "intent": "current",
+      "repo": "menhir",
+      "target_symbol": "MIN_SIMILARITY_THRESHOLD"
+    },
+    {
+      "id": "q_wrong_repo_alpha",
+      "family": "wrong_repo_same_topic",
+      "text": "how does hybrid_alpha work in menhir recall",
+      "support_ids": ["m_alpha_menhir"],
+      "intent": "current",
+      "repo": "menhir",
+      "target_symbol": "hybrid_alpha"
+    },
+    {
+      "id": "q_stale_neighbor_partition",
+      "family": "stale_semantic_neighbor",
+      "text": "current nightly price import partition behavior",
+      "support_ids": ["m_partition_generic1"],
+      "intent": "current",
+      "repo": "yawn.market"
+    }
+  ]
+}

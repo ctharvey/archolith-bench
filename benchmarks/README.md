@@ -23,6 +23,7 @@ comes from fixtures, label it as format evidence only.
 | `audit-fixture-2026-06-06.md` | Fixture audit report format evidence | No |
 | `industry-trusted-benchmark-coverage.md` | Product-to-industry-benchmark launch coverage matrix | No; coverage/gate artifact only |
 | `mteb-embedding-baseline-2026-06-19.md` | Single-arm embedding-model component baseline | No; component diagnostic, not proxy or memory-system A/B |
+| `menhir-phase3-view-consolidation-2026-07-07.md` | Menhir Phase 3 consumer-pipeline validation (TurnEvidence -> Views) | No; consumer-correctness validation, not a proxy or model score |
 
 ## Refresh TODO
 

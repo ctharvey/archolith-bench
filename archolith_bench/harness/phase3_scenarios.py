@@ -316,20 +316,20 @@ def default_scenarios() -> list[Scenario]:
             ),
             gate=False,
         ),
-        # 4. Negative correction: "Not 25 anymore, it is 20" binds only if the connective rule
-        #    recognizes this phrasing. Whether it does is exactly what we are measuring, so this is
-        #    CHARACTERIZATION, not a gate.
+        # 4. Negative correction: "Not 25 anymore, it is 20" supersedes via the connective rule.
+        #    Promoted to a GATE once menhir's correction resolver handled this phrasing (the "not OLD
+        #    anymore, it is NEW" pattern); it now guards against that binding regressing.
         Scenario(
             scenario_id="negative-correction",
-            description="'Not 25 anymore, it is 20' supersedes only via the connective rule",
+            description="'Not 25 anymore, it is 20' supersedes via the connective rule",
             phases=(
                 (Post("neg-movies", "I have 25 movies on my watch list.", "stated_measure"),),
                 (Post("neg-corr", "Not 25 anymore, it is 20.", "correction"),),
             ),
             assertions=(
-                Assertion("superseded", "movies 25 -> 20 (if connective recognized)", _MOVIES, 20.0, 25.0),
+                Assertion("superseded", "movies 25 -> 20", _MOVIES, 20.0, 25.0),
             ),
-            gate=False,
+            gate=True,
         ),
         # 5. Multi-namespace re-run: identical fixtures in two namespaces capture independently
         #    (the namespace-scoped turn_key regression, exercised across silos).

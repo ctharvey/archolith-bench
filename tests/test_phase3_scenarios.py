@@ -110,9 +110,10 @@ def test_default_scenarios_shape():
         "ambiguous-correction", "currency-worded-sum", "count-vs-spend",
         "negative-correction", "multi-namespace",
     }
-    # two are characterization (non-gate): count-vs-spend, negative-correction
+    # count-vs-spend is the only remaining characterization (non-gate) scenario; negative-correction
+    # was promoted to a gate once menhir's correction resolver handled the "not OLD anymore" form.
     non_gate = {s.scenario_id for s in scenarios if not s.gate}
-    assert non_gate == {"count-vs-spend", "negative-correction"}
+    assert non_gate == {"count-vs-spend"}
 
 
 def test_happy_model_passes_every_scenario():
@@ -145,13 +146,22 @@ def test_count_vs_spend_characterization_diverges_when_menhir_merges():
     assert suite_verdict(results) is True  # non-gate divergence does not fail the suite
 
 
-def test_negative_correction_characterization_diverges_when_connective_unrecognized():
+def test_negative_correction_is_a_gate_and_regression_fails_suite():
+    # negative-correction is now a GATE: if menhir stops binding the "not OLD anymore, it is NEW"
+    # form (regression), the scenario fails AND the suite verdict fails.
     client = ScenarioFakeClient(negative_correction_binds=False)
     results = run_scenario_suite(client, base_namespace="scn-neg")
     neg = next(r for r in results if r.scenario_id == "negative-correction")
-    assert neg.gate is False
+    assert neg.gate is True
     assert neg.passed is False  # stayed 25, never superseded
-    assert suite_verdict(results) is True
+    assert suite_verdict(results) is False  # a gate regression fails the suite
+
+
+def test_negative_correction_passes_when_bound():
+    client = ScenarioFakeClient(negative_correction_binds=True)
+    results = run_scenario_suite(client, base_namespace="scn-neg-ok")
+    neg = next(r for r in results if r.scenario_id == "negative-correction")
+    assert neg.gate is True and neg.passed is True
 
 
 def test_multi_namespace_independence():

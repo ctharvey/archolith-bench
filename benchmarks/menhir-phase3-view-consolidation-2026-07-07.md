@@ -104,28 +104,34 @@ never fail the verdict.
 | `ambiguous-correction` | gate | two Views == 25 -> a bare `20, not 25` touches NEITHER (F2 abstain) |
 | `currency-worded-sum` | gate | `50 dollars and 75 dollars` folds to `bike_spend = 125` |
 | `multi-namespace` | gate | identical fixtures in two namespaces capture independently |
+| `negative-correction` | gate | `Not 25 anymore, it is 20` supersedes via the connective rule |
 | `count-vs-spend` | characterization | `2 bikes for $125` -> count(2) and spend(125) do not merge |
-| `negative-correction` | characterization | `Not 25 anymore, it is 20` supersedes only via the connective rule |
 
-The two characterization scenarios are marked non-gate because whether menhir extracts a
-separate count from one sentence, and whether the connective rule recognizes the negative
-phrasing, are exactly what the benchmark is there to *measure*.
+`count-vs-spend` stays characterization (non-gate) because whether menhir co-extracts a count and
+a sum from one compound sentence is still what the benchmark is there to *measure*.
+`negative-correction` was **promoted to a gate** (2026-07-07) once menhir's correction resolver
+gained the `not OLD anymore, it is NEW` pattern — it now guards that binding against regression.
 
-### Live characterization results (2 runs against throwaway menhir)
+### Live results (2 runs against throwaway menhir)
 
-All **3 gate scenarios PASS** both runs (ambiguous-correction abstains, currency-SUM folds to
-125, multi-namespace independent); overall **verdict PASS**, safety invariants clean. Both
-characterization scenarios **DIVERGE** consistently — two real, reproducible consumer gaps the
-benchmark documented (verdict unaffected):
+All **4 gate scenarios PASS** both runs (ambiguous-correction abstains, currency-SUM folds to 125,
+multi-namespace independent, negative-correction supersedes 25 -> 20); overall **verdict PASS**,
+safety invariants clean. The remaining characterization scenario **DIVERGES** consistently — one
+real, reproducible consumer gap the benchmark documents (verdict unaffected):
 
 | Scenario | Live behavior | Gap |
 |----------|---------------|-----|
-| `count-vs-spend` | `2 bikes for $125 total` yields only the spend View (run 1) or abstains on both (run 2); no separate `count=2` View | menhir does not co-extract a count and a SUM from one compound sentence |
-| `negative-correction` | `Not 25 anymore, it is 20` does NOT supersede; movies stays 25 | the correction resolver's connective rule does not recognize the `Not X anymore, it is Y` phrasing |
+| `count-vs-spend` | `2 bikes for $125 total` yields only the spend View (or abstains); no separate `count=2` View | menhir does not co-extract a count and a SUM from one compound sentence |
 
-These are **consumer** gaps (extraction / correction-binding), not producer work — candidates for
-future menhir consumer improvements, out of scope while the producer is frozen. Offline smoke uses
-a fake modeling the happy F1/F2 path; the live run above is the source of truth for current behavior.
+#### Fixed (2026-07-07): negative-correction
+
+`Not 25 anymore, it is 20` previously did NOT supersede (the resolver's connective rule missed the
+`not OLD anymore, ...` phrasing, so the stale View survived). Fixed in menhir by adding a targeted
+`not OLD (anymore|any longer)[,] <conn> NEW` pattern (still precision-first: requires a connective,
+and the unique-value-match safety net means a detection can only re-value a View that already holds
+`old`). Confirmed live: the scenario flipped **DIVERGES -> PASS** on both runs, so it was promoted
+to a gate. The remaining `count-vs-spend` gap is a candidate for future menhir consumer work;
+producer stays frozen.
 
 ## Offline smoke (CI-safe)
 

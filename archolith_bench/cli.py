@@ -837,7 +837,11 @@ def _run_phase3_harness(args: argparse.Namespace, adapter) -> None:  # noqa: ANN
         sys.exit(1)
 
     print(f"Harness: {adapter.name} — live Phase 3 consolidation against {args.menhir_url}")
-    client = Phase3MenhirClient(args.menhir_url, api_key=API_KEY)
+    # Menhir's bearer (agent tier) is NOT the upstream LLM key. Prefer the menhir key envs so the
+    # run works against an auth-enabled instance; fall back to API_KEY (empty => auth-disabled OK).
+    menhir_key = os.getenv("MENHIR_AGENT_KEY") or os.getenv("MENHIR_API_KEY") or API_KEY
+    print(f"  auth: {'bearer set' if menhir_key else 'no key (expects an auth-disabled instance)'}")
+    client = Phase3MenhirClient(args.menhir_url, api_key=menhir_key)
     try:
         result = run_phase3(
             client,

@@ -1,5 +1,15 @@
 # archolith-bench Changelog
 
+## 2026-07-07 — Menhir command group and launch evidence hygiene
+
+**feat(menhir):** Added a first-class `archolith-bench menhir` command group with `list`, `smoke`, R1/R2/R3/oracle/intent/L4/R5 runners, LongMemEval aliasing, and extraction-model benchmarking under one product-facing surface.
+
+**feat(evidence):** Added a capability registry and shared evidence publisher so suites can emit tracked artifacts with command, commit, source, provider/model, caveats, metric rows, and public-copy gating.
+
+**docs(launch):** Normalized launch copy posture: active headline numbers are removed until refreshed launch evidence exists, historical numbers stay retired, and stack/audit/proxy evidence remains gated by tracked benchmark artifacts.
+
+**test:** Added registry, evidence-publisher, and Menhir CLI smoke coverage. Verification: `python -m pytest -q` => 377 passed, 1 skipped; scoped `ruff` passed; package editable dry-run passed.
+
 ## 2026-07-05 — R2 facet: structural-facet extraction decomposed (symbols improved; files need the graph)
 
 **feat(facet):** Added snake_case + SCREAMING_SNAKE identifier rules to the deterministic `FacetExtractor` (it previously caught only PascalCase + `foo(` calls, missing bare `source_aware_floor` / `weighted_rrf` / `FLOOR_EXEMPT_SOURCES`). Symbol-extraction recall on the draft fixture rose **0.11 -> 0.55**, lifting extracted-mode F recall@5 **0.275 -> 0.425**. 60 facet tests green (added `test_extract_snake_and_screaming_symbols`).

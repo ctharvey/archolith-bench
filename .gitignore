@@ -3,6 +3,7 @@ fixtures/local/
 __pycache__/
 .pytest_cache/
 .pytest-tmp/
+.tmp/
 .env
 .checkpoint_*
 *.pyc

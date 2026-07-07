@@ -1,5 +1,8 @@
 # archolith-bench — Benchmark Results
-Generated: 2026-06-21 17:41 UTC
+Generated: 2026-07-07 04:07 UTC
+
+> **Launch-claim status:** this generated report may include historical, fixture, or local methodology runs. It is not a source of headline numbers by itself. Public claims must come from `HEADLINE-NUMBERS.md`, which currently has no active values until refreshed launch evidence exists.
+
 ## Filter Suite (archolith-filter)
 Token-savings compression ratio measured on real tool-output corpora.
 | Category | Samples | Raw Tokens | Filtered | Savings |

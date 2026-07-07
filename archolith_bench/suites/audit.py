@@ -1,8 +1,9 @@
 """Audit suite: measure MCP token-waste reduction before/after via archolith-audit.
 
 Produces a per-server token-waste BEFORE/AFTER delta from two JSON audit
-report inputs. Uses archolith_mcp_audit.comparator.compare_reports to
-compare the reports and format_delta_report for human-readable output.
+report inputs. The distribution package is `archolith-audit`; the import
+package is `archolith_mcp_audit`, and the source checkout is
+`../archolith-mcp-audit`.
 """
 
 from __future__ import annotations

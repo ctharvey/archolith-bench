@@ -808,6 +808,89 @@ def _run_industry(args: argparse.Namespace) -> None:
     )
 
 
+def _run_phase3_harness(args: argparse.Namespace, adapter) -> None:  # noqa: ANN001
+    """Drive the Menhir Phase 3 View-consolidation benchmark (live, black-box, throwaway menhir).
+
+    Not an A/B: posts :TurnEvidence, triggers consolidation, and validates Views / abstentions /
+    supersession / idempotence. Requires --menhir-url (throwaway) and --confirm-menhir-reset.
+    """
+    from .harness import (
+        Phase3MenhirClient,
+        assert_not_production,
+        phase3_result_to_dict,
+        run_phase3,
+        write_phase3_evidence,
+    )
+
+    if args.offline_fixture is not None:
+        print("ERROR: menhir-phase3 has no offline mode; it needs a live throwaway --menhir-url",
+              file=sys.stderr)
+        sys.exit(1)
+    if not args.menhir_url:
+        print("ERROR: menhir-phase3 needs --menhir-url (a throwaway menhir instance)",
+              file=sys.stderr)
+        sys.exit(1)
+    assert_not_production(args.menhir_url)
+    if not args.confirm_menhir_reset:
+        print("ERROR: menhir-phase3 writes to and tears down a throwaway namespace; "
+              "pass --confirm-menhir-reset", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Harness: {adapter.name} — live Phase 3 consolidation against {args.menhir_url}")
+    client = Phase3MenhirClient(args.menhir_url, api_key=API_KEY)
+    try:
+        result = run_phase3(
+            client,
+            cases=adapter.cases(),
+            k=3,
+            reset_confirmed=args.confirm_menhir_reset,
+            menhir_url=args.menhir_url,
+            model=args.model,
+        )
+    finally:
+        client.close()
+
+    print(f"\n{adapter.name}: verdict={'PASS' if result.verdict else 'FAIL'}  "
+          f"namespace={result.namespace}")
+    for cr in result.cases:
+        tail = f" — {cr.notes}" if cr.notes else ""
+        print(f"  [{'PASS' if cr.passed else 'FAIL'}] {cr.case_id} ({cr.kind}){tail}")
+    m = result.metrics
+    print(f"  views_current={m['views_current']} superseded={m['views_superseded']} "
+          f"abstentions={m['abstentions']} supersessions={m['supersessions_applied']} "
+          f"wrong_view_writes={m['wrong_view_writes']} silent_abstentions={m['silent_abstentions']} "
+          f"duplicate_writes={m['duplicate_writes_on_rerun']}")
+
+    suffix = "json" if args.format == "json" else "md"
+    out_path = args.out or (args.output_dir / f"harness_{adapter.benchmark_id}.{suffix}")
+    write_phase3_evidence(result, out_path, output_format=args.format)
+    print(f"  Evidence written to {out_path}")
+
+    result_data = phase3_result_to_dict(result)
+    _publish_cli_evidence(
+        args,
+        title=f"Harness evidence: {adapter.name}",
+        product="menhir",
+        ability="Phase 3 personal-memory View consolidation",
+        fixture_or_live_source=args.menhir_url,
+        model_provider=args.model,
+        environment_caveats=[
+            "Phase 3 is a live black-box integration test against a throwaway menhir + Neo4j.",
+            "The producer (host lifecycle triage) is frozen; fixtures encode its verdicts.",
+            "Public launch copy requires current tracked launch evidence.",
+        ],
+        metric_rows=[
+            {"metric": key, "value": value}
+            for key, value in m.items()
+            if not isinstance(value, (list, dict))
+        ],
+        artifact=result_data,
+    )
+
+    if not result.verdict:
+        sys.exit(1)
+
+
 def _run_harness(args: argparse.Namespace) -> None:
     from .harness import (
         ADAPTERS,
@@ -822,6 +905,7 @@ def _run_harness(args: argparse.Namespace) -> None:
         get_adapter,
         is_external,
         is_memory,
+        is_phase3,
         run_ab,
         run_external_ab,
         run_memory_ab,
@@ -831,7 +915,14 @@ def _run_harness(args: argparse.Namespace) -> None:
     if args.list_adapters:
         print("Available harness adapters:")
         for bid, adapter in sorted(ADAPTERS.items()):
-            kind = "memory" if is_memory(adapter) else ("external-cli" if is_external(adapter) else "in-process")
+            if is_phase3(adapter):
+                kind = "phase3"
+            elif is_memory(adapter):
+                kind = "memory"
+            elif is_external(adapter):
+                kind = "external-cli"
+            else:
+                kind = "in-process"
             print(f"  {bid}  ({adapter.name}) [{kind}]")
         return
 
@@ -844,6 +935,10 @@ def _run_harness(args: argparse.Namespace) -> None:
     except KeyError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
+
+    if is_phase3(adapter):
+        _run_phase3_harness(args, adapter)
+        return
 
     arms = [a.strip() for a in args.arms.split(",") if a.strip()]
     offline = args.offline_fixture is not None

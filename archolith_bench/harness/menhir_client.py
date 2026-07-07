@@ -244,3 +244,104 @@ class HttpMenhirClient:
     def close(self) -> None:
         """Close the underlying HTTP client."""
         self._client.close()
+
+
+class Phase3MenhirClient(HttpMenhirClient):
+    """HTTP client for the Phase 3 (personal-memory View consolidation) black-box surface.
+
+    Exercises the SELECTIVE-capture pipeline end to end against a THROWAWAY menhir:
+    post `:TurnEvidence` (not `/api/memory` episodes), trigger consolidation, then inspect
+    Views / abstention receipts / supersession — without importing menhir or issuing Cypher.
+    Uses the endpoints added in menhir's routes.py:
+
+        POST /api/turn-evidence     capture one candidate user turn
+        POST /api/phase3/run        run one consolidation pass over a namespace
+        GET  /api/phase3/status     dirty flag + turn-evidence count
+        GET  /api/views             current counter Views (+ history) and abstention receipts
+        POST /api/phase3/reset      tear down the namespace (partition + TurnEvidence)
+    """
+
+    def post_turn_evidence(
+        self,
+        namespace: str,
+        text: str,
+        *,
+        role: str = "user",
+        declarant: str = "user",
+        session_id: str | None = None,
+        source_kind: str = "archolith-bench-phase3",
+        triage_reason: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        turn_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Capture one candidate user turn as `:TurnEvidence`.
+
+        `declarant="user"` is required for Phase 3 to consider the turn — the dirty query and
+        the user-evidence loader both filter `role='user' AND declarant='user'`. Returns the
+        raw response ``{turn_id, created, recorded_at}``.
+        """
+        url = self._base_url.rstrip("/") + "/api/turn-evidence"
+        payload: dict[str, Any] = {
+            "text": text,
+            "role": role,
+            "declarant": declarant,
+            "namespace": namespace,
+            "source_kind": source_kind,
+        }
+        if session_id is not None:
+            payload["session_id"] = session_id
+        if triage_reason is not None:
+            payload["triage_reason"] = list(triage_reason)
+        if metadata is not None:
+            payload["metadata"] = metadata
+        if turn_key is not None:
+            payload["turn_key"] = turn_key
+        response = self._client.post(url, json=payload, headers=self._headers)
+        response.raise_for_status()
+        return response.json()
+
+    def run_phase3(
+        self, namespace: str, *, k: int = 3, source: str = "perception"
+    ) -> dict[str, Any]:
+        """Run one consolidation pass over ``namespace`` and return its metrics dict."""
+        url = self._base_url.rstrip("/") + "/api/phase3/run"
+        response = self._client.post(
+            url, json={"namespace": namespace, "k": k, "source": source}, headers=self._headers
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def phase3_status(self, namespace: str) -> dict[str, Any]:
+        """Return ``{namespace, dirty, turn_evidence}`` for the namespace."""
+        url = self._base_url.rstrip("/") + "/api/phase3/status"
+        response = self._client.get(
+            url, params={"namespace": namespace}, headers=self._headers
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def fetch_views(self, namespace: str, *, limit: int = 100) -> dict[str, Any]:
+        """Return ``{namespace, count, views, receipts}`` — current counter Views (each with
+        ``history`` and ``superseded``) plus ``subject='perception'`` abstention receipts."""
+        url = self._base_url.rstrip("/") + "/api/views"
+        response = self._client.get(
+            url, params={"namespace": namespace, "limit": limit}, headers=self._headers
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def reset_phase3(self, namespace: str) -> dict[str, Any]:
+        """Full teardown: graphiti partition (Views + watermark) and namespace-keyed TurnEvidence.
+
+        Returns ``{namespace, nodes_deleted, turn_evidence_deleted}``. Best-effort: a first-run
+        teardown of a fresh namespace may 400/404, which is fine.
+        """
+        url = self._base_url.rstrip("/") + "/api/phase3/reset"
+        try:
+            response = self._client.post(
+                url, params={"namespace": namespace}, headers=self._headers
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception:
+            return {"namespace": namespace, "nodes_deleted": 0, "turn_evidence_deleted": 0}

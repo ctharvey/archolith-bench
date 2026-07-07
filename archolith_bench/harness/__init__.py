@@ -42,7 +42,17 @@ from .memory_ab import (
     assert_not_production,
     run_memory_ab,
 )
-from .menhir_client import HttpMenhirClient, StubMenhirClient
+from .menhir_client import HttpMenhirClient, Phase3MenhirClient, StubMenhirClient
+from .menhir_phase3 import (
+    MenhirPhase3Adapter,
+    Phase3Case,
+    Phase3Result,
+    default_phase3_cases,
+    is_phase3,
+    phase3_result_to_dict,
+    run_phase3,
+    write_phase3_evidence,
+)
 from .scoring import LLMJudgeScorer
 
 # Registry of available real-harness adapters, keyed by benchmark_id (the one roof).
@@ -58,6 +68,7 @@ ADAPTERS: dict[str, object] = {
         CyberSecEvalAdapter(),
         AgentDojoAdapter(),
         MtebAdapter(),
+        MenhirPhase3Adapter(),
     )
 }
 
@@ -101,7 +112,16 @@ __all__ = [
     "MemoryCheckpoint",
     "MemoryQAAdapter",
     "MenhirClient",
+    "MenhirPhase3Adapter",
     "MtebAdapter",
+    "Phase3Case",
+    "Phase3MenhirClient",
+    "Phase3Result",
+    "default_phase3_cases",
+    "is_phase3",
+    "phase3_result_to_dict",
+    "run_phase3",
+    "write_phase3_evidence",
     "checkpoint_path_for",
     "NO_MEMORY",
     "StubMenhirClient",

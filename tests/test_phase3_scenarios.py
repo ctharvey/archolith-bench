@@ -180,6 +180,38 @@ def test_gate_failure_fails_suite_verdict():
     assert suite_verdict(results) is False
 
 
+def test_phase3_client_post_carries_provenance():
+    # The live Phase3MenhirClient must send additive source_client/hook_version provenance
+    # (menhir stores them; older builds ignore unknown body fields).
+    from archolith_bench.harness import Phase3MenhirClient
+
+    class _Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"turn_id": "t", "created": True, "recorded_at": "now"}
+
+    captured = {}
+
+    class _Inner:
+        def post(self, url, json=None, headers=None):  # noqa: A002
+            captured["url"] = url
+            captured["json"] = json
+            return _Resp()
+
+        def close(self):
+            pass
+
+    client = Phase3MenhirClient("http://localhost:9")
+    client._client = _Inner()
+    client.post_turn_evidence("ns", "I have 25 movies on my watch list.", triage_reason=["number"])
+    assert captured["url"].endswith("/api/turn-evidence")
+    assert captured["json"]["source_client"] == "archolith_bench"
+    assert captured["json"]["hook_version"] == "menhir-phase3-bench-v1"
+    assert captured["json"]["text"].startswith("I have 25")
+
+
 def test_scenario_result_serializable():
     client = ScenarioFakeClient()
     results = run_scenario_suite(client, base_namespace="scn-json")

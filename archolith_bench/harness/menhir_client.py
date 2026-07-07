@@ -270,6 +270,8 @@ class Phase3MenhirClient(HttpMenhirClient):
         declarant: str = "user",
         session_id: str | None = None,
         source_kind: str = "archolith-bench-phase3",
+        source_client: str | None = "archolith_bench",
+        hook_version: str | None = "menhir-phase3-bench-v1",
         triage_reason: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
         turn_key: str | None = None,
@@ -279,6 +281,10 @@ class Phase3MenhirClient(HttpMenhirClient):
         `declarant="user"` is required for Phase 3 to consider the turn — the dirty query and
         the user-evidence loader both filter `role='user' AND declarant='user'`. Returns the
         raw response ``{turn_id, created, recorded_at}``.
+
+        `source_client`/`hook_version` are additive provenance labels the menhir route accepts
+        (older menhir builds simply ignore unknown body fields). They identify the benchmark as the
+        producer of these throwaway evidence rows.
         """
         url = self._base_url.rstrip("/") + "/api/turn-evidence"
         payload: dict[str, Any] = {
@@ -288,6 +294,10 @@ class Phase3MenhirClient(HttpMenhirClient):
             "namespace": namespace,
             "source_kind": source_kind,
         }
+        if source_client is not None:
+            payload["source_client"] = source_client
+        if hook_version is not None:
+            payload["hook_version"] = hook_version
         if session_id is not None:
             payload["session_id"] = session_id
         if triage_reason is not None:

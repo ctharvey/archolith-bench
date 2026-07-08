@@ -45,6 +45,19 @@ _SUM_TURNS = [
     ("I bought a bike for $50.", ["number", "money", "i_bought"]),
     ("I bought another bike for $75.", ["number", "money", "i_bought"]),
 ]
+
+# item 3 — SUM phrasing matrix: each variant should fold to bike SUM = 125. They stress the SAME
+# arithmetic under different surface phrasings, so a commit-rate spread across variants isolates
+# phrasing-sensitivity in the extractor / cross-check. All carry explicit prices, so the deterministic
+# SUM-grounding path (when enabled) should apply to every one.
+_R = ["number", "money", "i_bought"]
+_SUM_VARIANTS: dict[str, list[tuple[str, list[str]]]] = {
+    "two-episode": _SUM_TURNS,
+    "one-sentence": [("I bought a bike for $50 and another for $75.", _R)],
+    "worded": [("I spent 50 dollars and 75 dollars on bikes.", _R)],
+    "sequential": [("I spent $50 on a bike, then $75 on another one later.", _R)],
+    "list": [("Two bikes: $50 for one, $75 for the other.", _R)],
+}
 _COUNT_SPEND_TURNS = [
     ("I bought 2 bikes for $125 total.", ["number", "money", "i_bought"]),
 ]
@@ -75,12 +88,14 @@ def _has_receipt(views: dict, name: str) -> bool:
     return any(str(rc.get("counter", "")) == name for rc in views.get("receipts", []))
 
 
-def run_sum(client: Phase3MenhirClient, n: int, label: str, k: int) -> int:
+def _run_sum_variant(client: Phase3MenhirClient, turns, n: int, label: str, k: int) -> dict:
+    """Run one SUM phrasing variant N times; return a stats dict {committed, abstained, wrong, dup,
+    vetos}. wrong/dup are the safety invariants (must be 0)."""
     committed = abstained = wrong = dup = 0
     vetos: dict[str, int] = {}
     for i in range(n):
         ns = f"sumrate-{label}-{int(time.time())}-{i}"
-        for text, reasons in _SUM_TURNS:
+        for text, reasons in turns:
             client.post_turn_evidence(ns, text, triage_reason=reasons, session_id=f"{ns}-s")
         run = client.run_phase3(ns, k=k)
         views = client.fetch_views(ns)
@@ -102,14 +117,30 @@ def run_sum(client: Phase3MenhirClient, n: int, label: str, k: int) -> int:
             vetos[veto] = vetos.get(veto, 0) + c
         print(f"  [{i + 1}/{n}] {status:12s} views_written={run.get('views_written')} "
               f"abstained={run.get('abstained')} llm_calls={run.get('llm_calls')}")
-    rate = committed / n if n else 0.0
-    print(f"\n== {label}: N={n}  committed={committed}  abstained={abstained}  "
-          f"wrong={wrong}  dup={dup}")
-    print(f"   commit_rate={rate:.0%}  abstention_vetos={vetos or '{}'}")
-    if wrong or dup:
-        print(f"   !! SAFETY VIOLATION: wrong={wrong} dup={dup} (expected 0/0)")
-        return 1
-    return 0
+    return {"committed": committed, "abstained": abstained, "wrong": wrong, "dup": dup, "vetos": vetos}
+
+
+def run_sum(client: Phase3MenhirClient, n: int, label: str, k: int, variant: str) -> int:
+    """Run the fold-SUM commit-rate probe for one variant, or the whole matrix when variant=='all'."""
+    names = list(_SUM_VARIANTS) if variant == "all" else [variant]
+    rc = 0
+    rows: list[tuple[str, dict]] = []
+    for name in names:
+        print(f"\n--- variant '{name}' ---")
+        stats = _run_sum_variant(client, _SUM_VARIANTS[name], n, f"{label}-{name}", k)
+        rows.append((name, stats))
+        if stats["wrong"] or stats["dup"]:
+            rc = 1
+    print(f"\n== {label}: N={n} per variant ==")
+    print(f"  {'variant':<14} {'commit':>7} {'abstain':>8} {'wrong':>6} {'dup':>4}  vetos")
+    for name, s in rows:
+        rate = s["committed"] / n if n else 0.0
+        flag = "  !! SAFETY" if (s["wrong"] or s["dup"]) else ""
+        print(f"  {name:<14} {s['committed']}/{n}={rate:>3.0%} {s['abstained']:>8} "
+              f"{s['wrong']:>6} {s['dup']:>4}  {s['vetos'] or '{}'}{flag}")
+    if rc:
+        print("  !! SAFETY VIOLATION: wrong/dup > 0 (expected 0/0)")
+    return rc
 
 
 def run_count_spend(client: Phase3MenhirClient, n: int, label: str, k: int) -> int:
@@ -144,6 +175,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--menhir-url", required=True,
                    help="Throwaway menhir base URL (e.g. http://127.0.0.1:8099). NEVER a default.")
     p.add_argument("--fixture", choices=("sum", "count-spend"), default="sum")
+    p.add_argument("--variant", choices=(*_SUM_VARIANTS, "all"), default="two-episode",
+                   help="SUM phrasing variant (fixture=sum). 'all' runs the whole phrasing matrix.")
     p.add_argument("--n", type=int, default=10, help="Iterations (fresh namespace each)")
     p.add_argument("--label", default="probe", help="Label prefix for the throwaway namespaces")
     p.add_argument("--k", type=int, default=3, help="Consolidation k (self-consistency samples)")
@@ -152,12 +185,13 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
 
     key = args.api_key or os.getenv("MENHIR_AGENT_KEY") or os.getenv("MENHIR_API_KEY") or ""
-    print(f"probe fold-SUM/count-spend against {args.menhir_url}  fixture={args.fixture}  "
+    extra = f"  variant={args.variant}" if args.fixture == "sum" else ""
+    print(f"probe fold-SUM/count-spend against {args.menhir_url}  fixture={args.fixture}{extra}  "
           f"auth={'bearer set' if key else 'no key (auth-disabled instance)'}")
     client = Phase3MenhirClient(args.menhir_url, api_key=key)
     try:
         if args.fixture == "sum":
-            return run_sum(client, args.n, args.label, args.k)
+            return run_sum(client, args.n, args.label, args.k, args.variant)
         return run_count_spend(client, args.n, args.label, args.k)
     finally:
         close = getattr(client, "close", None)

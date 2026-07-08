@@ -1,5 +1,15 @@
 # archolith-bench Changelog
 
+## 2026-07-08 — SUM phrasing matrix + cross-check-quality live evidence
+
+**feat(probe):** `scripts/probe_phase3_sum_rate.py` gains a SUM **phrasing matrix** — `--variant`
+selects among `two-episode`/`one-sentence`/`worded`/`sequential`/`list` (all fold to bike SUM=125), or
+`all` runs the whole matrix with a per-variant commit-rate/wrong/dup/veto table. Used to characterize
+menhir's deterministic SUM-grounding OFF vs ON: the cross-check-dominated variants jumped 40%->90-100%
+with `wrong_view_writes=0` across OFF + 2x ON, so the win was promoted to menhir's default. Evidence
+appended to `benchmarks/menhir-phase3-view-consolidation-2026-07-07.md`. No benchmark logic changed
+beyond the additive probe variants.
+
 ## 2026-07-08 — Repeatable Phase 3 live-characterization tooling
 
 **feat(menhir-phase3):** Made the live consumer characterization reproducible on demand (it had been

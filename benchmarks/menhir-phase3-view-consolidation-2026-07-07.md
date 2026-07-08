@@ -201,6 +201,31 @@ detected, only the spend side was a candidate, and the fail-closed is now legibl
 the lever to investigate is the **holistic cross-check** (Lever B) variance/agreement tolerance — not
 verifier retries. Left as characterization; producer stays frozen; no consumer logic changed here.
 
+#### Cross-check-quality pack v1 (2026-07-08) — deterministic SUM grounding
+
+Acted on the lane above: menhir added deterministic SUM **arithmetic grounding**
+(`MENHIR_PERSONAL_MEMORY_SUM_GROUNDING`). "Arithmetic is not a belief" — when a SUM's amounts are each
+an explicit price literally in the source span, prove `50+75=125` deterministically and skip the noisy
+holistic cross-check (the sharper verifier still audits membership). Measured with the extended probe's
+SUM **phrasing matrix** (`scripts/probe_phase3_sum_rate.py --fixture sum --variant all`), OFF vs ON,
+N=5/variant (ON run 2x):
+
+| variant | OFF commit | ON commit (2x, n=10) | wrong (all runs) |
+|---------|-----------|----------------------|------------------|
+| two-episode  | 40%  | **100%** (10/10) | 0 |
+| one-sentence | 40%  | **90%** (9/10)   | 0 |
+| worded       | 100% | 90%              | 0 |
+| sequential   | 100% | 100%             | 0 |
+| list         | 60%  | 40%              | 0 |
+
+**`wrong_view_writes=0` in every cell across OFF + 2x ON** — the promotion gate. The
+cross-check-dominated variants (`two-episode`, `one-sentence`) jump from 40% to 90-100%; the win was
+promoted to menhir's default. Mechanism confirmed via `llm_calls`: grounded commits skip the holistic
+call (7->6) and rescue the OFF holistic-veto abstentions (llm_calls=4). The `worded`/`one-sentence`
+single dips are `self_consistency` (veto-1, upstream of grounding — noise); `list` is high-variance on
+`count_floor`/`verification` (a separate extraction gap grounding doesn't touch). Real `:8090`
+untouched. Reproduce via `RUNBOOK-phase3-live-characterization.md` + `--variant all`.
+
 ## Offline smoke (CI-safe)
 
 `archolith-bench harness menhir-phase3 --offline-fixture stub` runs the **full** driver + scenario

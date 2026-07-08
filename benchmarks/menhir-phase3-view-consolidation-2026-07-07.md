@@ -105,18 +105,23 @@ never fail the verdict.
 | `currency-worded-sum` | gate | `50 dollars and 75 dollars` folds to `bike_spend = 125` |
 | `multi-namespace` | gate | identical fixtures in two namespaces capture independently |
 | `negative-correction` | gate | `Not 25 anymore, it is 20` supersedes via the connective rule |
+| `arrow-correction` | gate | `changed it to 20 from 25` supersedes via the reverse from/to connective |
 | `count-vs-spend` | characterization | `2 bikes for $125` -> count(2) and spend(125) do not merge |
 
 `count-vs-spend` stays characterization (non-gate) because whether menhir co-extracts a count and
 a sum from one compound sentence is still what the benchmark is there to *measure*.
 `negative-correction` was **promoted to a gate** (2026-07-07) once menhir's correction resolver
 gained the `not OLD anymore, it is NEW` pattern — it now guards that binding against regression.
+`arrow-correction` was **promoted to a gate** (2026-07-08, consumer-quality-pack v1) once the
+resolver gained the ASCII-arrow (`25 -> 20`) and reverse (`to 20 from 25`) connectives.
 
 ### Live results (2 runs against throwaway menhir)
 
-All **4 gate scenarios PASS** both runs (ambiguous-correction abstains, currency-SUM folds to 125,
-multi-namespace independent, negative-correction supersedes 25 -> 20); overall **verdict PASS**,
-safety invariants clean. The remaining characterization scenario **DIVERGES** consistently — one
+All **4 then-existing gate scenarios PASS** both runs (ambiguous-correction abstains, currency-SUM
+folds to 125, multi-namespace independent, negative-correction supersedes 25 -> 20); overall
+**verdict PASS**, safety invariants clean. (The 5th gate, `arrow-correction`, was added later in
+consumer-quality-pack v1 and is offline-verified only — pending a live 2x run.) The remaining
+characterization scenario **DIVERGES** consistently — one
 real, reproducible consumer gap the benchmark documents (verdict unaffected):
 
 | Scenario | Live behavior | Gap |
@@ -133,6 +138,30 @@ and the unique-value-match safety net means a detection can only re-value a View
 to a gate. The remaining `count-vs-spend` gap is a candidate for future menhir consumer work;
 producer stays frozen.
 
+#### Consumer-quality-pack v1 (2026-07-08)
+
+Menhir-side consumer changes landed under `feat/phase3-consumer-quality-pack-v1`, governed by the
+invariant **a wrong current-state View is worse than a miss** (no change loosens precision):
+
+- **count-vs-spend (safety-only, DECISION 1).** Menhir added a deterministic `count_spend_compound`
+  detector and a `count_vs_spend_partial` observability receipt: when a `bought N <noun> for $M`
+  clause commits only one of {count, spend}, the fail-closed is now *legible* instead of a silent
+  miss. No View is written and nothing merges — so `count-vs-spend` **stays characterization**, not a
+  gate. Whether the extractor co-extracts both remains the stochastic gap this scenario measures.
+- **fold-SUM stochasticity.** Opt-in `verify_retries` (default 0 = unchanged) re-runs the full
+  k-sample verifier vote up to `1+retries` times, committing as soon as one attempt clears — each
+  attempt keeps the same unanimity bar, so a flaky-but-correct SUM gets more chances without lowering
+  precision. Verifier **receipt clarity**: a fail-closed SUM now carries `verify_votes`/`verify_k`/
+  `verify_attempts` (how close the audit was) into the decision trail.
+- **correction phrasings.** Resolver gained arrow (`25 -> 20`), reverse (`to 20 from 25`), and
+  replacement (`20 replaces 25` / `25 replaced by 20`) connectives — all precision-first behind the
+  unique-value-match net. `arrow-correction` promoted to a gate (above).
+
+**Verification status:** all menhir unit tests + this offline scenario suite (6 scenarios, gate PASS,
+invariants clean) pass. The **stochastic effectiveness of count-vs-spend co-extraction and the
+verify_retries recovery rate is NOT yet measured live** (no throwaway menhir on :8099 this session) —
+they remain **characterization pending a live 2x run**. Real `:8090` untouched.
+
 ## Offline smoke (CI-safe)
 
 `archolith-bench harness menhir-phase3 --offline-fixture stub` runs the **full** driver + scenario
@@ -145,10 +174,11 @@ server-side extraction defects or the fold-SUM stochasticity.
 ## Verification
 
 - menhir route tests: **21/21** (`tests/test_api_routes.py`, incl. `TestPhase3` +7).
-- archolith-bench: **391 passed** full suite; core driver tests **9/9**
+- archolith-bench: full suite passing; core driver tests **9/9**
   (`tests/test_menhir_phase3.py`, incl. namespace-scoped `turn_key` regression) + scenario/offline
-  tests **10/10** (`tests/test_phase3_scenarios.py`, incl. gate/characterization split, the shipped
-  `StubPhase3Client`, and the offline CLI smoke). Ruff clean.
+  tests **12/12** (`tests/test_phase3_scenarios.py`, incl. gate/characterization split, the shipped
+  `StubPhase3Client`, and the offline CLI smoke; 6 scenarios after the `arrow-correction` gate).
+  Ruff clean.
 
 ## Reproduce
 

@@ -72,6 +72,9 @@ class ScenarioFakeClient:
             return (25.0, 20.0)
         if "not 25 anymore, it is 20" in p and self.negative_correction_binds:
             return (25.0, 20.0)
+        # consumer-quality-pack v1 additions: arrow ("25 -> 20") and reverse ("to 20 from 25").
+        if "25 -> 20" in p or "to 20 from 25" in p:
+            return (25.0, 20.0)
         return None
 
     def fetch_views(self, namespace: str, *, limit: int = 100) -> dict:
@@ -108,10 +111,11 @@ def test_default_scenarios_shape():
     ids = {s.scenario_id for s in scenarios}
     assert ids == {
         "ambiguous-correction", "currency-worded-sum", "count-vs-spend",
-        "negative-correction", "multi-namespace",
+        "negative-correction", "arrow-correction", "multi-namespace",
     }
     # count-vs-spend is the only remaining characterization (non-gate) scenario; negative-correction
-    # was promoted to a gate once menhir's correction resolver handled the "not OLD anymore" form.
+    # and arrow-correction were promoted to gates once menhir's correction resolver handled the
+    # "not OLD anymore" and arrow / reverse from-to forms.
     non_gate = {s.scenario_id for s in scenarios if not s.gate}
     assert non_gate == {"count-vs-spend"}
 
@@ -263,4 +267,4 @@ def test_cli_offline_menhir_phase3_smoke(tmp_path):
     data = json.loads(out.read_text(encoding="utf-8"))
     assert data["verdict"] == "pass"
     assert data["scenario_suite"]["gate_passed"] is True
-    assert len(data["scenario_suite"]["scenarios"]) == 5
+    assert len(data["scenario_suite"]["scenarios"]) == 6

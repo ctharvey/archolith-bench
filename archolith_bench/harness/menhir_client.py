@@ -450,7 +450,12 @@ class StubPhase3Client:
 
     def _correction(self, prompt: str) -> tuple[float, float] | None:
         p = prompt.lower()
+        # mirrors menhir's correction_resolver connectives (the happy consumer): the "X, not Y" and
+        # "not X anymore, it is Y" forms, plus the consumer-quality-pack additions (arrow "X -> Y" and
+        # reverse "to Y from X"). Value-match against an existing View is still the real target guard.
         if "20, not 25" in p or "not 25 anymore, it is 20" in p:
+            return (25.0, 20.0)
+        if "25 -> 20" in p or "25 --> 20" in p or "to 20 from 25" in p:
             return (25.0, 20.0)
         return None
 

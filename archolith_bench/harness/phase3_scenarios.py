@@ -331,6 +331,21 @@ def default_scenarios() -> list[Scenario]:
             ),
             gate=True,
         ),
+        # 4b. Arrow / reverse correction phrasing: the consumer-quality-pack v1 added the ASCII-arrow
+        #     ("25 -> 20") and reverse "to NEW from OLD" connectives to menhir's correction resolver.
+        #     Promoted to a GATE (like negative-correction was) so those new bindings can't regress.
+        Scenario(
+            scenario_id="arrow-correction",
+            description="'changed it to 20 from 25' supersedes via the reverse from/to connective",
+            phases=(
+                (Post("arr-movies", "I have 25 movies on my watch list.", "stated_measure"),),
+                (Post("arr-corr", "Changed it to 20 from 25.", "correction"),),
+            ),
+            assertions=(
+                Assertion("superseded", "movies 25 -> 20 via reverse from/to", _MOVIES, 20.0, 25.0),
+            ),
+            gate=True,
+        ),
         # 5. Multi-namespace re-run: identical fixtures in two namespaces capture independently
         #    (the namespace-scoped turn_key regression, exercised across silos).
         Scenario(

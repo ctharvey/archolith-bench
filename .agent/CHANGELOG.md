@@ -1,5 +1,18 @@
 # archolith-bench Changelog
 
+## 2026-07-08 — Phase 3 arrow-correction gate (consumer-quality-pack v1)
+
+**feat(menhir-phase3):** Promoted a newly-hardened menhir correction phrasing to a permanent gate.
+`phase3_scenarios.py` adds the `arrow-correction` gate scenario (`"Changed it to 20 from 25."` ->
+supersede 25 -> 20 via menhir's new arrow/reverse connectives), mirroring the negative-correction
+promotion precedent. `StubPhase3Client._correction` (offline model of the happy consumer) and the
+scenario suite's `ScenarioFakeClient` learned the arrow (`25 -> 20`) and reverse (`to 20 from 25`)
+phrasings so the offline smoke models them. `count-vs-spend` stays **characterization** (menhir's
+count-vs-spend change was safety-only: a legible `count_vs_spend_partial` receipt, not co-extraction).
+Evidence doc updated with the consumer-quality-pack v1 section and honest "pending live 2x" status for
+the stochastic items (no throwaway menhir on :8099 this session; real `:8090` untouched).
+`tests/test_phase3_scenarios.py`: scenario-set ids + offline scenario count updated to 6 (12/12 pass).
+
 ## 2026-07-07 — Menhir command group and launch evidence hygiene
 
 **feat(menhir):** Added a first-class `archolith-bench menhir` command group with `list`, `smoke`, R1/R2/R3/oracle/intent/L4/R5 runners, LongMemEval aliasing, and extraction-model benchmarking under one product-facing surface.

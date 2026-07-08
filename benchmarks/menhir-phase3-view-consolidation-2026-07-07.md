@@ -158,9 +158,48 @@ invariant **a wrong current-state View is worse than a miss** (no change loosens
   unique-value-match net. `arrow-correction` promoted to a gate (above).
 
 **Verification status:** all menhir unit tests + this offline scenario suite (6 scenarios, gate PASS,
-invariants clean) pass. The **stochastic effectiveness of count-vs-spend co-extraction and the
-verify_retries recovery rate is NOT yet measured live** (no throwaway menhir on :8099 this session) —
-they remain **characterization pending a live 2x run**. Real `:8090` untouched.
+invariants clean) pass. Live characterization results below.
+
+#### Live characterization (2026-07-08, throwaway menhir :8099, gpt-4o-mini)
+
+Ran against a throwaway menhir on `:8099` (bench Neo4j on bolt 7688, `docker-compose.benchmark.yml`;
+real `:8090` untouched, no 429s). Two questions: does `verify_retries` improve the fold-SUM commit
+rate, and does the `count_vs_spend_partial` receipt fire live.
+
+**Full phase3 suite — 3 live runs (2× at retries=0, 1× at retries=1):** verdict **PASS** every run;
+core `phase3-bike-sum` committed; all 5 gate scenarios PASS (incl. the new `arrow-correction`);
+`count-vs-spend` DIVERGES (characterization, as designed); safety invariants
+`wrong_view_writes=0 silent_abstentions=0 duplicate_writes=0` every run.
+
+**Focused fold-SUM commit-rate probe** (fresh namespace per iteration, 2-purchase `bike_spend`
+fixture that should fold to SUM=125, N=10 each):
+
+| verify_retries | commit rate (=125) | wrong writes | duplicate writes | abstention veto |
+|----------------|--------------------|--------------|------------------|-----------------|
+| 0 (baseline)   | 5/10 (50%)         | 0            | 0                | `cross_check` ×5 |
+| 1              | 5/10 (50%)         | 0            | 0                | `cross_check` ×5 |
+
+**Finding — `verify_retries` does NOT help this fixture, and the mechanism is decisive (not a
+sample-size artifact):** every abstention fired on `perception_abstained_cross_check` (Lever B, the
+holistic second derivation) with `llm_calls=4` — i.e. the pipeline stopped at the cross-check gate,
+*before* the verifier (Lever C4) ever ran (a commit reaches `llm_calls=7`). Since `verify_retries`
+only re-runs the verifier, it is structurally unable to rescue a `cross_check` abstention — there is
+nothing downstream to retry. `retries=2` would be identical for the same reason. The fold-SUM
+stochasticity here is dominated by holistic-cross-check variance, not verifier variance.
+
+**Decision (per the pack's decision tree — "if retries mostly don't help, leave default 0"):**
+`MENHIR_PERSONAL_MEMORY_VERIFY_RETRIES` default stays **0**. The knob is wired (opt-in) for future
+manual tuning but is **not enabled**. The receipt-clarity fields (`verify_votes`/`verify_k`/
+`verify_attempts`) and the `count_vs_spend_partial` receipt are retained — they are the durable value.
+
+**`count_vs_spend_partial` receipt — confirmed live.** A `"bought 2 bikes for $125 total"` turn
+consolidated with `views_written=0, abstained=1`; the namespace's receipts carried
+`count_vs_spend_partial=1.0` alongside `perception_abstained_cross_check=1.0` — the compound was
+detected, only the spend side was a candidate, and the fail-closed is now legible (no wrong write).
+
+**Future consumer lane (documented, out of scope here):** if fold-SUM commit rate becomes a priority,
+the lever to investigate is the **holistic cross-check** (Lever B) variance/agreement tolerance — not
+verifier retries. Left as characterization; producer stays frozen; no consumer logic changed here.
 
 ## Offline smoke (CI-safe)
 

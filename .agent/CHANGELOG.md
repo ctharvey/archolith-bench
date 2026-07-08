@@ -1,5 +1,18 @@
 # archolith-bench Changelog
 
+## 2026-07-08 — Repeatable Phase 3 live-characterization tooling
+
+**feat(menhir-phase3):** Made the live consumer characterization reproducible on demand (it had been
+ad-hoc). `scripts/probe_phase3_sum_rate.py` — a committed probe that measures the fold-SUM commit rate
+(`--fixture sum`) and the `count_vs_spend_partial` receipt (`--fixture count-spend`) against a
+throwaway menhir, over N fresh namespaces (no reset needed). Reuses the tested `Phase3MenhirClient`;
+tallies abstention vetos so you can see WHICH gate is the SUM bottleneck; exits non-zero on any WRONG
+or DUPLICATE current View (doubles as a safety guard). `benchmarks/RUNBOOK-phase3-live-characterization.md`
+— the full throwaway bring-up/teardown loop (bench Neo4j via menhir's `docker-compose.benchmark.yml`,
+serve on :8099, run suite + probe, teardown) with the safety rules (never `:8090`, delete the
+key-bearing env file). Smoke-verified live: both fixtures run, `count_vs_spend_partial` fires, safety
+invariants clean, real `:8090` untouched. No consumer or benchmark logic changed.
+
 ## 2026-07-08 — Phase 3 arrow-correction gate (consumer-quality-pack v1)
 
 **feat(menhir-phase3):** Promoted a newly-hardened menhir correction phrasing to a permanent gate.

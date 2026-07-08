@@ -195,7 +195,7 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
     if audit_path.exists():
         with open(audit_path, encoding="utf-8") as f:
             audit_data = json.load(f)
-        lines.append("## Audit Suite (archolith-audit)\n")
+        lines.append("## Audit Suite (Archolith Skree)\n")
         before_p = str(audit_data.get("before_path", ""))
         after_p = str(audit_data.get("after_path", ""))
         is_sample = "fixture" in before_p.lower() or "fixture" in after_p.lower()
@@ -228,7 +228,7 @@ def write_benchmarks_md(results_dir: Path, out_path: Path) -> None:
             f"**Waste reduction:** {audit_data['waste_reduction']:,} ({audit_data['waste_reduction_pct']:.1f}%).\n\n"
         )
     else:
-        lines.append("## Audit Suite (archolith-audit)\n")
+        lines.append("## Audit Suite (Archolith Skree)\n")
         lines.append("*Pending before/after audit logs. Run `archolith-bench audit --before <log> --after <log>` to generate.*\n\n")
 
     # ---- Industry benchmark coverage ----

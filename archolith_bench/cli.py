@@ -753,7 +753,7 @@ def _run_audit(args: argparse.Namespace) -> None:
     _publish_cli_evidence(
         args,
         title="MCP audit evidence",
-        product="archolith-mcp-audit",
+        product="archolith-skree",
         ability="MCP token-waste reduction",
         fixture_or_live_source=f"before={before_path}; after={after_path}",
         model_provider="offline audit logs",

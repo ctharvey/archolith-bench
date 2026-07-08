@@ -131,7 +131,7 @@ CAPABILITIES: tuple[Capability, ...] = (
         launch_claim_rule="Compression claims require current corpus provenance and tracked aggregate evidence.",
     ),
     Capability(
-        product="archolith-mcp-audit",
+        product="archolith-skree",
         ability="MCP token-waste reduction",
         runner_command="archolith-bench audit --before <real-before.json> --after <real-after.json>",
         dependency="archolith-audit distribution (`archolith_mcp_audit`) and real before/after logs",

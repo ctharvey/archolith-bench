@@ -206,7 +206,7 @@ INDUSTRY_BENCHMARKS: tuple[IndustryBenchmark, ...] = (
     IndustryBenchmark(
         benchmark_id="helm-token-accounting",
         name="HELM-style token/cost accounting",
-        product="archolith-audit",
+        product="archolith-skree",
         suite="audit",
         authority="Stanford CRFM",
         benchmark_type="efficiency, transparency, and reproducibility reporting",
@@ -214,7 +214,7 @@ INDUSTRY_BENCHMARKS: tuple[IndustryBenchmark, ...] = (
         source_url="https://github.com/stanford-crfm/helm",
         paper_url="https://openreview.net/forum?id=iO4LZibEqW",
         rationale=(
-            "archolith-audit is not a model-quality benchmark. Its trusted external analogue is HELM's "
+            "Archolith Skree is not a model-quality benchmark. Its trusted external analogue is HELM's "
             "transparent reporting of efficiency metrics, with reproducible inputs and clear caveats."
         ),
         local_coverage=(

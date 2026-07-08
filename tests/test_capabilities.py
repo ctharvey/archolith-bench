@@ -14,7 +14,7 @@ def test_capability_registry_covers_required_products() -> None:
         "menhir",
         "archolith-context",
         "archolith-filter",
-        "archolith-mcp-audit",
+        "archolith-skree",
         "archolith-security",
     }.issubset(products)
 

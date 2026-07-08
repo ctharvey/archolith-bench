@@ -113,14 +113,14 @@ This matrix maps each Archolith product to external benchmark families that are 
 
 ### HELM-style token/cost accounting (helm-token-accounting)
 
-- Product: `archolith-audit`
+- Product: `archolith-skree`
 - Suite: `audit`
 - Authority: Stanford CRFM
 - Type: efficiency, transparency, and reproducibility reporting
 - Status: `implemented-local`
 - Source: https://github.com/stanford-crfm/helm
 - Paper: https://openreview.net/forum?id=iO4LZibEqW
-- Why relevant: archolith-audit is not a model-quality benchmark. Its trusted external analogue is HELM's transparent reporting of efficiency metrics, with reproducible inputs and clear caveats.
+- Why relevant: Archolith Skree is not a model-quality benchmark. Its trusted external analogue is HELM's transparent reporting of efficiency metrics, with reproducible inputs and clear caveats.
 - Local coverage: `archolith-bench audit` compares before/after MCP audit JSON reports and writes aggregate token and waste deltas. Current bundled fixtures are examples only.
 - Launch gate: Use real before/after session logs, not fixtures. Publish server-level deltas and note any new waste type regressions.
 - Command: `archolith-bench audit --before <real-before.json> --after <real-after.json> --format markdown`

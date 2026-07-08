@@ -18,7 +18,7 @@ def test_registry_covers_launch_products() -> None:
 
     assert "archolith-context" in products
     assert "archolith-filter" in products
-    assert "archolith-audit" in products
+    assert "archolith-skree" in products
     assert "archolith-security" in products
 
 

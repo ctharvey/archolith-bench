@@ -33,7 +33,7 @@ Multi-turn token savings, effective cost, and continuity metrics across proxy ex
 | debugging | proxy_plus_filter | default | 912 | 3,142 | -244.5% | 0.0% | N/A |
 | long_agent | proxy_plus_filter | default | 15,077 | 17,387 | -15.3% | 41.4% | N/A |
 
-## Audit Suite (archolith-audit)
+## Audit Suite (Archolith Skree)
 > **Note:** sample/fixture data, not a live audit run. The numbers below reflect the bundled `fixtures/` inputs and demonstrate the report format only. Run `archolith-bench audit` against real before/after session logs to produce measured results.
 
 MCP token-waste reduction before vs after.
@@ -61,7 +61,7 @@ Coverage matrix for external benchmark families that are relevant enough to anch
 | archolith-context | proxy | BigCodeBench-Hard | candidate-before-launch | `benchmarks/proxy-bigcodebench-hard-YYYY-MM-DD.md` |
 | archolith-filter | filter | HELM efficiency metrics | implemented-local | `benchmarks/filter-YYYY-MM-DD.md` |
 | archolith-filter | filter | SWE-bench-style agent traces | candidate-before-launch | `benchmarks/filter-swe-style-traces-YYYY-MM-DD.md` |
-| archolith-audit | audit | HELM-style token/cost accounting | implemented-local | `benchmarks/audit-live-before-after-YYYY-MM-DD.md` |
+| archolith-skree | audit | HELM-style token/cost accounting | implemented-local | `benchmarks/audit-live-before-after-YYYY-MM-DD.md` |
 | archolith-context | proxy | LongMemEval (in-context / proxy) | candidate-before-launch | `benchmarks/longmemeval-proxy-YYYY-MM-DD.md` |
 | menhir | memory | LongMemEval (persistent menhir memory) | candidate-before-launch | `benchmarks/longmemeval-menhir-YYYY-MM-DD.md` |
 | menhir | memory | Deep Memory Retrieval (DMR) | candidate-before-launch | `benchmarks/dmr-YYYY-MM-DD.md` |

@@ -1,0 +1,19 @@
+{
+  "title": "Filter suite evidence",
+  "command": "archolith-bench filter --corpora corpora/",
+  "commit": "0000000",
+  "product": "archolith-filter",
+  "ability": "tool-output compression",
+  "fixture_or_live_source": "Fixture data from corpora/sample",
+  "model_provider": "offline archolith-filter corpus",
+  "environment_caveats": [
+    "Offline fixture output demonstrates harness behavior only.",
+    "Do not use as public launch evidence."
+  ],
+  "public_copy_allowed": true,
+  "metric_rows": [
+    { "category": "test", "samples": 5, "total_raw_tokens": 10000, "total_filtered_tokens": 5000, "savings_ratio": 0.5 }
+  ],
+  "artifact": { "runs": [] },
+  "generated_at": "2026-06-15T10:00:00Z"
+}

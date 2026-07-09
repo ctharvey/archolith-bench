@@ -1,0 +1,20 @@
+{
+  "title": "Proxy suite evidence: token savings",
+  "command": "archolith-bench proxy --all --arms direct,proxy_plus_filter --budgets 15000",
+  "commit": "a1b2c3d",
+  "product": "archolith-context",
+  "ability": "context curation and continuity",
+  "fixture_or_live_source": "Live run against production proxy on 2026-07-01",
+  "model_provider": "gpt-4o-mini",
+  "environment_caveats": [
+    "Requires a running archolith-context proxy and upstream provider.",
+    "Single-turn code-review scenario with 15K budget."
+  ],
+  "public_copy_allowed": true,
+  "metric_rows": [
+    { "arm": "direct", "n": 10, "score": 0.85, "input_tokens": 150000, "output_tokens": 30000, "cost_usd": 0.15 },
+    { "arm": "proxy_plus_filter", "n": 10, "score": 0.82, "input_tokens": 60000, "output_tokens": 28000, "cost_usd": 0.06 }
+  ],
+  "artifact": { "runs": [] },
+  "generated_at": "2026-07-01T12:00:00Z"
+}

@@ -1,0 +1,534 @@
+"""Offline evidence policy validator for archolith-bench evidence safety.
+
+Validates HEADLINE-NUMBERS.md and benchmark evidence artifacts against the
+repo's public-claim policy.  No network, no model calls, no Docker.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Literal
+
+
+# ---------------------------------------------------------------------------
+# Data model
+# ---------------------------------------------------------------------------
+
+REJECTED_ACTIVE_TERMS: tuple[str, ...] = (
+    "fixture",
+    "sample",
+    "demo",
+    "historical",
+    "candidate",
+    "pending",
+    "not for copy",
+    "internal only",
+    "smoke only",
+    "offline stub",
+)
+
+PLACEHOLDER_TERMS: tuple[str, ...] = (
+    "pending",
+    "none",
+    "tbd",
+    "unknown",
+    "_none_",
+)
+
+_COMMIT_RE = re.compile(r"^[0-9a-f]{7,40}$")
+_DATE_RE = re.compile(r"^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$")
+
+REQUIRED_EVIDENCE_FIELDS: tuple[str, ...] = (
+    "title",
+    "command",
+    "commit",
+    "product",
+    "ability",
+    "fixture_or_live_source",
+    "model_provider",
+    "environment_caveats",
+    "metric_rows",
+    "artifact",
+    "public_copy_allowed",
+)
+
+HEADLINE_COLUMNS = ("Product", "Claim", "Value", "Source", "Commit", "Run date", "Notes")
+
+
+@dataclass
+class PolicyIssue:
+    severity: Literal["error", "warning"]
+    code: str
+    path: str
+    message: str
+
+
+@dataclass
+class PolicyResult:
+    ok: bool
+    errors: list[PolicyIssue] = field(default_factory=list)
+    warnings: list[PolicyIssue] = field(default_factory=list)
+    summary: dict[str, Any] = field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _make_error(code: str, path: str, message: str) -> PolicyIssue:
+    return PolicyIssue(severity="error", code=code, path=path, message=message)
+
+
+def _make_warning(code: str, path: str, message: str) -> PolicyIssue:
+    return PolicyIssue(severity="warning", code=code, path=path, message=message)
+
+
+def _is_commit_like(s: str) -> bool:
+    return bool(_COMMIT_RE.match(s.strip()))
+
+
+def _is_date_like(s: str) -> bool:
+    return bool(_DATE_RE.match(s.strip()))
+
+
+def _is_placeholder(s: str) -> bool:
+    return s.strip().lower() in PLACEHOLDER_TERMS
+
+
+def _contains_rejected_term(s: str) -> bool:
+    """Check if *s* contains any of the REJECTED_ACTIVE_TERMS."""
+    lower = s.strip().lower()
+    for term in REJECTED_ACTIVE_TERMS:
+        if term in lower:
+            return True
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Markdown table parsing
+# ---------------------------------------------------------------------------
+
+def _parse_headline_table(text: str) -> list[dict[str, str]]:
+    """Return parsed rows from the ``## Active Headline Numbers`` table.
+
+    Each row maps column name → cell value (stripped).
+    """
+    start = text.find("## Active Headline Numbers")
+    if start == -1:
+        return []
+
+    after_header = text.index("\n", start)
+    rest = text[after_header:]
+    end = rest.find("\n## ")
+    if end == -1:
+        section = rest
+    else:
+        section = rest[:end]
+
+    lines = section.strip().splitlines()
+    rows: list[dict[str, str]] = []
+    in_header = True
+    columns: list[str] = []
+
+    for line in lines:
+        raw = line.strip()
+        if not raw.startswith("|") or not raw.endswith("|"):
+            continue
+        if re.match(r"^\|[-\s|]+\|$", raw):
+            continue
+        cells = [c.strip().strip("`_").strip() for c in raw.split("|")[1:-1]]
+
+        if in_header:
+            columns = cells
+            in_header = False
+            continue
+
+        if not cells or all(c in ("", "_none_") for c in cells):
+            rows.append({col: "" for col in columns})
+            continue
+
+        row = {}
+        for i, col in enumerate(columns):
+            row[col] = cells[i] if i < len(cells) else ""
+        rows.append(row)
+
+    return rows
+
+
+# ---------------------------------------------------------------------------
+# HEADLINE-NUMBERS.md validation
+# ---------------------------------------------------------------------------
+
+def validate_headline_numbers(headline_path: Path) -> PolicyResult:
+    """Validate *HEADLINE-NUMBERS.md* active claims."""
+    result = PolicyResult(ok=True, summary={
+        "headline_active_claims": 0,
+    })
+
+    if not headline_path.exists():
+        result.ok = False
+        result.errors.append(_make_error(
+            "file_not_found", str(headline_path),
+            "HEADLINE-NUMBERS.md not found",
+        ))
+        return result
+
+    text = headline_path.read_text(encoding="utf-8")
+    rows = _parse_headline_table(text)
+
+    if not rows:
+        # No table found at all — treat as a warning but not a hard error
+        result.warnings.append(_make_warning(
+            "no_active_table", str(headline_path),
+            "No ``## Active Headline Numbers`` table found",
+        ))
+        return result
+
+    # Single placeholder row with _none_ → pass
+    # After stripping underscores, "_none_" becomes "none"; also accept "none" as product.
+    first = rows[0]
+    product_val = first.get("Product", "").strip().lower()
+    is_none = product_val in ("_none_", "none") or _is_placeholder(product_val)
+    if is_none:
+        return result
+
+    # Validate each active claim row
+    active_rows = 0
+    for i, row in enumerate(rows):
+        active_rows += 1
+        ridx = i + 1  # 1-based row number
+
+        for col in HEADLINE_COLUMNS:
+            val = row.get(col, "")
+            if col in ("Product", "Claim", "Value"):
+                if _is_placeholder(val) or not val.strip():
+                    result.ok = False
+                    result.errors.append(_make_error(
+                        "missing_claim_field", str(headline_path),
+                        f"Active headline row {ridx} column '{col}' is blank or placeholder",
+                    ))
+
+            elif col == "Source":
+                if not val.strip() or _is_placeholder(val):
+                    result.ok = False
+                    result.errors.append(_make_error(
+                        "missing_source", str(headline_path),
+                        f"Active headline row {ridx}: source is blank or placeholder",
+                    ))
+
+            elif col == "Commit":
+                if not val.strip() or _is_placeholder(val) or not _is_commit_like(val):
+                    result.ok = False
+                    result.errors.append(_make_error(
+                        "missing_commit", str(headline_path),
+                        f"Active headline row {ridx}: commit is missing or not commit-like",
+                    ))
+
+            elif col == "Run date":
+                if not val.strip() or _is_placeholder(val) or not _is_date_like(val):
+                    result.ok = False
+                    result.errors.append(_make_error(
+                        "invalid_run_date", str(headline_path),
+                        f"Active headline row {ridx}: run date is missing or not YYYY-MM-DD",
+                    ))
+
+            elif col == "Notes":
+                if not val.strip() or _is_placeholder(val):
+                    result.ok = False
+                    result.errors.append(_make_error(
+                        "missing_notes", str(headline_path),
+                        f"Active headline row {ridx}: notes are blank or placeholder",
+                    ))
+
+        for col in ("Product", "Claim", "Value", "Source", "Notes"):
+            if _contains_rejected_term(row.get(col, "")):
+                result.ok = False
+                result.errors.append(_make_error(
+                    "rejected_term_in_active_claim", str(headline_path),
+                    f"Active headline row {ridx} column '{col}' contains rejected term: "
+                    f"'{row.get(col, '')}'",
+                ))
+
+    result.summary["headline_active_claims"] = active_rows
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Evidence artifact validation
+# ---------------------------------------------------------------------------
+
+def validate_evidence_artifact(artifact_path: Path) -> PolicyResult:
+    """Validate a single evidence JSON artifact."""
+    result = PolicyResult(ok=True, summary={
+        "artifact_path": str(artifact_path),
+        "public_copy_allowed": False,
+    })
+
+    if not artifact_path.exists():
+        result.ok = False
+        result.errors.append(_make_error(
+            "file_not_found", str(artifact_path),
+            "Evidence file not found",
+        ))
+        return result
+
+    try:
+        data = json.loads(artifact_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        result.ok = False
+        result.errors.append(_make_error(
+            "malformed_json", str(artifact_path),
+            f"Malformed JSON: {e}",
+        ))
+        return result
+
+    if not isinstance(data, dict):
+        result.ok = False
+        result.errors.append(_make_error(
+            "malformed_json", str(artifact_path),
+            "Expected a JSON object at top level",
+        ))
+        return result
+
+    pc_allowed = _get_bool(data, "public_copy_allowed")
+    result.summary["public_copy_allowed"] = pc_allowed
+
+    if pc_allowed:
+        # Hard failures for missing fields
+        for field in REQUIRED_EVIDENCE_FIELDS:
+            if field == "public_copy_allowed":
+                continue
+            if field not in data or data[field] is None:
+                result.ok = False
+                result.errors.append(_make_error(
+                    "missing_field", str(artifact_path),
+                    f"public_copy_allowed=true but required field '{field}' is missing",
+                ))
+
+        if not _is_commit_like(data.get("commit", "")):
+            result.ok = False
+            result.errors.append(_make_error(
+                "missing_commit", str(artifact_path),
+                "public_copy_allowed=true but commit is missing or not commit-like",
+            ))
+
+        if not data.get("command", "").strip():
+            result.ok = False
+            result.errors.append(_make_error(
+                "missing_command", str(artifact_path),
+                "public_copy_allowed=true but command is missing",
+            ))
+
+        if not data.get("product", "").strip():
+            result.ok = False
+            result.errors.append(_make_error(
+                "missing_product", str(artifact_path),
+                "public_copy_allowed=true but product is missing",
+            ))
+
+        if not data.get("ability", "").strip():
+            result.ok = False
+            result.errors.append(_make_error(
+                "missing_ability", str(artifact_path),
+                "public_copy_allowed=true but ability is missing",
+            ))
+
+        if not data.get("fixture_or_live_source", "").strip():
+            result.ok = False
+            result.errors.append(_make_error(
+                "missing_fixture_or_live_source", str(artifact_path),
+                "public_copy_allowed=true but fixture_or_live_source is missing",
+            ))
+
+        if not data.get("model_provider", "").strip():
+            result.ok = False
+            result.errors.append(_make_error(
+                "missing_model_provider", str(artifact_path),
+                "public_copy_allowed=true but model_provider is missing",
+            ))
+
+        metric_rows = data.get("metric_rows", [])
+        if not metric_rows:
+            result.ok = False
+            result.errors.append(_make_error(
+                "empty_metric_rows", str(artifact_path),
+                "public_copy_allowed=true but metric_rows is empty",
+            ))
+
+        caveats = data.get("environment_caveats", [])
+        if not caveats:
+            result.ok = False
+            result.errors.append(_make_error(
+                "empty_caveats", str(artifact_path),
+                "public_copy_allowed=true but environment_caveats is empty",
+            ))
+
+        artifact_val = data.get("artifact")
+        if artifact_val is None:
+            result.ok = False
+            result.errors.append(_make_error(
+                "missing_artifact", str(artifact_path),
+                "public_copy_allowed=true but artifact is missing",
+            ))
+
+        # Reject fixture/sample/demo language in fixture_or_live_source and caveats
+        source = data.get("fixture_or_live_source", "")
+        if _contains_rejected_term(source):
+            result.ok = False
+            result.errors.append(_make_error(
+                "fixture_source_rejected", str(artifact_path),
+                f"public_copy_allowed=true but fixture_or_live_source contains rejected term: "
+                f"'{source}'",
+            ))
+
+        for ci, caveat in enumerate(caveats):
+            if _contains_rejected_term(caveat):
+                result.ok = False
+                result.errors.append(_make_error(
+                    "caveat_rejected_term", str(artifact_path),
+                    f"public_copy_allowed=true but environment_caveats[{ci}] contains "
+                    f"rejected term: '{caveat}'",
+                ))
+
+    else:
+        # public_copy_allowed=false: missing fields are warnings, not errors
+        for field in REQUIRED_EVIDENCE_FIELDS:
+            if field == "public_copy_allowed":
+                continue
+            if field not in data or data[field] is None:
+                result.warnings.append(_make_warning(
+                    "missing_field", str(artifact_path),
+                    f"public_copy_allowed=false: field '{field}' is missing",
+                ))
+
+        if not _is_commit_like(data.get("commit", "")):
+            result.warnings.append(_make_warning(
+                "missing_commit", str(artifact_path),
+                "public_copy_allowed=false: commit is missing or not commit-like",
+            ))
+
+    return result
+
+
+def _get_bool(data: dict, key: str) -> bool:
+    val = data.get(key)
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, str):
+        return val.strip().lower() in ("true", "1", "yes")
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Cross-check
+# ---------------------------------------------------------------------------
+
+def _cross_check_evidence_against_headline(
+    evidence_data: dict,
+    headline_rows: list[dict[str, str]],
+    artifact_path: Path,
+) -> list[PolicyIssue]:
+    """Check that ``public_copy_allowed=true`` evidence has a matching headline claim."""
+    issues: list[PolicyIssue] = []
+    if not evidence_data.get("public_copy_allowed"):
+        return issues
+
+    product = evidence_data.get("product", "").strip().lower()
+    title = evidence_data.get("title", "").strip().lower()
+    command = evidence_data.get("command", "").strip().lower()
+    path_str = str(artifact_path).strip().lower()
+
+    matched = False
+    for row in headline_rows:
+        row_product = row.get("Product", "").strip().lower()
+        row_source = row.get("Source", "").strip().lower()
+        row_claim = row.get("Claim", "").strip().lower()
+
+        if not row_product or _is_placeholder(row_product):
+            continue
+
+        if row_product != product:
+            continue
+
+        source_match = (
+            title in row_source
+            or command in row_source
+            or path_str in row_source
+        )
+        if not source_match:
+            # Also check if claim text overlaps with title
+            if title and row_claim:
+                if title in row_claim or row_claim in title:
+                    source_match = True
+
+        if source_match:
+            matched = True
+            break
+
+    if not matched:
+        issues.append(_make_warning(
+            "no_matching_headline_claim", str(artifact_path),
+            f"public_copy_allowed=true evidence for product '{product}' has no matching "
+            f"active headline claim in HEADLINE-NUMBERS.md",
+        ))
+
+    return issues
+
+
+# ---------------------------------------------------------------------------
+# Aggregate validator
+# ---------------------------------------------------------------------------
+
+def validate_policy(
+    headline_path: Path,
+    evidence_paths: list[Path],
+) -> PolicyResult:
+    """Run all policy validations and return an aggregate result."""
+    headline_result = validate_headline_numbers(headline_path)
+
+    all_errors: list[PolicyIssue] = list(headline_result.errors)
+    all_warnings: list[PolicyIssue] = list(headline_result.warnings)
+    evidence_checked = 0
+    public_copy_allowed = 0
+    public_copy_rejected = 0
+
+    headline_rows: list[dict[str, str]] = []
+    if headline_path.exists():
+        headline_rows = _parse_headline_table(headline_path.read_text(encoding="utf-8"))
+
+    for ep in evidence_paths:
+        if not ep.suffix.lower() == ".json":
+            continue
+        evidence_checked += 1
+        art_result = validate_evidence_artifact(ep)
+        all_errors.extend(art_result.errors)
+        all_warnings.extend(art_result.warnings)
+
+        if art_result.summary.get("public_copy_allowed"):
+            public_copy_allowed += 1
+            # Cross-check
+            try:
+                data = json.loads(ep.read_text(encoding="utf-8"))
+                cross_issues = _cross_check_evidence_against_headline(data, headline_rows, ep)
+                all_warnings.extend(cross_issues)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                pass
+        else:
+            public_copy_rejected += 1
+
+    ok = len(all_errors) == 0
+
+    return PolicyResult(
+        ok=ok,
+        errors=all_errors,
+        warnings=all_warnings,
+        summary={
+            "headline_active_claims": headline_result.summary.get("headline_active_claims", 0),
+            "evidence_files_checked": evidence_checked,
+            "public_copy_allowed": public_copy_allowed,
+            "public_copy_rejected": public_copy_rejected,
+        },
+    )

@@ -1,0 +1,12 @@
+{
+  "title": "Internal audit evidence",
+  "command": "archolith-bench audit --before before.json --after after.json",
+  "product": "archolith-skree",
+  "ability": "MCP token-waste reduction",
+  "fixture_or_live_source": "Internal run against staging",
+  "model_provider": "offline audit logs",
+  "environment_caveats": [],
+  "public_copy_allowed": false,
+  "metric_rows": [],
+  "artifact": {}
+}

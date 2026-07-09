@@ -77,6 +77,11 @@ def _load_pricing(args: argparse.Namespace) -> PricingModel | None:
     return None
 
 
+def _resolve_menhir_bearer_key() -> str:
+    """Resolve the Menhir bearer token with priority: MENHIR_AGENT_KEY > MENHIR_API_KEY > API_KEY."""
+    return os.getenv("MENHIR_AGENT_KEY") or os.getenv("MENHIR_API_KEY") or API_KEY or ""
+
+
 def _publish_cli_evidence(
     args: argparse.Namespace,
     *,
@@ -1006,7 +1011,9 @@ def _run_harness(args: argparse.Namespace) -> None:
                       file=sys.stderr)
                 sys.exit(1)
             assert_not_production(args.menhir_url)
-            client = HttpMenhirClient(args.menhir_url, api_key=API_KEY)
+            menhir_key = _resolve_menhir_bearer_key()
+            print(f"  auth: {'bearer set' if menhir_key else 'no key (expects an auth-disabled instance)'}")
+            client = HttpMenhirClient(args.menhir_url, api_key=menhir_key)
             send_fn = send_chat
         checkpoint = None
         if getattr(args, "resume", False):

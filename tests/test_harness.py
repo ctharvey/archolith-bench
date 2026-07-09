@@ -692,3 +692,109 @@ def test_harness_cli_external_offline(tmp_path):
     )
     assert result.returncode == 0, f"stderr: {result.stderr}"
     assert (tmp_path / "harness_swe-bench.json").exists()
+
+
+# ---- Menhir bearer key resolution ----
+
+def test_resolve_menhir_bearer_key_agent_wins(monkeypatch):
+    from archolith_bench import cli as cli_module
+    monkeypatch.setenv("MENHIR_AGENT_KEY", "agent-value")
+    monkeypatch.setenv("MENHIR_API_KEY", "api-value")
+    monkeypatch.setattr(cli_module, "API_KEY", "upstream-value")
+    assert cli_module._resolve_menhir_bearer_key() == "agent-value"
+
+
+def test_resolve_menhir_bearer_key_api_wins_when_agent_missing(monkeypatch):
+    from archolith_bench import cli as cli_module
+    monkeypatch.delenv("MENHIR_AGENT_KEY", raising=False)
+    monkeypatch.setenv("MENHIR_API_KEY", "api-value")
+    monkeypatch.setattr(cli_module, "API_KEY", "upstream-value")
+    assert cli_module._resolve_menhir_bearer_key() == "api-value"
+
+
+def test_resolve_menhir_bearer_key_fallback_to_upstream(monkeypatch):
+    from archolith_bench import cli as cli_module
+    monkeypatch.delenv("MENHIR_AGENT_KEY", raising=False)
+    monkeypatch.delenv("MENHIR_API_KEY", raising=False)
+    monkeypatch.setattr(cli_module, "API_KEY", "upstream-value")
+    assert cli_module._resolve_menhir_bearer_key() == "upstream-value"
+
+
+def test_resolve_menhir_bearer_key_empty_when_none_set(monkeypatch):
+    from archolith_bench import cli as cli_module
+    monkeypatch.delenv("MENHIR_AGENT_KEY", raising=False)
+    monkeypatch.delenv("MENHIR_API_KEY", raising=False)
+    monkeypatch.setattr(cli_module, "API_KEY", "")
+    assert cli_module._resolve_menhir_bearer_key() == ""
+
+
+def test_generic_memory_harness_passes_resolved_key(monkeypatch, tmp_path):
+    from archolith_bench import cli as cli_module
+    import argparse
+
+    monkeypatch.setenv("MENHIR_AGENT_KEY", "menhir-bearer-token")
+
+    captured_key = [None]
+
+    class FakeHttpMenhirClient:
+        def __init__(self, url, *, api_key="", **kwargs):
+            captured_key[0] = api_key
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def close(self):
+            pass
+        def new_group(self):
+            return "g-1"
+        def ingest(self, *args, **kwargs):
+            pass
+        def recall(self, *args, **kwargs):
+            return []
+        def reset(self, *args, **kwargs):
+            pass
+
+    monkeypatch.setattr("archolith_bench.harness.HttpMenhirClient", FakeHttpMenhirClient)
+    monkeypatch.setattr("archolith_bench.harness.assert_not_production", lambda url: None)
+    monkeypatch.setattr(cli_module, "send_chat", lambda *a, **kw: ("x", 1.0, {}))
+
+    class MockABResult:
+        model = "test"
+        arms = {}
+        deltas = {}
+
+    monkeypatch.setattr("archolith_bench.harness.run_memory_ab", lambda *a, **kw: MockABResult())
+    monkeypatch.setattr("archolith_bench.harness.write_harness_evidence", lambda *a, **kw: None)
+    monkeypatch.setattr("archolith_bench.harness.ab_result_to_dict", lambda *a, **kw: {})
+    monkeypatch.setattr("archolith_bench.cli._publish_cli_evidence", lambda *a, **kw: None)
+
+    args = argparse.Namespace(
+        benchmark_id="longmemeval-menhir",
+        list_adapters=False,
+        arms="menhir_recall",
+        offline_fixture=None,
+        menhir_url="http://localhost:8099",
+        model="test-model",
+        recall_limit=10,
+        confirm_menhir_reset=True,
+        dry_run_menhir_reset=False,
+        recall_only=False,
+        namespace_template="lme-{question_id}",
+        format="json",
+        output_dir=tmp_path,
+        out=None,
+        publish_evidence=None,
+        public_copy=False,
+        command_text="test",
+        scorer="containment",
+        judge_api_key="",
+        judge_model="gpt-4o-mini",
+        judge_url=None,
+        resume=False,
+        subset=None,
+        limit=None,
+    )
+
+    cli_module._run_harness(args)
+
+    assert captured_key[0] == "menhir-bearer-token"

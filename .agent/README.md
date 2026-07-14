@@ -8,6 +8,7 @@
 Unified benchmark suite for the archolith product family. Measures token savings, continuity, compression, and cross-product metrics across proxy, filter, audit, and stack scenarios.
 
 ## Suites
+- **menhir bootstrap-hygiene**: Deterministic acceptance gate for structural/recent leakage, exact workspace isolation, scoped pins, stale advisories, and off-topic/token diagnostics
 - **proxy** (Phase 1, critical path for June 30 launch): Multi-turn token savings + continuity across experiment arms
 - **filter** (Phase 2): Compression-ratio product claim on real corpora via archolith-filter
 - **stack** (Phase 3): Experimental four-way comparison (direct/filter/proxy/proxy+filter); pending refreshed live run before launch copy
@@ -23,6 +24,7 @@ pip install -e ".[all]"                 # optional filter/audit suite deps after
 archolith-bench proxy --list          # list scenarios (no proxy needed)
 archolith-bench proxy --all --arms direct,proxy_only  # run against live proxy
 archolith-bench industry --launch-only                # generate launch benchmark coverage matrix
+archolith-bench menhir bootstrap-hygiene --offline   # deterministic startup hygiene gate
 ```
 
 ### Progress on long runs

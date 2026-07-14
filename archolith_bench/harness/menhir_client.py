@@ -34,6 +34,8 @@ class StubMenhirClient:
         session_id: str | None = None,
         source: str | None = None,
         wait: bool = True,
+        flagged: bool = False,
+        bootstrap_scope: str | None = None,
     ) -> None:
         """Append a formatted snippet to the group's list."""
         if not content:
@@ -129,6 +131,8 @@ class HttpMenhirClient:
         session_id: str | None = None,
         source: str | None = None,
         wait: bool = True,
+        flagged: bool = False,
+        bootstrap_scope: str | None = None,
     ) -> None:
         """Ingest a snippet as a menhir episode in the group's namespace silo.
 
@@ -158,6 +162,10 @@ class HttpMenhirClient:
             payload["occurred_at"] = occurred_at
         if session_id is not None:
             payload["session_id"] = session_id
+        if flagged:
+            payload["flagged"] = True
+        if bootstrap_scope is not None:
+            payload["bootstrap_scope"] = bootstrap_scope
         response = self._client.post(
             url,
             params={"wait": "true" if wait else "false"},
@@ -228,6 +236,54 @@ class HttpMenhirClient:
                     snippets.append(name.strip())
 
         return snippets
+
+    def recall_raw(self, group_id: str, query: str, limit: int = 10) -> dict[str, Any]:
+        """Return the unmodified HTTP recall response for benchmark assertions."""
+        url = self._base_url.rstrip("/") + self._recall_path
+        response = self._client.post(
+            url,
+            json={
+                "query": query,
+                "limit": limit,
+                "namespace": group_id,
+                "include_session": True,
+            },
+            headers=self._headers,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data if isinstance(data, dict) else {"results": data}
+
+    def bootstrap_flagged(
+        self, reader_id: str, workspace: str, limit: int = 50
+    ) -> dict[str, Any]:
+        """Read scoped bootstrap pins and establish the matching receipt."""
+        url = self._base_url.rstrip("/") + "/api/bootstrap/flagged"
+        response = self._client.get(
+            url,
+            params={"reader_id": reader_id, "workspace": workspace, "limit": limit},
+            headers=self._headers,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def bootstrap_context(
+        self, reader_id: str, workspace: str, namespace: str, recent_limit: int = 50
+    ) -> dict[str, Any]:
+        """Read recent context using the receipt established for this workspace."""
+        url = self._base_url.rstrip("/") + "/api/bootstrap/context"
+        response = self._client.post(
+            url,
+            json={
+                "reader_id": reader_id,
+                "workspace": workspace,
+                "namespace": namespace,
+                "recent_limit": recent_limit,
+            },
+            headers=self._headers,
+        )
+        response.raise_for_status()
+        return response.json()
 
     def reset(self, group_id: str) -> None:
         """Best-effort silo teardown via DELETE /api/namespace/{namespace}.

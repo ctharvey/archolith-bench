@@ -357,6 +357,17 @@ def main(argv: list[str] | None = None) -> None:
     smoke_p.add_argument("--publish-dir", type=Path, default=None,
                          help="Optional directory for tracked evidence markdown")
 
+    hygiene_p = menhir_sub.add_parser(
+        "bootstrap-hygiene", help="Gate recent/bootstrap scope hygiene"
+    )
+    hygiene_p.add_argument(
+        "--fixture", type=Path, default=Path("fixtures/menhir_bootstrap_hygiene.json")
+    )
+    hygiene_p.add_argument("--offline", action="store_true", help="Run deterministic fixture policy only")
+    hygiene_p.add_argument("--menhir-url", default=None, help="Throwaway Menhir URL for live black-box mode")
+    hygiene_p.add_argument("--confirm-menhir-reset", action="store_true")
+    hygiene_p.add_argument("--out", type=Path, default=Path("results/menhir-bootstrap-hygiene.json"))
+
     def add_menhir_run_args(p: argparse.ArgumentParser, default_out: str) -> None:
         p.add_argument("fixture", nargs="?", default=None, help="Optional fixture JSON")
         p.add_argument("--out", type=Path, default=Path(default_out), help="JSON artifact output")
@@ -1249,6 +1260,7 @@ def _run_ports(args: argparse.Namespace) -> None:
 
 def _run_menhir(args: argparse.Namespace) -> None:
     from .core.capabilities import render_capabilities_markdown
+    from .harness import assert_not_production
     from .suites import menhir as menhir_suite
 
     cmd = getattr(args, "menhir_command", None)
@@ -1261,6 +1273,29 @@ def _run_menhir(args: argparse.Namespace) -> None:
         return
     if cmd == "smoke":
         menhir_suite.run_smoke(args.output_dir, publish_dir=args.publish_dir)
+        return
+    if cmd == "bootstrap-hygiene":
+        if not args.offline:
+            if not args.menhir_url:
+                print("ERROR: live bootstrap-hygiene requires --menhir-url", file=sys.stderr)
+                sys.exit(1)
+            assert_not_production(args.menhir_url)
+            if not args.confirm_menhir_reset:
+                print(
+                    "ERROR: live bootstrap-hygiene requires --confirm-menhir-reset",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+        artifact = menhir_suite.run_bootstrap_hygiene(
+            args.fixture,
+            menhir_url=None if args.offline else args.menhir_url,
+            api_key="" if args.offline else _resolve_menhir_bearer_key(),
+        )
+        menhir_suite.print_summary(cmd, artifact)
+        menhir_suite.write_json_artifact(artifact, args.out)
+        print(f"\nwrote artifact: {args.out}")
+        if not artifact.get("passed"):
+            sys.exit(2)
         return
     if cmd == "longmemeval":
         harness_args = argparse.Namespace(

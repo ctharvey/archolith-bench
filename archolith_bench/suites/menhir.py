@@ -30,6 +30,28 @@ def run_r1(fixture_path: Path | None = None, *, k: int = 5) -> dict:
     return R1BenchmarkRunner(fixture, build_stub_conditions(fixture), k=k).run()
 
 
+def run_bootstrap_hygiene(
+    fixture_path: Path | None = None,
+    *,
+    menhir_url: str | None = None,
+    api_key: str = "",
+) -> dict:
+    """Run the deterministic policy gate or a live black-box throwaway probe."""
+    from ..bootstrap_hygiene import BootstrapFixture, BootstrapHygieneRunner
+
+    fixture = BootstrapFixture.from_file(
+        fixture_path or FIXTURES / "menhir_bootstrap_hygiene.json"
+    )
+    if menhir_url is None:
+        return BootstrapHygieneRunner(fixture).run()
+
+    from ..harness.menhir_client import HttpMenhirClient
+
+    print(f"bootstrap-hygiene live target: {menhir_url}")
+    with HttpMenhirClient(menhir_url, api_key=api_key) as client:
+        return BootstrapHygieneRunner(fixture, client=client).run()
+
+
 def run_r2_facet(
     fixture_path: Path | None = None,
     *,
@@ -146,6 +168,8 @@ def publish_menhir_evidence(
 
 def metric_rows_for(kind: str, artifact: dict) -> list[dict[str, Any]]:
     key = kind.lower()
+    if "bootstrap" in key or "hygiene" in key:
+        return [{"passed": artifact.get("passed"), **artifact.get("metrics", {})}]
     if "r1" in key or "hybrid retrieval" in key:
         return _condition_rows(artifact, "conditions")
     if "facet" in key:

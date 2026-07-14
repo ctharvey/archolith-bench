@@ -1,0 +1,50 @@
+{
+  "name": "menhir-bootstrap-hygiene-v1",
+  "workspaces": ["alpha", "beta"],
+  "negative_query": "How do I set up a dedicated Palworld game server?",
+  "records": [
+    {
+      "id": "struct-alpha",
+      "content": "alpha structural project inventory sentinel",
+      "workspace": "alpha",
+      "structure_role": "file"
+    },
+    {
+      "id": "recent-alpha",
+      "content": "alpha nginx reverse proxy software server deployment sentinel",
+      "workspace": "alpha"
+    },
+    {
+      "id": "recent-beta",
+      "content": "beta dedicated Minecraft infrastructure server sentinel",
+      "workspace": "beta"
+    },
+    {
+      "id": "general-pin",
+      "content": "general startup conduct sentinel",
+      "workspace": "alpha",
+      "flagged": true,
+      "bootstrap_scope": "general"
+    },
+    {
+      "id": "alpha-pin",
+      "content": "alpha workspace startup sentinel",
+      "workspace": "alpha",
+      "flagged": true,
+      "bootstrap_scope": "workspace:alpha"
+    },
+    {
+      "id": "beta-pin",
+      "content": "beta workspace startup sentinel",
+      "workspace": "beta",
+      "flagged": true,
+      "bootstrap_scope": "workspace:beta"
+    },
+    {
+      "id": "stale-advisory",
+      "content": "verify this stale file anchor before acting",
+      "workspace": "alpha",
+      "stale_advisory": "Verify the referenced file before acting on this memory."
+    }
+  ]
+}

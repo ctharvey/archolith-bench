@@ -1,5 +1,9 @@
 # archolith-bench Changelog
 
+## 2026-07-13 — Menhir bootstrap hygiene acceptance gate
+
+Added `archolith-bench menhir bootstrap-hygiene --offline` with a deterministic two-workspace fixture and hard gates for structural/recent leakage, recent and pin isolation, pin recall, and stale-advisory preservation. Live mode uses public Menhir HTTP surfaces, refuses production-looking targets, requires reset confirmation, and tears down its throwaway namespaces. Off-topic returned-count/false-positive and bootstrap token volume remain diagnostic rather than ranking-change gates.
+
 ## 2026-07-08 — SUM phrasing matrix + cross-check-quality live evidence
 
 **feat(probe):** `scripts/probe_phase3_sum_rate.py` gains a SUM **phrasing matrix** — `--variant`

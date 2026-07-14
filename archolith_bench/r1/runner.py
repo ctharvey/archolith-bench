@@ -158,78 +158,165 @@ def aggregate_metrics(
     return agg
 
 
+# Guards that must not WORSEN. Direction matters: a guard can be lower-is-better
+# (an error rate) or higher-is-better (a recall metric the challenger must not trade away).
+DEFAULT_GUARDS_LOWER_IS_BETTER: tuple[str, ...] = (
+    "stale_hit_rate",
+    "wrong_scope_injection_rate",
+)
+DEFAULT_GUARDS_HIGHER_IS_BETTER: tuple[str, ...] = ()
+
+
 def evaluate_win_gate(
     results: dict[str, ConditionResult],
     regress_tolerance: float = 0.0,
     saturation_ceiling: float = SATURATION_CEILING,
+    *,
+    baseline_condition: str = BASELINE_CONDITION,
+    challenger_prefix: str = "E_",
+    primary_improvement_metrics: tuple[str, ...] = IMPROVEMENT_METRICS,
+    improvement_mode: str = "all",
+    guards_lower_is_better: tuple[str, ...] = DEFAULT_GUARDS_LOWER_IS_BETTER,
+    guards_higher_is_better: tuple[str, ...] = DEFAULT_GUARDS_HIGHER_IS_BETTER,
 ) -> dict:
-    """Decide whether any E (hybrid) config beats the A_current baseline.
+    """Decide whether any challenger condition beats the baseline.
 
-    Graduation (recalibrated): E strictly beats A on every UNSATURATED improvement
-    metric (those in ``IMPROVEMENT_METRICS`` whose baseline is below
-    ``saturation_ceiling``) AND does not regress a SATURATED improvement metric,
-    ``stale_hit_rate``, or ``wrong_scope_injection_rate`` by more than
-    ``regress_tolerance``. A metric already saturated at the baseline is exempt from
-    the must-beat test (no headroom), so the gate no longer demands the impossible
-    ``exact > 1.0``; the graduating alpha maximizing exact+symbol recall is recommended.
+    Graduation: the challenger improves the UNSATURATED primary metrics (those in
+    ``primary_improvement_metrics`` whose baseline is below ``saturation_ceiling``)
+    per ``improvement_mode``, does not regress any primary metric (eligible or
+    saturated), and does not worsen any guard -- all within ``regress_tolerance``.
+    A metric already saturated at the baseline is exempt from the must-beat test (no
+    headroom), so the gate never demands the impossible ``exact > 1.0``.
+
+    ``improvement_mode`` selects the quantifier over the eligible primary metrics:
+
+    - ``"all"`` (default, preserves historical R1 behavior): the challenger must
+      strictly beat EVERY eligible metric. Appropriate when the primaries are
+      INDEPENDENT (e.g. ``exact_string_recall`` vs ``symbol_recall``), where
+      demanding both is a defensible strict gate.
+
+    - ``"any"``: the challenger must beat AT LEAST ONE eligible metric and regress
+      NONE. Required when the primaries are NESTED or otherwise correlated, where
+      "all" is unsatisfiable even by a genuine win. Concretely: ``recall@5`` and
+      ``recall@10`` are nested, so a gold moving from rank 6 to rank 2 improves
+      ``recall@5`` and MRR but leaves ``recall@10`` UNCHANGED -- under ``"all"`` the
+      conjunction fails and a real improvement is rejected, and the caller then
+      wrongly concludes the change was redundant. Use ``"any"`` for nested metric
+      families.
+
+    Defaults reproduce the previous behavior exactly for existing callers.
     """
-    if BASELINE_CONDITION not in results:
-        return {"graduates": False, "reason": f"missing {BASELINE_CONDITION} baseline"}
-    base = results[BASELINE_CONDITION].metrics
-    e_names = [n for n in results if n.startswith("E_")]
+    if baseline_condition not in results:
+        return {"graduates": False, "reason": f"missing {baseline_condition} baseline"}
+    if improvement_mode not in ("all", "any"):
+        raise ValueError(f'improvement_mode must be "all" or "any", got {improvement_mode!r}')
+    base = results[baseline_condition].metrics
+    e_names = [n for n in results if n.startswith(challenger_prefix)]
 
-    # Split the improvement metrics into those with headroom (eligible to earn a win)
+    # Fail loudly on a metric the gate is configured to consult but that the run did not
+    # produce. This must NOT be softened to a .get(0.0) default: a guard that silently
+    # evaluates to 0.0 is a guard that silently guards NOTHING, which is precisely the
+    # failure a guard exists to prevent.
+    configured = (
+        *primary_improvement_metrics,
+        *guards_lower_is_better,
+        *guards_higher_is_better,
+    )
+    missing = [k for k in configured if k not in base]
+    if missing:
+        raise ValueError(
+            f"win gate configured with metric(s) {missing} that the run did not produce "
+            f"(baseline {baseline_condition!r} has {sorted(base)}). Fix the metric set or the "
+            f"gate configuration -- a missing guard would otherwise pass vacuously."
+        )
+
+    # Split the primary metrics into those with headroom (eligible to earn a win)
     # and those already maxed at the baseline (exempt from must-beat, must not regress).
-    eligible = [k for k in IMPROVEMENT_METRICS if base[k] < saturation_ceiling]
-    saturated = [k for k in IMPROVEMENT_METRICS if base[k] >= saturation_ceiling]
+    eligible = [k for k in primary_improvement_metrics if base[k] < saturation_ceiling]
+    saturated = [k for k in primary_improvement_metrics if base[k] >= saturation_ceiling]
+
+    quantifier = all if improvement_mode == "all" else any
 
     evaluated: list[dict] = []
     winners: list[dict] = []
     for name in e_names:
         m = results[name].metrics
         # Per-metric flags kept for artifact readability / backward compatibility.
-        beats_exact = m["exact_string_recall"] > base["exact_string_recall"]
-        beats_symbol = m["symbol_recall"] > base["symbol_recall"]
-        # Must strictly beat every metric that has headroom; if none has headroom
+        beats_exact = m.get("exact_string_recall", 0.0) > base.get("exact_string_recall", 0.0)
+        beats_symbol = m.get("symbol_recall", 0.0) > base.get("symbol_recall", 0.0)
+        # Improvement over the metrics that have headroom. If none has headroom
         # (all saturated) there is nothing to demonstrate a win on -> cannot graduate.
-        beats_eligible = bool(eligible) and all(m[k] > base[k] for k in eligible)
+        beats_eligible = bool(eligible) and quantifier(m[k] > base[k] for k in eligible)
+        # Under "any", beating one eligible metric must not come at the cost of another,
+        # so eligible metrics also carry a non-regression duty. Under "all" this is
+        # implied (every eligible strictly improves) and the check is a no-op.
+        no_eligible_regression = all(
+            m[k] >= base[k] - regress_tolerance for k in eligible
+        )
         # A saturated metric may not slip (e.g. don't drop exact from 1.0 to win symbol).
         no_saturated_regression = all(
             m[k] >= base[k] - regress_tolerance for k in saturated
         )
-        stale_ok = m["stale_hit_rate"] <= base["stale_hit_rate"] + regress_tolerance
-        scope_ok = (
-            m["wrong_scope_injection_rate"]
-            <= base["wrong_scope_injection_rate"] + regress_tolerance
+        guards_ok = all(
+            m[k] <= base[k] + regress_tolerance for k in guards_lower_is_better
+        ) and all(
+            m[k] >= base[k] - regress_tolerance for k in guards_higher_is_better
         )
-        wins = beats_eligible and no_saturated_regression and stale_ok and scope_ok
+        # Retained for artifact readability; subsumed by guards_ok.
+        stale_ok = m.get("stale_hit_rate", 0.0) <= base.get("stale_hit_rate", 0.0) + regress_tolerance
+        scope_ok = (
+            m.get("wrong_scope_injection_rate", 0.0)
+            <= base.get("wrong_scope_injection_rate", 0.0) + regress_tolerance
+        )
+        wins = (
+            beats_eligible
+            and no_eligible_regression
+            and no_saturated_regression
+            and guards_ok
+        )
         entry = {
             "condition": name,
             "beats_exact": beats_exact,
             "beats_symbol": beats_symbol,
             "beats_eligible": beats_eligible,
+            "no_eligible_regression": no_eligible_regression,
             "no_saturated_regression": no_saturated_regression,
             "no_stale_regression": stale_ok,
             "no_scope_regression": scope_ok,
+            "guards_ok": guards_ok,
             "wins": wins,
-            "exact_string_recall": m["exact_string_recall"],
-            "symbol_recall": m["symbol_recall"],
-            "stale_hit_rate": m["stale_hit_rate"],
-            "wrong_scope_injection_rate": m["wrong_scope_injection_rate"],
         }
+        # Report every metric the gate actually consulted, whatever it was configured with.
+        # (The four legacy keys below are retained verbatim for artifact/back-compat; they
+        # are absent-safe so a caller with a different metric set does not KeyError.)
+        for key in (
+            *primary_improvement_metrics,
+            *guards_lower_is_better,
+            *guards_higher_is_better,
+            "exact_string_recall",
+            "symbol_recall",
+            "stale_hit_rate",
+            "wrong_scope_injection_rate",
+        ):
+            if key in m:
+                entry[key] = m[key]
         evaluated.append(entry)
         if wins:
             winners.append(entry)
 
+    def _primary_sum(e: dict) -> float:
+        return sum(e.get(k, 0.0) for k in primary_improvement_metrics)
+
+    def _guard_penalty(e: dict) -> float:
+        # Lower-is-better guards count against; higher-is-better guards count for.
+        return sum(e.get(k, 0.0) for k in guards_lower_is_better) - sum(
+            e.get(k, 0.0) for k in guards_higher_is_better
+        )
+
     recommended = None
     if winners:
-        winners.sort(
-            key=lambda e: (
-                -(e["exact_string_recall"] + e["symbol_recall"]),
-                e["stale_hit_rate"] + e["wrong_scope_injection_rate"],
-                e["condition"],
-            )
-        )
+        # Best primary total, then least guard damage, then name (stable).
+        winners.sort(key=lambda e: (-_primary_sum(e), _guard_penalty(e), e["condition"]))
         recommended = winners[0]["condition"]
 
     gate = {
@@ -238,11 +325,22 @@ def evaluate_win_gate(
         "recommended_hybrid_alpha": _alpha_of(recommended),
         "eligible_metrics": eligible,
         "saturated_metrics": saturated,
+        "improvement_mode": improvement_mode,
+        "primary_improvement_metrics": list(primary_improvement_metrics),
+        "guards_lower_is_better": list(guards_lower_is_better),
+        "guards_higher_is_better": list(guards_higher_is_better),
         "baseline": {
-            "exact_string_recall": base["exact_string_recall"],
-            "symbol_recall": base["symbol_recall"],
-            "stale_hit_rate": base["stale_hit_rate"],
-            "wrong_scope_injection_rate": base["wrong_scope_injection_rate"],
+            key: base[key]
+            for key in (
+                *primary_improvement_metrics,
+                *guards_lower_is_better,
+                *guards_higher_is_better,
+                "exact_string_recall",
+                "symbol_recall",
+                "stale_hit_rate",
+                "wrong_scope_injection_rate",
+            )
+            if key in base
         },
         "evaluated": evaluated,
         "regress_tolerance": regress_tolerance,
@@ -250,8 +348,9 @@ def evaluate_win_gate(
     }
     if not eligible:
         gate["reason"] = (
-            f"no unsaturated improvement metric: every metric in {list(IMPROVEMENT_METRICS)} "
-            f"is >= {saturation_ceiling} at baseline, so there is no headroom to earn a win"
+            f"no unsaturated improvement metric: every metric in "
+            f"{list(primary_improvement_metrics)} is >= {saturation_ceiling} at baseline, "
+            f"so there is no headroom to earn a win"
         )
     return gate
 

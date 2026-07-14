@@ -136,6 +136,12 @@ class MenhirLiveRetriever:
                 namespace=namespace,
                 tuning=self.tuning,
                 trace=True,
+                # A benchmark must not mutate the graph it measures. recall() defaults to
+                # update_access=True, which touches last_accessed, reinforces edge weights,
+                # and schedules rehydration -- so a later condition would run against a graph
+                # that earlier conditions modified, making multi-condition results depend on
+                # execution order. update_access=False makes recall a pure read.
+                update_access=False,
             )
         )
         latency_ms = (time.perf_counter() - start) * 1000.0

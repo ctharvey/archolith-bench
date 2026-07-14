@@ -130,6 +130,12 @@ async def _run(fixture, k: int, candidate_k: int) -> dict:
             result = await recall_service.recall(
                 q.text, limit=candidate_k, candidate_k=candidate_k,
                 namespace=None, tuning=tuning, trace=True,
+                # A benchmark must not mutate the graph it measures. recall() defaults to
+                # update_access=True, which touches last_accessed, reinforces edge weights,
+                # and schedules rehydration -- so each condition in this loop would run
+                # against a graph the previous conditions modified, making results depend
+                # on execution order. update_access=False makes recall a pure read.
+                update_access=False,
             )
             latencies.append((perf_counter() - t0) * 1000.0)
             ranked_by_query[q.id] = _map_ids([r.uuid for r in result.results], gold_ids)

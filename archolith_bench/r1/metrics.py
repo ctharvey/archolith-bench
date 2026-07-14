@@ -16,11 +16,88 @@ from .models import R1Memory, R1Query
 
 
 def recall_at_k(ranked: Sequence[str], support_ids: Sequence[str], k: int) -> float:
-    """Fraction of gold support ids present in the top-k."""
+    """Fraction of gold support ids present in the top-k.
+
+    This is the multi-support metric: it wants ALL of ``support_ids`` in the top-k.
+    For known-item / duplicate-cluster crediting (any one member counts), use
+    ``known_item_recall_at_k`` instead.
+    """
     if not support_ids:
         return 0.0
     top = set(ranked[:k])
     return sum(1 for sid in support_ids if sid in top) / len(support_ids)
+
+
+# ---------------------------------------------------------------------------
+# Known-item retrieval (auto-generated eval, plan v6 §2 / §6.2)
+#
+# One query has ONE intended answer memory, plus its DUPLICATE CLUSTER: the clone
+# is a duplicate of prod, and prod holds near-duplicate memories, so retrieving any
+# semantically-identical sibling is a correct answer, not a miss. So the gold is a
+# SET (the cluster) and "any member counts", which is the opposite of recall_at_k's
+# "all members" semantics -- hence a separate function so the two are never confused.
+# ---------------------------------------------------------------------------
+
+# Sentinel used when the caller has no explicit limit; callers should pass the real
+# recall() limit so an absent gold gets rank = limit + 1 (see known_item_rank).
+_DEFAULT_ABSENT_RANK_BASE = 1_000_000
+
+
+def known_item_rank(
+    ranked: Sequence[str], gold_ids: Sequence[str], *, limit: int | None = None
+) -> int:
+    """1-based rank of the FIRST gold-cluster member in ``ranked``.
+
+    ``gold_ids`` is the duplicate cluster (one or more ids that all count as the
+    answer). If no cluster member appears, the gold is ABSENT and its rank is
+    ``limit + 1`` -- a finite, total, monotone value so rank comparisons and MRR are
+    always defined (plan v6 §6.2). ``limit`` should be the recall() ``limit`` used to
+    produce ``ranked``; if omitted, a large sentinel base is used so absence still
+    sorts strictly worse than any present rank.
+    """
+    gold = set(gold_ids)
+    for i, mid in enumerate(ranked):
+        if mid in gold:
+            return i + 1
+    base = limit if limit is not None else max(len(ranked), _DEFAULT_ABSENT_RANK_BASE)
+    return base + 1
+
+
+def known_item_recall_at_k(ranked: Sequence[str], gold_ids: Sequence[str], k: int) -> float:
+    """1.0 if ANY gold-cluster member is in the top-k, else 0.0.
+
+    Binary per query (a query has one answer, present or not). Average across queries
+    upstream to get recall@k. Note nested-ness: recall@5 == 1.0 implies recall@10 == 1.0,
+    which is exactly why the win gate must use improvement_mode="any" (plan v6 §6.3).
+    """
+    if not gold_ids:
+        return 0.0
+    top = set(ranked[:k])
+    return 1.0 if any(g in top for g in gold_ids) else 0.0
+
+
+def reciprocal_rank(rank: int) -> float:
+    """1/rank. Pairs with known_item_rank's limit+1 convention (never divides by zero)."""
+    if rank <= 0:
+        raise ValueError(f"rank must be >= 1 (got {rank}); known_item_rank never returns < 1")
+    return 1.0 / rank
+
+
+def mrr(ranks: Sequence[int]) -> float:
+    """Mean reciprocal rank over per-query ranks (each from known_item_rank)."""
+    if not ranks:
+        return 0.0
+    return sum(reciprocal_rank(r) for r in ranks) / len(ranks)
+
+
+def rank_regressed(rank_challenger: int, rank_baseline: int, rank_tolerance: int = 0) -> bool:
+    """True if the challenger's gold rank is worse than the baseline's, beyond tolerance.
+
+    ``rank_tolerance`` is an INTEGER (ranks are integers) and is deliberately distinct
+    from the float ``regress_tolerance`` used for metric deltas in the win gate
+    (plan v6 §6.2). Worse == larger rank number.
+    """
+    return rank_challenger > rank_baseline + rank_tolerance
 
 
 def exact_string_hit(

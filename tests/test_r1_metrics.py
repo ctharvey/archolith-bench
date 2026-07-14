@@ -87,3 +87,74 @@ def test_scope_conflict_only_when_both_set_and_differ() -> None:
     assert M._scope_conflict(_q("q", repo="a"), _mem("m", repo="a")) is False
     assert M._scope_conflict(_q("q"), _mem("m", repo="b")) is False
     assert M._scope_conflict(_q("q", project="p1"), _mem("m", project="p2")) is True
+
+
+# --- known-item retrieval metrics (plan v6 auto-gen eval) -------------------
+
+
+def test_known_item_rank_finds_first_cluster_member() -> None:
+    ranked = ["a", "b", "gold", "c"]
+    assert M.known_item_rank(ranked, ["gold"], limit=10) == 3
+
+
+def test_known_item_rank_any_cluster_member_counts() -> None:
+    # duplicate cluster: gold or gold_dup both count; the FIRST to appear sets the rank
+    ranked = ["a", "gold_dup", "b", "gold"]
+    assert M.known_item_rank(ranked, ["gold", "gold_dup"], limit=10) == 2
+
+
+def test_known_item_rank_absent_gold_is_limit_plus_one() -> None:
+    ranked = ["a", "b", "c"]
+    assert M.known_item_rank(ranked, ["gold"], limit=10) == 11
+    # total + monotone: an absent gold sorts strictly worse than any present rank
+    present = M.known_item_rank(["gold"], ["gold"], limit=10)
+    absent = M.known_item_rank(["x"], ["gold"], limit=10)
+    assert present < absent
+
+
+def test_known_item_recall_at_k_is_binary_and_nested() -> None:
+    ranked = ["a", "b", "c", "d", "e", "f", "gold"]  # gold at rank 7
+    assert M.known_item_recall_at_k(ranked, ["gold"], 5) == 0.0  # outside top-5
+    assert M.known_item_recall_at_k(ranked, ["gold"], 10) == 1.0  # inside top-10
+    # NESTED: a gold in the top-5 is necessarily in the top-10. This is exactly why
+    # the win gate must use improvement_mode="any" (a 6->2 move lifts @5 but not @10).
+    ranked2 = ["a", "gold", "c"]
+    assert M.known_item_recall_at_k(ranked2, ["gold"], 5) == 1.0
+    assert M.known_item_recall_at_k(ranked2, ["gold"], 10) == 1.0
+
+
+def test_known_item_recall_credits_any_duplicate_member() -> None:
+    ranked = ["a", "b", "gold_dup", "d", "e"]
+    assert M.known_item_recall_at_k(ranked, ["gold", "gold_dup"], 5) == 1.0
+
+
+def test_reciprocal_rank_and_mrr() -> None:
+    assert M.reciprocal_rank(1) == 1.0
+    assert M.reciprocal_rank(2) == 0.5
+    assert abs(M.mrr([1, 2, 4]) - (1.0 + 0.5 + 0.25) / 3) < 1e-9
+    assert M.mrr([]) == 0.0
+
+
+def test_reciprocal_rank_rejects_nonpositive() -> None:
+    for bad in (0, -1):
+        try:
+            M.reciprocal_rank(bad)
+        except ValueError:
+            pass
+        else:  # pragma: no cover
+            raise AssertionError(f"expected ValueError for rank={bad}")
+
+
+def test_mrr_uses_limit_plus_one_for_absent_gold() -> None:
+    # A run where gold is absent (rank limit+1) must contribute 1/(limit+1), not be dropped.
+    r_present = M.known_item_rank(["gold"], ["gold"], limit=9)   # rank 1
+    r_absent = M.known_item_rank(["x"], ["gold"], limit=9)       # rank 10
+    assert abs(M.mrr([r_present, r_absent]) - (1.0 + 1.0 / 10) / 2) < 1e-9
+
+
+def test_rank_regressed_uses_integer_tolerance() -> None:
+    assert M.rank_regressed(3, 2) is True            # 3 > 2, worse
+    assert M.rank_regressed(2, 2) is False           # equal, not a regression
+    assert M.rank_regressed(1, 3) is False           # better
+    assert M.rank_regressed(4, 2, rank_tolerance=2) is False  # within tolerance
+    assert M.rank_regressed(5, 2, rank_tolerance=2) is True   # beyond tolerance

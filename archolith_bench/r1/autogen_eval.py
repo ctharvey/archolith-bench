@@ -62,9 +62,19 @@ class CorpusReader(Protocol):
         ...
 
     def duplicate_cluster(self, node: CorpusNode, threshold: float) -> Sequence[str]:
-        """UUIDs whose content_embedding cosine to ``node`` is >= ``threshold``,
-        INCLUDING ``node`` itself. The clone is a duplicate of prod, and prod holds
-        near-duplicate memories, so any sibling counts as the answer (plan v6 §2.2)."""
+        """UUIDs of GENUINE near-duplicates of ``node`` -- \"the same fact stored twice.\"
+
+        The clone is a duplicate of prod, and prod holds near-duplicate memories, so
+        retrieving any sibling is a correct answer, not a miss (plan v6 §2.2).
+
+        ANTI-SKEW CONTRACT (plan Appendix H.2 -- load-bearing): the cluster MUST be
+        computed by a LANE-NEUTRAL signal -- lexical near-identity (normalized-text hash
+        or high token Jaccard on the recall-text). It MUST NOT be computed from
+        ``content_embedding`` cosine, ``name_embedding`` cosine, or BM25 score. Clustering
+        by a lane's own ranking function makes \"what counts as a hit\" the very metric that
+        lane optimizes, rigging cluster-crediting toward that arm. ``threshold`` is the
+        lexical-similarity threshold (e.g. Jaccard >= 0.9), NOT an embedding cosine.
+        """
         ...
 
 

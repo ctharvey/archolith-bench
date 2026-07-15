@@ -18,6 +18,7 @@
 #   lme.sh brief-ab [--score]          # BriefBuilder A/B (flat vs +Timeline); --score spends OpenAI
 #   lme.sh entropy [floor|both]        # D0 retrieval-entropy instrument (GPT-free fitness function)
 #   lme.sh probe <question_id>         # single-question recall ranking trace
+#   lme.sh ir-gate                     # M1 gate verdict + artifacts (Phase 4, JSON + Markdown)
 #   lme.sh -h|--help                   # show this help
 
 set -euo pipefail
@@ -87,6 +88,16 @@ case "$COMMAND" in
   probe)
     if [ -z "${2:-}" ]; then echo "usage: lme.sh probe <question_id>" >&2; exit 1; fi
     "${_LONGMEMEVAL_DIR}/lib/recall_probe.sh" "$2"
+    ;;
+  ir-gate)
+    # Phase 4: M1 gate verdict + artifacts (JSON + Markdown)
+    # Requires a running menhir server on LME_PORT_RQ and the persistent graph already built.
+    # Emits gate verdict block + JSON/Markdown artifacts to results/lme-gate/
+    MENHIR_URL="http://localhost:${LME_PORT_RQ}" \
+      MENHIR_MAIN="${MENHIR_MAIN}" \
+      LME_RUN_ID="${LME_RUN_ID:-}" \
+      LME_GRAPH_FRESH="${LME_GRAPH_FRESH:-false}" \
+      "${MENHIR_FRONTIER_PY}" "${_LONGMEMEVAL_DIR}/analysis/lib/retrieval_quality.py"
     ;;
   -h|--help)
     usage 0

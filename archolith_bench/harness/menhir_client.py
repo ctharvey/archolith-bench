@@ -131,6 +131,7 @@ class HttpMenhirClient:
         occurred_at: str | None = None,
         session_id: str | None = None,
         source: str | None = None,
+        diff: str | None = None,
         wait: bool = True,
         flagged: bool = False,
         bootstrap_scope: str | None = None,

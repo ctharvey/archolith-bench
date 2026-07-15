@@ -19,10 +19,27 @@ from retrieval_quality import (  # noqa: E402  -- real shipped code under test
     format_narrow_line,
     format_wide_line,
     gold_rank,
+    has_explainability,
     mrr_at_k,
     summarize,
     support_rank,
 )
+
+# Captured verbatim from a live menhir /api/recall response on 2026-07-15 (LME smoke graph).
+# If menhir's recall contract changes, this fixture is the thing to update -- deliberately, after
+# looking at a real body, not by guessing field names.
+LIVE_RECALL_RESULT = {
+    "uuid": "0b0a...",
+    "name": "car wax",
+    "content": "Meguiar's Ultimate Liquid Wax was recommended",
+    "scope": "PERSISTENT",
+    "memory_type": "SEMANTIC",
+    "final_score": 0.83,
+    "retrieval_score": 1.02,
+    "retrieval_score_kind": "graphiti_rrf",
+    "relevance_basis": "legacy_rrf_threshold_unvalidated",
+    "is_superseded_view": False,
+}
 
 
 def _fmt_summary_line(s):
@@ -98,6 +115,31 @@ def test_gate_math_uses_real_summarize():
     overall = all(measured) if measured else False
     assert measured == [gate1, gate2]  # the None gate is excluded, not coerced to True
     assert overall is False  # gate1 fails at 0.67, so overall must fail
+
+
+def test_explainability_accepts_the_live_recall_shape():
+    """The gate must pass on a REAL /api/recall result.
+
+    Regression: the gate originally looked for `score`/`confidence`/`rank`, none of which menhir
+    returns, so it would have reported a false 0% FAIL on every live run.
+    """
+    assert has_explainability(LIVE_RECALL_RESULT) is True
+    # the guessed names are genuinely absent -- this is why the old check failed
+    for guessed in ("score", "confidence", "rank"):
+        assert guessed not in LIVE_RECALL_RESULT
+
+
+def test_explainability_rejects_results_missing_scoring_metadata():
+    """A result without score semantics is not explainable, and must fail the gate."""
+    assert has_explainability({"name": "x", "content": "y"}) is False
+    assert has_explainability({}) is False
+    assert has_explainability("not-a-dict") is False
+    # a bare score with no scale/basis is uninterpretable -> still not explainable
+    assert has_explainability({"final_score": 0.9}) is False
+    # dropping any single required field fails
+    for field in ("final_score", "retrieval_score_kind", "relevance_basis"):
+        partial = {k: v for k, v in LIVE_RECALL_RESULT.items() if k != field}
+        assert has_explainability(partial) is False, f"missing {field} must fail the gate"
 
 
 def test_rank_helpers_real_behaviour():

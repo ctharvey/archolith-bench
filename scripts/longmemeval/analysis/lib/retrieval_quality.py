@@ -132,6 +132,24 @@ def format_narrow_line(label: str, s: dict) -> str:
             f"{s['found']:5d}/{s['total']:<5d}  {_median_str(s):>11s}  {s['mrr@10']:.4f}")
 
 
+# The explainability contract, verified against a live /api/recall response on 2026-07-15.
+# A result carries: final_score, retrieval_score, retrieval_score_kind, relevance_basis,
+# is_superseded_view, memory_type, scope, name, content, uuid.
+# It does NOT carry `score`, `confidence`, or `rank` -- an earlier version of this gate guessed
+# those names and would have reported a false 0% FAIL on every live run. Do not guess this again;
+# check it against a real response body.
+EXPLAINABILITY_FIELDS = ("final_score", "retrieval_score_kind", "relevance_basis")
+
+
+def has_explainability(result: dict) -> bool:
+    """A menhir recall result must expose WHY it ranked: a score, that score's semantics, and
+    the relevance basis. `retrieval_score_kind` matters because a raw score is uninterpretable
+    without knowing its scale (graphiti RRF vs cosine)."""
+    if not isinstance(result, dict):
+        return False
+    return all(f in result for f in EXPLAINABILITY_FIELDS)
+
+
 def mrr_at_k(ranks: list[int | None], k: int = 10) -> float:
     """Mean Reciprocal Rank at k: mean of (1/rank if rank <= k else 0) for the subset.
     Handles None (not found) by treating as 0 contribution.
@@ -207,10 +225,9 @@ async def main():
                 "m_supp": m_supp_rank, "g_supp": g_supp_rank,
                 "supp_n": len(supp),
                 # explainability — menhir results carry scoring metadata
-                "m_has_explainability": len(m_raw) > 0 and all(
-                    isinstance(r, dict) and ("score" in r or "confidence" in r or "rank" in r)
-                    for r in m_raw
-                ) if m_raw else None,
+                "m_has_explainability": (
+                    all(has_explainability(r) for r in m_raw) if m_raw else None
+                ),
             })
     finally:
         await g.close()

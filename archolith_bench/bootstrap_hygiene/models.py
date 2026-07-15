@@ -13,10 +13,15 @@ class BootstrapRecord:
     id: str
     content: str
     workspace: str
+    source: str = "user"
     flagged: bool = False
     bootstrap_scope: str | None = None
     structure_role: str | None = None
     stale_advisory: str | None = None
+    stale_action: str | None = None
+    stale_reason: str | None = None
+    anchor_project: str | None = None
+    anchor_path: str | None = None
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> "BootstrapRecord":
@@ -24,10 +29,15 @@ class BootstrapRecord:
             id=str(value["id"]),
             content=str(value["content"]),
             workspace=str(value.get("workspace") or ""),
+            source=str(value.get("source") or "user"),
             flagged=bool(value.get("flagged")),
             bootstrap_scope=value.get("bootstrap_scope"),
             structure_role=value.get("structure_role"),
             stale_advisory=value.get("stale_advisory"),
+            stale_action=value.get("stale_action"),
+            stale_reason=value.get("stale_reason"),
+            anchor_project=value.get("anchor_project"),
+            anchor_path=value.get("anchor_path"),
         )
 
 

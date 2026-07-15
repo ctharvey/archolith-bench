@@ -5,9 +5,9 @@
   "records": [
     {
       "id": "struct-alpha",
-      "content": "alpha structural project inventory sentinel",
+      "content": "Directory: alpha/bootstrap-hygiene/legacy-structural-sentinel",
       "workspace": "alpha",
-      "structure_role": "file"
+      "source": "project-scan"
     },
     {
       "id": "recent-alpha",
@@ -44,7 +44,11 @@
       "id": "stale-advisory",
       "content": "verify this stale file anchor before acting",
       "workspace": "alpha",
-      "stale_advisory": "Verify the referenced file before acting on this memory."
+      "anchor_project": "menhir",
+      "anchor_path": "src/menhir/infrastructure/memory_queries.py",
+      "stale_reason": "file_changed_after_anchor",
+      "stale_action": "verify_current_file_before_relying",
+      "stale_advisory": "This memory is anchored to a file that changed after anchoring. Inspect the current file before relying on it. If outdated, update or supersede the memory."
     }
   ]
 }

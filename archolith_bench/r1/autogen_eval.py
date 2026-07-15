@@ -116,7 +116,11 @@ def looks_like_leak(query: str, node: CorpusNode) -> bool:
     q_ids = {t.lower() for t in _raw_tokens(query) if _is_identifier_shaped(t)}
     if not q_ids:
         return False
-    n_ids = {t.lower() for t in _raw_tokens(node.name) if _is_identifier_shaped(t)}
+    # The generator sees the full recall text, not only the entity name. Comparing
+    # against name alone lets an identifier copied from summary/content slip through
+    # and turns the case into an artificial BM25 win.
+    source_text = f"{node.name} {node.text}"
+    n_ids = {t.lower() for t in _raw_tokens(source_text) if _is_identifier_shaped(t)}
     return bool(q_ids & n_ids)
 
 

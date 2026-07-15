@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "description": "Human-authored paraphrase anchors for the content-vector recall experiment.",
+  "cases": [
+    {
+      "id": "analytics-env-setting",
+      "query": "Which environment setting replaced the hardcoded analytics tracking identifier?",
+      "namespace": "default",
+      "gold_ids": [
+        "69d94ed7-6ccb-4886-84f9-257d91b3676e",
+        "8107f346-47f8-41b8-a8a5-adcdf9f18756"
+      ]
+    },
+    {
+      "id": "decay-frequency-setting",
+      "query": "How frequently is the memory decay maintenance cycle configured to run?",
+      "namespace": "default",
+      "gold_ids": ["82495c70-536f-4fcc-8bf6-393df8f8f64f"]
+    },
+    {
+      "id": "stale-support-label",
+      "query": "What recall feature marks an answer whose supporting source may be outdated?",
+      "namespace": "default",
+      "gold_ids": [
+        "178a98c5-c717-498a-9bd2-c0daff5ccece",
+        "b50a7d42-d4e7-4f67-98d1-5409e24227db"
+      ]
+    },
+    {
+      "id": "oracle-output-merging",
+      "query": "Which component combines findings produced by several reasoning families?",
+      "namespace": "default",
+      "gold_ids": [
+        "617b73b8-ba7d-4be8-aa0e-b11fb2d8a8ec",
+        "72d443b0-c5f5-464c-b6ec-09bcc49fa61b",
+        "4b24ba92-d5bb-4e81-9c99-5cec12dc8edb"
+      ]
+    }
+  ]
+}

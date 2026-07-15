@@ -77,6 +77,15 @@ def test_leak_detection_flags_distinctive_token_reuse() -> None:
     assert looks_like_leak("what is lifecycle_decay_interval_s", node) is True
 
 
+def test_leak_detection_checks_summary_identifiers_not_only_name() -> None:
+    node = CorpusNode(
+        uuid="u",
+        name="decay schedule",
+        text="Configured by MENHIR_DECAY_INTERVAL_SECONDS.",
+    )
+    assert looks_like_leak("what does MENHIR_DECAY_INTERVAL_SECONDS control", node) is True
+
+
 def test_leak_detection_passes_genuine_paraphrase() -> None:
     node = CorpusNode(uuid="u", name="lifecycle_decay_interval_s", text="the decay interval setting")
     # Genuine paraphrase shares no distinctive (long) token with the name.

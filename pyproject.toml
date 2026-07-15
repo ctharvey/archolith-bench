@@ -36,6 +36,7 @@ cyberseceval = ["datasets>=2"]
 agentdojo = ["agentdojo>=0.1"]
 mteb = ["mteb>=1.0"]
 harness = ["datasets>=2"]
+content-vector = ["neo4j>=5.0", "openai>=1.0"]
 all = ["archolith-filter", "archolith-audit", "datasets>=2"]
 dev = ["pytest>=8", "ruff>=0.4"]
 

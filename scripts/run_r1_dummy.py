@@ -104,6 +104,7 @@ async def _run(fixture, k: int, candidate_k: int) -> dict:
     from menhir.services.scoring_service import ScoringService
 
     from archolith_bench.progress import ProgressReporter
+    from archolith_bench.r1.graph_fingerprint import assert_no_writes, graph_write_fingerprint
     from archolith_bench.r1.runner import ALPHA_SWEEP, ConditionResult, aggregate_metrics, evaluate_win_gate
 
     settings = MemorySettings.from_env()
@@ -119,6 +120,16 @@ async def _run(fixture, k: int, candidate_k: int) -> dict:
         conditions[f"E_hybrid_a{alpha:g}"] = RetrievalTuningConfig(enable_bm25=True, hybrid_alpha=alpha)
 
     results: dict[str, ConditionResult] = {}
+
+    # Neo4jRepository.execute() already returns the row-dict iterable expected by
+    # graph_write_fingerprint. This tiny adapter keeps the benchmark out of the
+    # repository's private driver while still enforcing the before/after contract.
+    class _RepositorySession:
+        def run(self, cypher: str):
+            return neo4j.execute(cypher)
+
+    fingerprint_session = _RepositorySession()
+    before = graph_write_fingerprint(fingerprint_session)
     # Live heartbeat on stderr: this loop is len(conditions) x len(queries) real recalls
     # (~10 min on the dummy), so without progress it looks hung.
     progress = ProgressReporter(len(conditions) * len(fixture.queries), label="R1 recall")
@@ -143,6 +154,9 @@ async def _run(fixture, k: int, candidate_k: int) -> dict:
         metrics = aggregate_metrics(fixture, ranked_by_query, latencies, k)
         results[name] = ConditionResult(condition=name, metrics=metrics, per_query=ranked_by_query)
     progress.close()
+
+    after = graph_write_fingerprint(fingerprint_session)
+    assert_no_writes(before, after, context="R1 dummy condition loop")
 
     neo4j.close()
     if hasattr(gc, "aclose"):

@@ -184,6 +184,14 @@ def _trace_to_dict(trace: Any) -> dict[str, Any] | None:
                 "survived_floor": c.survived_floor,
                 "final_score": c.final_score,
                 "rank": c.rank,
+                "bm25_rank": c.bm25_rank,
+                "cosine_rank": c.cosine_rank,
+                "content_rank": getattr(c, "content_rank", None),
+                "content_cosine": getattr(c, "content_cosine", None),
+                "contributing_sources": sorted(
+                    getattr(source, "value", source)
+                    for source in getattr(c, "contributing_sources", ())
+                ),
             }
             for c in trace.candidates
         ],

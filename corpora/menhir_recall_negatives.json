@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "description": "Off-topic negative queries. Keyword absence and max content cosine are verified against each frozen clone and copied into the run manifest.",
+  "cases": [
+    {"id": "macrame-knot", "query": "How do I tie a square knot for a macrame plant hanger?", "absent_keyword": "macrame"},
+    {"id": "telescope-collimation", "query": "How do I collimate a Newtonian telescope?", "absent_keyword": "collimation"},
+    {"id": "aquarium-nitrate", "query": "What nitrate level is safe for a planted aquarium?", "absent_keyword": "aquarium"},
+    {"id": "sewing-zipper-foot", "query": "How do I install an invisible zipper using a zipper foot?", "absent_keyword": "zipper"},
+    {"id": "violin-strings", "query": "Which violin string tension is best for a beginner?", "absent_keyword": "violin"},
+    {"id": "espresso-descaling", "query": "How often should an espresso machine be descaled?", "absent_keyword": "espresso"},
+    {"id": "sourdough-temperature", "query": "What oven temperature gives sourdough a crisp crust?", "absent_keyword": "sourdough"},
+    {"id": "iceland-passport", "query": "What documents are needed to renew a passport in Iceland?", "absent_keyword": "iceland"},
+    {"id": "bonsai-pruning", "query": "When should a juniper bonsai be root-pruned?", "absent_keyword": "bonsai"},
+    {"id": "pottery-glaze", "query": "What firing cone should I use for a celadon pottery glaze?", "absent_keyword": "celadon"}
+  ]
+}

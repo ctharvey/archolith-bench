@@ -33,6 +33,7 @@ class StubMenhirClient:
         occurred_at: str | None = None,
         session_id: str | None = None,
         source: str | None = None,
+        diff: str | None = None,
         wait: bool = True,
         flagged: bool = False,
         bootstrap_scope: str | None = None,
@@ -158,6 +159,8 @@ class HttpMenhirClient:
         payload: dict = {"episode": f"{role}: {content}", "namespace": group_id}
         if source is not None:
             payload["source"] = source
+        if diff is not None:
+            payload["diff"] = diff
         if occurred_at is not None:
             payload["occurred_at"] = occurred_at
         if session_id is not None:
@@ -170,6 +173,25 @@ class HttpMenhirClient:
             url,
             params={"wait": "true" if wait else "false"},
             json=payload,
+            headers=self._headers,
+        )
+        response.raise_for_status()
+
+    def ingest_raw(
+        self,
+        group_id: str,
+        content: str,
+        *,
+        source: str,
+        wait: bool = True,
+    ) -> None:
+        """Ingest an exact episode body for deterministic compatibility probes."""
+
+        url = self._base_url.rstrip("/") + self._ingest_path
+        response = self._client.post(
+            url,
+            params={"wait": "true" if wait else "false"},
+            json={"episode": content, "namespace": group_id, "source": source},
             headers=self._headers,
         )
         response.raise_for_status()
@@ -268,7 +290,12 @@ class HttpMenhirClient:
         return response.json()
 
     def bootstrap_context(
-        self, reader_id: str, workspace: str, namespace: str, recent_limit: int = 50
+        self,
+        reader_id: str,
+        workspace: str,
+        namespace: str,
+        recent_limit: int = 50,
+        query: str = "",
     ) -> dict[str, Any]:
         """Read recent context using the receipt established for this workspace."""
         url = self._base_url.rstrip("/") + "/api/bootstrap/context"
@@ -279,6 +306,25 @@ class HttpMenhirClient:
                 "workspace": workspace,
                 "namespace": namespace,
                 "recent_limit": recent_limit,
+                "query": query,
+            },
+            headers=self._headers,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def mark_file_changed(self, *, path: str, project: str) -> dict[str, Any]:
+        """Mark a structural file dirty through Menhir's supported Hook Center API."""
+
+        url = self._base_url.rstrip("/") + "/api/tool-events"
+        response = self._client.post(
+            url,
+            json={
+                "event_type": "file_changed",
+                "operation": "edit",
+                "path": path,
+                "project": project,
+                "source_client": "archolith-bench",
             },
             headers=self._headers,
         )

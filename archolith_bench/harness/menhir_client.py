@@ -37,6 +37,7 @@ class StubMenhirClient:
         wait: bool = True,
         flagged: bool = False,
         bootstrap_scope: str | None = None,
+        turn_evidence_uuid: str | None = None,
     ) -> None:
         """Append a formatted snippet to the group's list."""
         if not content:
@@ -122,6 +123,41 @@ class HttpMenhirClient:
         """Return a fresh isolated namespace id."""
         return uuid.uuid4().hex
 
+    def record_turn_evidence(
+        self,
+        namespace: str,
+        text: str,
+        *,
+        role: str = "user",
+        declarant: str = "user",
+        session_id: str | None = None,
+        source_kind: str = "archolith-bench",
+        source_client: str | None = "archolith_bench",
+        turn_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Capture one user turn as :TurnEvidence so a subsequent ``source="user"`` ingest
+        can cite its UUID and pass the admission gate.
+
+        Returns ``{turn_id, created, recorded_at}``.
+        """
+        url = self._base_url.rstrip("/") + "/api/turn-evidence"
+        payload: dict[str, Any] = {
+            "text": text,
+            "role": role,
+            "declarant": declarant,
+            "namespace": namespace,
+            "source_kind": source_kind,
+        }
+        if source_client is not None:
+            payload["source_client"] = source_client
+        if session_id is not None:
+            payload["session_id"] = session_id
+        if turn_key is not None:
+            payload["turn_key"] = turn_key
+        response = self._client.post(url, json=payload, headers=self._headers)
+        response.raise_for_status()
+        return response.json()
+
     def ingest(
         self,
         group_id: str,
@@ -135,6 +171,7 @@ class HttpMenhirClient:
         wait: bool = True,
         flagged: bool = False,
         bootstrap_scope: str | None = None,
+        turn_evidence_uuid: str | None = None,
     ) -> None:
         """Ingest a snippet as a menhir episode in the group's namespace silo.
 
@@ -143,6 +180,10 @@ class HttpMenhirClient:
         ``source="user"`` for user turns — that becomes a Guard-5 external anchor, so the
         EvidenceAnchorWarden admits facts the user stated. Omit (default "remote-api" ->
         agent_inference) for assistant/system turns, which are not anchors.
+
+        ``turn_evidence_uuid`` grounds a ``source="user"`` claim against a
+        previously recorded :TurnEvidence node. Without it Menhir's admission gate
+        downgrades the claim to ``agent_inference``.
 
         By default uses ``wait=true`` so the episode is fully enriched before
         the call returns (back-compat for Mode-B per-item driver). Pass
@@ -170,6 +211,8 @@ class HttpMenhirClient:
             payload["flagged"] = True
         if bootstrap_scope is not None:
             payload["bootstrap_scope"] = bootstrap_scope
+        if turn_evidence_uuid is not None:
+            payload["turn_evidence_uuid"] = turn_evidence_uuid
         response = self._client.post(
             url,
             params={"wait": "true" if wait else "false"},

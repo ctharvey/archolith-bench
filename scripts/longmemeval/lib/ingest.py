@@ -85,10 +85,40 @@ def _ingest_turn(
 ) -> None:
     """Ingest one turn with bounded exponential backoff on transient errors.
 
+    For user turns, records :TurnEvidence first so the ``source="user"`` claim
+    passes Menhir's admission gate (requires a grounding UUID).  Without it the
+    gate downgrades the claim to ``agent_inference`` and writes a noisy
+    admission-denial entity.
+
     Uses wait=False: the per-item drain is the real completeness guarantee,
     so we don't block per-turn.  This removes ~11k blocking round-trips and
     lets the single enrichment worker drain back-to-back with no idle gaps.
     """
+    is_user = role.strip().lower() == "user"
+    turn_evidence_uuid: str | None = None
+
+    # Ground the user-tier claim by recording turn evidence first.
+    if is_user:
+        for attempt in range(tries):
+            try:
+                ev = client.record_turn_evidence(
+                    ns,
+                    content,
+                    role="user",
+                    session_id=session_id,
+                )
+                turn_evidence_uuid = ev.get("turn_id")
+                break
+            except (httpx.HTTPError,) as exc:
+                if attempt == tries - 1:
+                    # Evidence capture failed — fall back to ungrounded ingest
+                    # (will be downgraded to agent_inference by the admission gate).
+                    print(f"    turn-evidence failed after {tries} attempts: {exc.__class__.__name__}; "
+                          "ingesting without grounding", flush=True)
+                wait = 2 ** (attempt + 1)
+                print(f"    turn-evidence retry {attempt+1}/{tries} after {exc.__class__.__name__} -> sleep {wait}s", flush=True)
+                time.sleep(wait)
+
     for attempt in range(tries):
         try:
             client.ingest(
@@ -100,7 +130,8 @@ def _ingest_turn(
                 # A user's own utterance is external testimony -> "user" is a Guard-5 anchor kind,
                 # so facts the user stated survive the EvidenceAnchorWarden. Assistant/system turns
                 # stay unanchored (default "remote-api" -> agent_inference).
-                source=("user" if role.strip().lower() == "user" else None),
+                source=("user" if is_user else None),
+                turn_evidence_uuid=turn_evidence_uuid,
                 wait=False,
             )
             return

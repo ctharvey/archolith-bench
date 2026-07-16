@@ -194,6 +194,25 @@ Also computes `turn_one_orientation_score` via restart/bootstrap: replays the sc
 - `write_benchmarks_md()` — generates `BENCHMARKS.md` from all results
 - Includes `results/industry_benchmarks.json` when present, so generated `BENCHMARKS.md` shows trusted benchmark coverage and evidence paths
 
+## Persistent LongMemEval ingestion fixtures
+
+The persistent LongMemEval builder lives under `scripts/longmemeval/`. Its Python ingester accepts
+either the Hugging Face dataset or an explicit offline JSON fixture. Fixture runs use the same
+`HttpMenhirClient`, per-turn ingestion, queue drain, failed-episode retry, manifest, promotion,
+and Graphiti-backed graph mutation as a normal build.
+
+`run_suburbs_fixture.sh` is the canonical extraction-regression entrypoint. It gives the run a
+dedicated Neo4j container, volume, ports, manifest, logs, and result directory; refuses accidental
+reuse unless resume is explicitly enabled; checks that Menhir contains the required fix commit;
+then verifies current and retired graph facts directly. Fixture evidence is diagnostic and must
+not be reported as full LongMemEval answer-accuracy evidence.
+The first live run on 2026-07-16 is intentionally recorded as RED: the exact long utterance kept
+the suburb proposition but bound it to Chicago. Full-corpus rebuilds are gated on this fixture
+becoming green.
+
+
+
+
 ## Configuration / Environment Variables
 
 All configuration via `.env` file:

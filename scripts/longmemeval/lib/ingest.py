@@ -35,13 +35,19 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Derive from this file's location so the default manifest path is a real Windows
-# path. A hardcoded "/c/Users/..." (Git Bash style) is misread by Windows Python's
-# open() as drive-root-relative -> writes land in C:\c\Users\... (the manifest the
-# progress tracker then can't find).
-BENCH_DIR = str(Path(__file__).resolve().parents[1])
-if BENCH_DIR not in sys.path:
-    sys.path.insert(0, BENCH_DIR)
+# Derive real Windows paths from <repo>/scripts/longmemeval/lib/ingest.py.
+# parents[3] is the repository root; the old parents[1] value silently placed the
+# standalone default manifest under scripts/longmemeval instead of results/lme-ingest.
+# Environment-provided manifest and fixture paths remain explicit overrides.
+BENCH_ROOT = Path(__file__).resolve().parents[3]
+if str(BENCH_ROOT) not in sys.path:
+    sys.path.insert(0, str(BENCH_ROOT))
+
+DEFAULT_MANIFEST = os.getenv(
+    "LME_MANIFEST_PATH",
+    str(BENCH_ROOT / "results" / "lme-ingest" / "manifest.json"),
+)
+
 
 import httpx  # noqa: E402
 from archolith_bench.harness.longmemeval import LongMemEvalMemoryAdapter  # noqa: E402
@@ -212,19 +218,55 @@ def _retry_failed(ns: str, admin: httpx.Client, menhir_url: str) -> int:
     return requeued
 
 
-def main() -> int:
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=500)
     ap.add_argument("--menhir-url", default="http://localhost:8102")
-    ap.add_argument("--manifest", default=f"{BENCH_DIR}/results/lme-ingest/manifest.json")
+    ap.add_argument("--manifest", default=DEFAULT_MANIFEST)
+    ap.add_argument(
+        "--fixture",
+        default=os.getenv("LME_FIXTURE_PATH"),
+        help="offline LongMemEval JSON array; defaults to LME_FIXTURE_PATH when set",
+    )
+    ap.add_argument(
+        "--namespace-prefix",
+        default=os.getenv("LME_NS_PREFIX", "lme-"),
+        help="namespace prefix for ingested items (default: LME_NS_PREFIX or lme-)",
+    )
     ap.add_argument("--drain-timeout", type=float, default=1800.0,
                     help="max seconds to wait for an item's enrichment to settle")
-    args = ap.parse_args()
+    return ap.parse_args(argv)
+
+def _load_items(
+    adapter: LongMemEvalMemoryAdapter,
+    *,
+    limit: int,
+    fixture_path: str | None,
+) -> list[dict]:
+    items = adapter.load_items(limit=limit, fixture_path=fixture_path)
+    if fixture_path and not items:
+        raise ValueError(f"LongMemEval fixture is empty: {fixture_path}")
+    return items
+
+
+def _namespace(question_id: str, prefix: str) -> str:
+    clean_prefix = prefix.strip()
+    if not clean_prefix:
+        raise ValueError("namespace prefix must not be empty")
+    return f"{clean_prefix}{question_id}"
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(argv)
 
     adapter = LongMemEvalMemoryAdapter()
-    import os
-    print(f"loading LongMemEval items (limit={args.limit}, variant={os.getenv('LONGMEMEVAL_VARIANT','s')})...", flush=True)
-    items = adapter.load_items(limit=args.limit)
+    source = (
+        f"fixture={args.fixture}"
+        if args.fixture
+        else f"variant={os.getenv('LONGMEMEVAL_VARIANT', 's')}"
+    )
+    print(f"loading LongMemEval items (limit={args.limit}, {source})...", flush=True)
+    items = _load_items(adapter, limit=args.limit, fixture_path=args.fixture)
     print(f"loaded {len(items)} items", flush=True)
 
     manifest_path = Path(args.manifest)
@@ -244,7 +286,7 @@ def main() -> int:
 
     for n, item in enumerate(remaining):
         qid = str(item.get("question_id") or f"lme-{n}")
-        ns = f"lme-{qid}"
+        ns = _namespace(qid, args.namespace_prefix)
         # Item not in manifest -> may be partially ingested from a prior crash; reset clean.
         try:
             client.reset(ns)
@@ -281,6 +323,7 @@ def main() -> int:
 
         manifest.append({
             "question_id": qid, "namespace": ns,
+            "fixture": str(Path(args.fixture).resolve()) if args.fixture else None,
             "question": adapter.question(item), "answer": str(item.get("answer", "")),
             "question_type": item.get("question_type"), "turns": turns,
             "episodes": drained.get("total"), "ready": drained.get("ready"),

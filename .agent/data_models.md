@@ -2,6 +2,16 @@
 
 No database. All state is in-memory dataclasses, JSON files on disk, and checkpoint files.
 
+## Persistent LongMemEval Regression Fixture
+
+`fixtures/longmemeval/menhir_suburbs_extraction_regression.json` is a one-item LongMemEval-compatible
+JSON array. In addition to the standard `question_id`, `question_type`, `question`, `answer`,
+`haystack_sessions`, `haystack_dates`, and `haystack_session_ids` fields, the item carries
+`fixture_expectations`: the isolated namespace, current subject/object/fact matchers, stale object,
+minimum turn count, and required Menhir commit. The persistent ingester records the resolved fixture
+path in each manifest row.
+
+
 ## Bootstrap Hygiene Models (`bootstrap_hygiene/`)
 
 `BootstrapFixture` contains explicit workspace keys, memory records, and an off-topic query. Each `BootstrapRecord` may be recent semantic memory, structural noise, a retention pin with `general`/`workspace:<key>` scope, or a stale-advisory sentinel. `BootstrapHygieneRunner` emits hard gate booleans plus report-only negative-query and input-token metrics in both deterministic offline and guarded live black-box modes.

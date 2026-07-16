@@ -1,5 +1,17 @@
 # archolith-bench Changelog
 
+## 2026-07-16 — Isolated LME fixture for combined extraction
+
+Added a one-item Rachel/Chicago/suburbs regression fixture and a fresh-graph runner that isolates
+Neo4j container, volume, ports, manifest, and results. The persistent ingester now accepts offline
+fixture JSON and explicit namespace prefixes, resolves its default manifest from the repository
+root, and records fixture provenance. Graph verification requires the combined-extraction Menhir
+commit, a current Rachel-to-suburb edge, retirement of Chicago, and target-episode presence.
+The first isolated live run is RED: the exact long utterance retained the suburb proposition but
+bound it to Chicago, created no suburb entity, and left one Chicago edge current. It also exposed a
+stale trust-contract assumption: `source="user"` is denied without turn evidence and produces an
+admission-verdict entity. Full-corpus rebuilds are now gated on this fixture becoming green.
+
 ## 2026-07-13 — Menhir bootstrap hygiene acceptance gate
 
 Added `archolith-bench menhir bootstrap-hygiene --offline` with a deterministic two-workspace fixture and hard gates for structural/recent leakage, recent and pin isolation, pin recall, and stale-advisory preservation. Live mode uses public Menhir HTTP surfaces, refuses production-looking targets, requires reset confirmation, and tears down its throwaway namespaces. Off-topic returned-count/false-positive and bootstrap token volume remain diagnostic rather than ranking-change gates.

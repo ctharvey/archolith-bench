@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -56,6 +57,25 @@ from archolith_bench.harness.menhir_client import HttpMenhirClient  # noqa: E402
 # Throwaway lme Neo4j (must match _lme_build_db.sh).
 NEO4J_CONTAINER = os.getenv("LME_NEO4J_CONTAINER", "menhir-lme-neo4j")
 NEO4J_PW = os.getenv("LME_NEO4J_PW", "lmedata123")
+
+# Sentence splitting — long multi-topic messages bury factual claims in geographic
+# noise, causing Graphiti's node resolution to collapse distinct entities (e.g.
+# "the suburbs" into "Chicago").  Splitting isolates each claim so extraction
+# sees one topic per episode.
+_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
+_SPLIT_MIN_LENGTH = int(os.getenv("LME_SPLIT_MIN_LENGTH", "100"))
+
+
+def _split_sentences(text: str, min_length: int = _SPLIT_MIN_LENGTH) -> list[str]:
+    """Split *text* on sentence boundaries when it exceeds *min_length* chars.
+
+    Returns a list of non-empty stripped strings.  Short texts return as a
+    single-element list so the caller can always iterate.
+    """
+    if len(text) <= min_length:
+        return [text]
+    parts = _SENTENCE_BOUNDARY.split(text)
+    return [p.strip() for p in parts if p.strip()]
 
 
 def _parse_lme_date(date_str: str | None) -> str | None:
@@ -335,12 +355,14 @@ def main(argv: list[str] | None = None) -> int:
             for turn in session:
                 content = turn.get("content", "")
                 if content:
-                    _ingest_turn(
-                        client, ns, turn.get("role", "user"), content,
-                        occurred_at=occurred_at,
-                        session_id=session_id,
-                    )
-                    turns += 1
+                    role = turn.get("role", "user")
+                    for sentence in _split_sentences(content):
+                        _ingest_turn(
+                            client, ns, role, sentence,
+                            occurred_at=occurred_at,
+                            session_id=session_id,
+                        )
+                        turns += 1
 
         # DRAIN: wait for this item's enrichment to fully settle before recording it as done,
         # so "manifest done" == "fully enriched" (recall A/B then sees a complete graph).

@@ -8,6 +8,7 @@ from archolith_bench.harness.memory_ab import (
     VALUE_RECALL_V3_AUTHORITATIVE,
     VALUE_RECALL_V3_COARSE,
     VALUE_RECALL_V4_ADVISORY,
+    VALUE_RECALL_V5_DERIVED,
     _snippet_has_stale,
     run_memory_ab,
 )
@@ -393,3 +394,118 @@ def test_advisory_arm_does_not_suppress_untyped_backfill() -> None:
     ctx = result.arms[VALUE_RECALL_V4_ADVISORY].results[0].recalled
     assert "37 coins in their collection" in ctx  # untyped backfill left intact
     assert "38 coins" in ctx  # typed current candidate present
+
+
+# --- v5 derivation ("assumptions") layer -------------------------------------------
+
+def _derived(graph: SupersededValueGraph, query: str) -> str:
+    return "\n".join(graph.derived_recall(query, limit=6))
+
+
+def test_derived_increment_by_one_from_added_a_new() -> None:
+    # 69fee5aa shape: a stated anchor (37) + "added a new coin" -> 38, never stated literally.
+    graph = SupersededValueGraph.from_sessions(
+        "t",
+        _sessions("I have 37 coins in my collection.", "I just added a new coin to my collection."),
+        grouping="coarse",
+    )
+    out = _derived(graph, "How many coins do I have now?")
+    assert "[typed-value count derived]" in out
+    assert "~38" in out
+    assert "37 coins" in out  # stated anchor retained (advisory base, nothing deleted)
+
+
+def test_derived_increment_by_n_more() -> None:
+    graph = SupersededValueGraph.from_sessions(
+        "t",
+        _sessions("I own 10 books.", "I bought 3 more books at the shop."),
+        grouping="coarse",
+    )
+    out = _derived(graph, "How many books do I have?")
+    assert "~13" in out  # single +3 event; the "3 books" in the delta is not a second anchor
+
+
+def test_derived_decrement_from_sold() -> None:
+    graph = SupersededValueGraph.from_sessions(
+        "t",
+        _sessions("I have 38 coins.", "I sold 5 coins last week."),
+        grouping="coarse",
+    )
+    out = _derived(graph, "How many coins do I have?")
+    assert "~33" in out
+
+
+def test_derived_requires_an_anchor() -> None:
+    # Delta with no stated absolute -> nothing to fold onto.
+    graph = SupersededValueGraph.from_sessions(
+        "t", _sessions("I added a new coin to my collection."), grouping="coarse"
+    )
+    assert "derived" not in _derived(graph, "How many coins do I have?")
+
+
+def test_derived_skips_ambiguous_two_anchors() -> None:
+    graph = SupersededValueGraph.from_sessions(
+        "t",
+        _sessions("I have 37 coins.", "I have 50 coins in total now.", "I added a new coin."),
+        grouping="coarse",
+    )
+    # Two distinct stated anchors (37, 50) in one cluster -> ambiguous base -> no derived hint.
+    assert "derived" not in _derived(graph, "How many coins do I have?")
+
+
+def test_derived_skips_when_result_is_already_stated() -> None:
+    graph = SupersededValueGraph.from_sessions(
+        "t",
+        _sessions("I have 37 coins.", "I added a new coin.", "Now I have 38 coins."),
+        grouping="coarse",
+    )
+    # 38 is stated, so the fold is redundant; v4 advisory already surfaces 38.
+    assert "derived" not in _derived(graph, "How many coins do I have?")
+
+
+def test_derived_only_when_noun_is_asked_about() -> None:
+    graph = SupersededValueGraph.from_sessions(
+        "t",
+        _sessions("I have 37 coins.", "I added a new coin."),
+        grouping="coarse",
+    )
+    # Question about an unrelated noun -> no derived coin hint.
+    assert "derived" not in _derived(graph, "How many books do I own?")
+
+
+def test_v5_arm_emits_derived_hint_and_keeps_backfill() -> None:
+    class _DeltaAdapter(_ValueAdapter):
+        def load_items(self, subset, limit, fixture_path):  # noqa: ANN001
+            return [
+                {
+                    "question_id": "v5-1",
+                    "answer": "38",
+                    "question_type": "knowledge-update",
+                    "question": "How many coins do I have now?",
+                    "sessions": _sessions(
+                        "I have 37 coins in my collection.",
+                        "I just added a new coin to my collection.",
+                    ),
+                }
+            ]
+
+    class _CoinClient(_StaleBlindClient):
+        def recall(self, group_id: str, query: str, limit: int = 10) -> list[str]:
+            return ["The user collects coins as a hobby."]  # untyped, no number
+
+    def _derive_send(client, base_url, api_key, messages, model, **kwargs):  # noqa: ANN001
+        context = messages[-1]["content"]
+        return ("38" if "~38" in context else "unknown"), 1.0, {"prompt_tokens": 10, "completion_tokens": 1}
+
+    result = run_memory_ab(
+        _DeltaAdapter(),
+        arms=(VALUE_RECALL_V5_DERIVED,),
+        client=_CoinClient(),
+        send_fn=_derive_send,
+        recall_limit=6,
+    )
+    arm = result.arms[VALUE_RECALL_V5_DERIVED]
+    ctx = arm.results[0].recalled
+    assert "[typed-value count derived]" in ctx and "~38" in ctx
+    assert "collects coins as a hobby" in ctx  # untyped backfill intact
+    assert arm.score == 1.0

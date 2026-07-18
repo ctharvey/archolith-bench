@@ -66,7 +66,14 @@ VALUE_RECALL_V3_AUTHORITATIVE = "menhir_value_recall_v3_authoritative"
 # "candidate"), and hard-drop ONLY an author-rejected value. The answer LLM makes the final
 # pick. Determinism is reserved for author-stated corrections; everything else is a hint.
 VALUE_RECALL_V4_ADVISORY = "menhir_value_recall_v4_advisory"
-DEFAULT_MEMORY_ARMS = (NO_MEMORY, SINGLE_RECALL)  # v2/v3/v4 arms intentionally excluded
+# v5 derivation / "assumptions" arm (EXPERIMENTAL; opt-in only). Advisory base (v4) plus a
+# deterministic delta fold: when a single stated count anchor and signed increment/decrement
+# events resolve to an integer-consistent value that is never stated literally (69fee5aa:
+# "37 coins" + "added a new coin" -> 38), surface it as a labeled DERIVED hint. Never
+# authoritative, never deletes a stated value; gated hard toward silence to avoid confident-
+# wrong arithmetic. See value_nodes_v2.SupersededValueGraph.derived_recall.
+VALUE_RECALL_V5_DERIVED = "menhir_value_recall_v5_derived"
+DEFAULT_MEMORY_ARMS = (NO_MEMORY, SINGLE_RECALL)  # v2/v3/v4/v5 arms intentionally excluded
 
 _PLANNER_SYSTEM = (
     "You turn a user's question into focused memory-search queries. The memory system is a "
@@ -264,6 +271,33 @@ def _value_augmented_recall_v4(
     return "\n".join(merged)
 
 
+def _value_augmented_recall_v5(
+    adapter: "MemoryQAAdapter",
+    item: dict,
+    recalled: list[str],
+    question: str,
+    recall_limit: int,
+    task_id: str,
+) -> str:
+    """v5 derivation: v4 advisory typed context plus a deterministic delta-fold derived hint,
+    then untyped backfill. Same merge/cap contract as v1-v4; untyped recall left intact."""
+    graph = SupersededValueGraph.from_item(
+        f"value5-{task_id}", item, adapter.sessions(item), grouping="coarse"
+    )
+    value_limit = min(4, max(1, recall_limit // 3))
+    value_snippets = graph.derived_recall(question, limit=value_limit)
+    merged: list[str] = []
+    seen: set[str] = set()
+    for snippet in [*value_snippets, *recalled]:
+        if snippet in seen:
+            continue
+        seen.add(snippet)
+        merged.append(snippet)
+        if len(merged) >= recall_limit:
+            break
+    return "\n".join(merged)
+
+
 def _value_context_for_arm(
     arm: str,
     adapter: "MemoryQAAdapter",
@@ -294,6 +328,10 @@ def _value_context_for_arm(
         )
     if arm == VALUE_RECALL_V4_ADVISORY:
         return _value_augmented_recall_v4(
+            adapter, item, recalled, question, recall_limit, task_id
+        )
+    if arm == VALUE_RECALL_V5_DERIVED:
+        return _value_augmented_recall_v5(
             adapter, item, recalled, question, recall_limit, task_id
         )
     return "\n".join(recalled)

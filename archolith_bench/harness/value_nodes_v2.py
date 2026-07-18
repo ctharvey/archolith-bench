@@ -112,6 +112,62 @@ _ALIAS: dict[str, str] = {
 }
 
 
+# --- v5 delta lexicon (deterministic increment/decrement events; question/answer-blind) ---
+# Each pattern requires an explicit quantity (digit, number word, or a/an/another) so vague
+# statements ("added some coins") never produce a delta. The counted noun is singularized and
+# matched to a COUNT cluster's entity noun; unmatched deltas are dropped (no guess).
+_NUM = r"\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve"
+# +1 article form ONLY ("added a new coin"). Bare "got N nouns" is deliberately NOT an
+# increment - it is ambiguous with stating a new absolute ("I got 25 titles" = the list is now
+# 25, not +25), which produced a confident-wrong fold on 4d6b87c8. Explicit multi-unit
+# increments must say "more/additional/extra" and are matched by _DELTA_MORE.
+_DELTA_ADD = re.compile(
+    r"\b(?:added|acquired|purchased|bought|picked up|got)\s+(?:a|an|another|one)\s+"
+    r"(?:new\s+|extra\s+|other\s+)?(?P<noun>[a-z]+)",
+    re.IGNORECASE,
+)
+_DELTA_MORE = re.compile(
+    rf"\b(?P<n>{_NUM})\s+(?:more|additional|extra)\s+(?P<noun>[a-z]+)", re.IGNORECASE
+)
+_DELTA_SUB = re.compile(
+    rf"\b(?:sold|lost|gave away|got rid of|donated|removed)\s+(?P<n>{_NUM}|a|an|one)\s+(?P<noun>[a-z]+)",
+    re.IGNORECASE,
+)
+# Numbers appearing in a temporal reference ("pre-1920", "since 2019") are years, not counts;
+# v1 sometimes extracts them as a count of the following noun. Exclude them from anchors.
+def _is_temporal_ref(fact: str, value: int) -> bool:
+    return bool(
+        re.search(
+            rf"(?:pre-?|post-?|since\s+|before\s+|after\s+|in\s+|circa\s+){value}\b",
+            fact,
+            re.IGNORECASE,
+        )
+    )
+
+
+def _delta_int(token: str) -> int | None:
+    """Parse a delta magnitude from a digit, number word, or singular article."""
+    t = token.lower().strip()
+    if t.isdigit():
+        return int(t)
+    if t in {"a", "an", "another"}:
+        return 1
+    if t in _ONES:
+        return _ONES[t]
+    if t in _TENS:
+        return _TENS[t]
+    return None
+
+
+@dataclass(frozen=True)
+class _DeltaEvent:
+    magnitude: int  # signed: + increment, - decrement
+    noun: str       # singularized + aliased counted noun (cluster match key)
+    session_index: int
+    turn_index: int
+    phrase: str     # evidence text for the advisory hint
+
+
 @dataclass(frozen=True)
 class _V2Meta:
     cluster_key: tuple
@@ -148,6 +204,9 @@ class SupersededValueGraph(ValueGraph):
     def __init__(self, namespace: str, *, grouping: str = "lexical") -> None:
         super().__init__(namespace)
         self._meta: dict[str, _V2Meta] = {}
+        self._deltas: list[_DeltaEvent] = []  # v5 increment/decrement events
+        self._delta_origin: set[str] = set()  # count edges whose value is a delta magnitude
+        self._pending_delta_spans: list[tuple[int, int]] = []
         # "lexical": entity/attribute/scope/kind key (v2).
         # "coarse": drop the fragmenting context tokens, cluster by
         # (attribute, kind, unit, entity-noun) only. Near-oracle for single-attribute
@@ -198,6 +257,43 @@ class SupersededValueGraph(ValueGraph):
         cluster_key = self._cluster_key(sentence, kind, unit)
         present, past = self._correction_signal(sentence, span)
         self._meta[edge.edge_id] = _V2Meta(cluster_key, present, past, edge.ordinal)
+        # A count value whose span sits inside a delta phrase ("3 more cards") is the delta
+        # magnitude, not an independent anchor; record it so _derived_hints excludes it.
+        if kind is ValueKind.COUNT and any(
+            span[0] < end and span[1] > start for start, end in self._pending_delta_spans
+        ):
+            self._delta_origin.add(edge.edge_id)
+
+    def _add_sentence(self, sentence: str, *, session_index: int, turn_index: int) -> None:  # type: ignore[override]
+        # Capture delta events first so their spans are known while v1 extraction runs: a count
+        # value that lies inside a delta phrase ("3 more cards") is the delta magnitude, not a
+        # standalone anchor, and must be excluded from the anchor set in _add_assertion.
+        self._pending_delta_spans = self._scan_deltas(sentence, session_index, turn_index)
+        super()._add_sentence(sentence, session_index=session_index, turn_index=turn_index)
+        self._pending_delta_spans = []
+
+    def _scan_deltas(
+        self, sentence: str, session_index: int, turn_index: int
+    ) -> list[tuple[int, int]]:
+        # Verb-anchored patterns first so the bare "N more <noun>" pattern cannot double-count
+        # the same span ("bought 3 more cards" is one +3 event, not +3 twice).
+        occupied: list[tuple[int, int]] = []
+        # (pattern, sign, has_explicit_n). _DELTA_ADD is the +1 article form (no "n" group).
+        for pattern, sign, has_n in ((_DELTA_ADD, 1, False), (_DELTA_SUB, -1, True), (_DELTA_MORE, 1, True)):
+            for match in pattern.finditer(sentence):
+                span = match.span()
+                if any(span[0] < end and span[1] > start for start, end in occupied):
+                    continue
+                magnitude = _delta_int(match.group("n")) if has_n else 1
+                if not magnitude:
+                    continue
+                occupied.append(span)
+                noun = _singular(match.group("noun").lower())
+                noun = _ALIAS.get(noun, noun)
+                self._deltas.append(
+                    _DeltaEvent(sign * magnitude, noun, session_index, turn_index, match.group(0).strip())
+                )
+        return occupied
 
     def _cluster_key(self, sentence: str, kind: ValueKind, unit: str | None) -> tuple:
         words = _words(sentence)
@@ -449,3 +545,100 @@ class SupersededValueGraph(ValueGraph):
         value = self.values[edge.target_node_id]
         tag = f"{value.kind.value} {label}" if label else value.kind.value
         return f"[typed-value {tag}] {edge.fact}"
+
+    # --- v5 derivation ("assumptions") layer -----------------------------------------
+    # Targets the miss class no selection mechanism reaches, because the answer is never
+    # stated literally (69fee5aa: "37 coins" + "added a new coin" -> 38). The typed layer
+    # DERIVES the value by folding signed deltas onto a single stated anchor and surfaces it
+    # as an explicitly-labeled ADVISORY hint (never authoritative; the v4 base is unchanged
+    # and no stated value is deleted). Gated hard toward silence: the catastrophic failure is
+    # a confident-wrong derived number, so a hint fires only for an unambiguous, integer-
+    # consistent, query-relevant fold.
+
+    def derived_recall(self, query: str, limit: int = 4) -> list[str]:
+        """v4 advisory base + at most one derived count hint per relevant cluster, prepended
+        within the same total top-k. Falls back to plain advisory when nothing derives."""
+        base = self.advisory_recall(query, limit)
+        hints = self._derived_hints(query)
+        if not hints:
+            return base
+        merged: list[str] = []
+        seen: set[str] = set()
+        for snippet in [*hints, *base]:
+            if snippet in seen:
+                continue
+            seen.add(snippet)
+            merged.append(snippet)
+            if len(merged) >= limit:
+                break
+        return merged
+
+    def _derived_hints(self, query: str) -> list[str]:
+        """Derive count values by folding signed deltas onto a single stated anchor.
+
+        Emits a hint for a COUNT cluster only when ALL hold: the counted noun is asked about
+        (query-relevant); exactly one distinct integer anchor exists; >=1 delta with the same
+        counted noun occurs at-or-after the anchor; the fold is integer-consistent, non-negative,
+        and differs from every stated value (else it is redundant). Otherwise emit nothing.
+        """
+        if not self._deltas:
+            return []
+        low_query = query.lower()
+        # Aggregate valid COUNT anchors per counted noun ACROSS ALL clusters. The anchor gate is
+        # global on purpose: if a noun has more than one distinct stated count anywhere (e.g. an
+        # incidental "my other two bikes" alongside "three bikes" and "four bikes"), its count is
+        # ambiguous and no fold is trustworthy - derive nothing. Over-merging distinct attributes
+        # here only causes MORE silence, never a wrong derivation. Temporal-reference years and
+        # delta-magnitude counts are excluded from anchors.
+        anchor_values: dict[str, set[int]] = {}
+        stated: dict[str, set[int]] = {}
+        anchor_key: dict[str, tuple[int, int]] = {}
+        for edge in self.edges:
+            meta = self._meta.get(edge.edge_id)
+            if meta is None:
+                continue
+            value = self.values[edge.target_node_id]
+            if value.kind is not ValueKind.COUNT:
+                continue
+            noun = meta.cluster_key[3] if len(meta.cluster_key) >= 4 else ""
+            if not noun:
+                continue
+            normalized = value.normalized
+            if isinstance(normalized, list):
+                stated.setdefault(noun, set()).update(
+                    x for x in normalized if isinstance(x, int) and not isinstance(x, bool)
+                )
+                continue
+            if not isinstance(normalized, int) or isinstance(normalized, bool):
+                continue
+            if edge.edge_id in self._delta_origin or _is_temporal_ref(edge.fact, normalized):
+                continue
+            anchor_values.setdefault(noun, set()).add(normalized)
+            stated.setdefault(noun, set()).add(normalized)
+            key = (edge.session_index, edge.turn_index)
+            if noun not in anchor_key or key < anchor_key[noun]:
+                anchor_key[noun] = key
+        hints: list[str] = []
+        for noun, values in anchor_values.items():
+            if noun not in low_query:
+                continue  # relevance gate: only surface a hint the question asks about
+            if len(values) != 1:
+                continue  # globally ambiguous stated count -> silence
+            anchor_value = next(iter(values))
+            deltas = [
+                d for d in self._deltas
+                if d.noun == noun and (d.session_index, d.turn_index) >= anchor_key[noun]
+            ]
+            if not deltas:
+                continue
+            total = sum(d.magnitude for d in deltas)
+            derived = anchor_value + total
+            if total == 0 or derived < 0 or derived in stated.get(noun, set()):
+                continue  # no-op, impossible, or redundant with a stated value
+            evidence = "; ".join(d.phrase for d in deltas[:2])
+            sign = f"+{total}" if total > 0 else str(total)
+            hints.append(
+                f"[typed-value count derived] {noun}: ~{derived} "
+                f"(stated {anchor_value} {sign}: {evidence})"
+            )
+        return hints

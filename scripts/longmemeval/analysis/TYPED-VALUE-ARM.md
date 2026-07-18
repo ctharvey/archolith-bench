@@ -232,3 +232,43 @@ exactly the v2/v3 finding. The robust, always-available lever is the advisory/ca
 never regresses and hands the disambiguation to the strong answer model. A paid answer-level run
 is NOT yet justified (predicted ~= v1); the offline result is the deliverable. Not wired into any
 default config; opt-in via `--arms menhir_value_recall_v4_advisory`.
+
+## v5 derivation / "assumptions" layer (OFFLINE prototype - advise a derived value; 2026-07-18)
+
+Targets the residual miss class no *selection* mechanism can reach because the answer is never
+stated literally: `69fee5aa` (coins owned, gold 38) = "37 coins" + "added a new coin". Arm
+`menhir_value_recall_v5_derived` (`SupersededValueGraph.derived_recall`, grouping="coarse"):
+the v4 advisory base plus a deterministic **delta fold** that surfaces one labeled
+`[typed-value count derived] coin: ~38 (stated 37 +1: added a new coin)` hint - ADVISORY only,
+never authoritative, never deleting a stated value (the v4 base is unchanged). Plan:
+`.agent/plans/archolith-bench-typed-value-derivation-arm-plan.md`.
+
+Scoped to ONE primitive (delta fold); comparative / relation-direction / filtered-count are
+explicit follow-ons. Gated hard toward silence (the catastrophic failure for a derivation layer
+is a confident-wrong number): a hint fires only when the counted noun is asked about; the noun
+has exactly ONE distinct stated count across the whole item (a global anchor gate); >=1 signed
+delta with the same noun occurs at-or-after the anchor; and the fold is integer-consistent,
+non-negative, and not already a stated value. Delta magnitudes and temporal-reference years
+("pre-1920") are excluded from anchors; bare "got N nouns" is NOT a delta (ambiguous with a new
+absolute - it caused a confident-wrong ~45 on `4d6b87c8` in an early cut and was removed).
+
+**Offline result (deterministic, no paid calls; all pre-registered gates pass):**
+- **Fire rate 1/78.** Only `69fee5aa` derives -> `~38` (correct). All 3 offline acceptance gates
+  pass: (1) `69fee5aa` -> 38; (2) zero derived hints on the 6 abstention fixtures; (3) zero
+  derived hints on any of the 53 v1-correct items.
+- The **bike items** (`89941a93`/`89941a94`, "compositional count", gold 4 stated directly) are
+  the key negative check: an early per-cluster gate let a stray "my other two bikes" anchor fold
+  to a wrong ~3; the **global** single-anchor gate correctly refuses to derive when a noun has
+  multiple stated counts ({2,3,4}). The arm stays silent rather than guess - this is the
+  anti-benchmax property, not a tuned win.
+
+**Not benchmax (explicit):** the arm contains ZERO fixture-specific constants (no "coin", no
+37/38, no item IDs); every gate is a general linguistic/extraction rule, and the unit tests
+exercise the fold on non-fixture inputs (books, decrements, other numbers). The delta-fold is a
+real, general memory capability (inventory/collection counts). **But with a 1/78 fire rate the
+benchmark cannot measure its impact - a single-item delta is noise - so NO paid run is run and NO
+accuracy claim is made.** The deliverable is: a general, provably-*safe*-on-this-fixture
+derivation primitive (1 correct fire, 0 misfires across 77 items incl. all abstention and bike
+traps), plus the honest finding that this KU subset barely exercises derivation. Real validation
+needs a fixture with many delta-fold cases or production traffic. Not wired into any default
+config; opt-in via `--arms menhir_value_recall_v5_derived`.

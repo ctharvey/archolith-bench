@@ -272,3 +272,46 @@ derivation primitive (1 correct fire, 0 misfires across 77 items incl. all abste
 traps), plus the honest finding that this KU subset barely exercises derivation. Real validation
 needs a fixture with many delta-fold cases or production traffic. Not wired into any default
 config; opt-in via `--arms menhir_value_recall_v5_derived`.
+
+## Oracle entity-grouping probe (TERMINAL sidecar experiment; 2026-07-18)
+
+The four sidecar variants (v2-v5) all hit the same wall from different angles: lexical/coarse
+grouping fragments (v2) or over-merges (v3) or never fires its deterministic tier (v4/v5). To
+isolate whether the blocker is truly **entity resolution** (vs attribute resolution or reasoning),
+a read-only probe regrouped the typed assertions of the 8 residual-miss cases by a **hand-labeled
+oracle (entity, attribute)** - bypassing lexical grouping entirely - and re-ran the REAL selection
+(`_current_edge_ids`) and delta fold (`_derived_hints`). Offline, deterministic, no graph/cost.
+Script: `scripts/longmemeval/analysis/oracle_entity_grouping_probe.py`.
+
+| Item | Gold | Oracle-grouped outcome | Blocker class |
+|------|------|------------------------|---------------|
+| `dfde3500` | Wednesday | **FIXED** (Juan vs Maria separated) | entity resolution |
+| `b6019101` | 5 | **FIXED** (MCU vs all films) | scope resolution |
+| `59524333` | 6:00pm | **FIXED** (gym vs meeting time + recency) | entity resolution |
+| `f9e8c073` | five | **FIXED** (recency in clean cluster) | (grouping ok; recency) |
+| `dad224aa` | 7:30 | **FIXED** (7:30 supersedes 8:30) | (grouping ok; recency) |
+| `69fee5aa` | 38 | **FIXED** (delta 37+1 after year-noise excluded) | entity resolution + delta |
+| `71315a70` | 10-12h | **NOT ENTITY** (gold is the *earlier* mention) | reasoning: mention-order != truth |
+| `e66b632c` | 27:45 | **NOT ENTITY** (asks for *previous* PB; both values present) | reasoning: previous-value question |
+
+**Result: 6/8 recovered by perfect entity/scope grouping; 2/8 are not entity problems at all.**
+- The 6 wins confirm the meta-conclusion mechanically: when assertions are grouped by resolved
+  entity (and scope), supersession selection and delta derivation DO recover the gold value. The
+  blocker for these was entity/scope resolution, not the selection logic - which already works.
+- The 2 residual are reasoning, not attribute/entity resolution: `71315a70` needs to know the
+  earlier value is authoritative (mention order is not truth order), and `e66b632c` explicitly
+  asks for the *previous* (superseded) value, so any current-selection is wrong by construction.
+  Both are exactly what the **v4 advisory** path already handles correctly - show both candidates
+  and let the answer model reason - so they need NO new deterministic mechanism.
+
+### Sidecar research: CLOSED
+
+**Typed scalar representation is validated; lexical sidecar authority and lexical entity grouping
+are rejected after four independent variants (v2 fragmentation, v3 over-merge/authority regression,
+v4 zero-fire deterministic tier, v5 1/78 fire).** The oracle probe shows the remaining gains are
+gated on real entity/scope resolution, which a lexical sidecar structurally cannot provide.
+**Further progress requires integration with Menhir's entity and View layers**, not more sidecar
+tuning. Design principle carried forward for the View: **authoritative selection when the value is
+entity-resolved AND the question wants the current value; advisory (show candidates) when the
+question needs reasoning (previous-value, ambiguous recency, comparison).** Arithmetic/filtered-
+count/coreference remain separate primitives (reducer/aggregation/coref), out of scope for selection.

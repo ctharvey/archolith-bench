@@ -37,11 +37,15 @@ from .checkpoint import MemoryCheckpoint, checkpoint_path_for
 from .memory_ab import (
     DEFAULT_MEMORY_ARMS,
     NO_MEMORY,
+    VALUE_RECALL,
+    VALUE_RECALL_V2_CURRENT,
+    VALUE_RECALL_V2_HISTORY,
     MemoryQAAdapter,
     MenhirClient,
     assert_not_production,
     run_memory_ab,
 )
+from .value_nodes_v2 import SupersededValueGraph
 from .menhir_client import (
     HttpMenhirClient,
     Phase3MenhirClient,
@@ -149,6 +153,10 @@ __all__ = [
     "write_phase3_evidence",
     "checkpoint_path_for",
     "NO_MEMORY",
+    "VALUE_RECALL",
+    "VALUE_RECALL_V2_CURRENT",
+    "VALUE_RECALL_V2_HISTORY",
+    "SupersededValueGraph",
     "StubMenhirClient",
     "StubPhase3Client",
     "SweBenchAdapter",

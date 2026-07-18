@@ -30,6 +30,8 @@ from ..core.api import API_KEY, MODEL, PROXY_URL, send_chat
 from ..core.metrics import PricingModel, compute_arm_cost
 from .base import ABResult, ArmResult, TaskResult, _compute_deltas, _pick_pricing, _usage_tokens
 from .menhir_client import HttpMenhirClient
+from .value_nodes import ValueGraph
+from .value_nodes_v2 import SupersededValueGraph
 
 # Arms: a no-memory floor vs memory-recall arms.
 NO_MEMORY = "no_memory"
@@ -40,7 +42,15 @@ SINGLE_RECALL = "menhir_recall"
 # multi-entity question yields a blended embedding that often retrieves one event
 # but not the other; per-entity queries retrieve both.
 AGENTIC_RECALL = "menhir_agentic_recall"
-DEFAULT_MEMORY_ARMS = (NO_MEMORY, SINGLE_RECALL)
+VALUE_RECALL = "menhir_value_recall"
+# Supersession-aware value arms (v2). EXPERIMENTAL - REJECTED (2026-07-18): did not beat
+# v1 (0/5 targeted misses recovered); kept only as documented negative evidence and never
+# included in DEFAULT_MEMORY_ARMS or any default config. Opt-in only via explicit --arms.
+# Pre-registered as two separate arms so the current-only vs current+history emission choice
+# was reported across all items, not selected post-hoc. See value_nodes_v2.SupersededValueGraph.
+VALUE_RECALL_V2_CURRENT = "menhir_value_recall_v2_current"
+VALUE_RECALL_V2_HISTORY = "menhir_value_recall_v2_history"
+DEFAULT_MEMORY_ARMS = (NO_MEMORY, SINGLE_RECALL)  # v2 arms intentionally excluded
 
 _PLANNER_SYSTEM = (
     "You turn a user's question into focused memory-search queries. The memory system is a "
@@ -104,6 +114,90 @@ def _agentic_recall(client: "MenhirClient", group_id: str, subqueries: list[str]
                 if len(merged) >= recall_limit:
                     return "\n".join(merged)
     return "\n".join(merged)
+
+
+def _value_augmented_recall(
+    adapter: "MemoryQAAdapter",
+    item: dict,
+    recalled: list[str],
+    question: str,
+    recall_limit: int,
+    task_id: str,
+) -> str:
+    """Combine typed value assertions with ordinary recall at equal total top-k.
+
+    The sidecar graph is built from user haystack turns only. Value snippets are
+    placed first and ordinary recall backfills the remaining slots. The final
+    context never exceeds recall_limit snippets.
+    """
+    graph = ValueGraph.from_item(f"value-{task_id}", item, adapter.sessions(item))
+    value_limit = min(4, max(1, recall_limit // 3))
+    value_snippets = graph.recall(question, limit=value_limit)
+    merged: list[str] = []
+    seen: set[str] = set()
+    for snippet in [*value_snippets, *recalled]:
+        if snippet in seen:
+            continue
+        seen.add(snippet)
+        merged.append(snippet)
+        if len(merged) >= recall_limit:
+            break
+    return "\n".join(merged)
+
+
+def _value_augmented_recall_v2(
+    adapter: "MemoryQAAdapter",
+    item: dict,
+    recalled: list[str],
+    question: str,
+    recall_limit: int,
+    task_id: str,
+    *,
+    emit_history: bool,
+) -> str:
+    """v2 value augmentation: supersession-aware CURRENT selection, same total top-k.
+
+    Identical merge/cap contract as ``_value_augmented_recall`` (value snippets first,
+    ordinary recall backfills, never exceeding recall_limit). The only difference is the
+    sidecar graph type (SupersededValueGraph) and the ``emit_history`` emission mode.
+    """
+    graph = SupersededValueGraph.from_item(f"value2-{task_id}", item, adapter.sessions(item))
+    value_limit = min(4, max(1, recall_limit // 3))
+    value_snippets = graph.recall(question, limit=value_limit, emit_history=emit_history)
+    merged: list[str] = []
+    seen: set[str] = set()
+    for snippet in [*value_snippets, *recalled]:
+        if snippet in seen:
+            continue
+        seen.add(snippet)
+        merged.append(snippet)
+        if len(merged) >= recall_limit:
+            break
+    return "\n".join(merged)
+
+
+def _value_context_for_arm(
+    arm: str,
+    adapter: "MemoryQAAdapter",
+    item: dict,
+    recalled: list[str],
+    question: str,
+    recall_limit: int,
+    task_id: str,
+) -> str:
+    """Dispatch the memory context for value/plain arms (shared by both recall paths)."""
+    if arm == VALUE_RECALL:
+        return _value_augmented_recall(adapter, item, recalled, question, recall_limit, task_id)
+    if arm == VALUE_RECALL_V2_CURRENT:
+        return _value_augmented_recall_v2(
+            adapter, item, recalled, question, recall_limit, task_id, emit_history=False
+        )
+    if arm == VALUE_RECALL_V2_HISTORY:
+        return _value_augmented_recall_v2(
+            adapter, item, recalled, question, recall_limit, task_id, emit_history=True
+        )
+    return "\n".join(recalled)
+
 
 _PROD_MARKERS = ("prod", "production", "menhir.", "staging.", "preprod", "preview", "release")
 
@@ -195,7 +289,9 @@ def _run_memory_arm(
             # recall in place. No new_group, no mutation -> needs no --confirm-menhir-reset.
             group_id = namespace_template.format(question_id=item.get("question_id") or task_id)
             recalled = client.recall(group_id, question, limit=recall_limit)
-            memory_context = "\n".join(recalled)
+            memory_context = _value_context_for_arm(
+                arm, adapter, item, recalled, question, recall_limit, task_id
+            )
         else:
             group_id = client.new_group()
             try:
@@ -210,7 +306,9 @@ def _run_memory_arm(
                     memory_context = _agentic_recall(client, group_id, subqueries, recall_limit)
                 else:
                     recalled = client.recall(group_id, question, limit=recall_limit)
-                    memory_context = "\n".join(recalled)
+                    memory_context = _value_context_for_arm(
+                        arm, adapter, item, recalled, question, recall_limit, task_id
+                    )
             finally:
                 if reset_memory:
                     _reset_memory_group(

@@ -50,7 +50,15 @@ VALUE_RECALL = "menhir_value_recall"
 # was reported across all items, not selected post-hoc. See value_nodes_v2.SupersededValueGraph.
 VALUE_RECALL_V2_CURRENT = "menhir_value_recall_v2_current"
 VALUE_RECALL_V2_HISTORY = "menhir_value_recall_v2_history"
-DEFAULT_MEMORY_ARMS = (NO_MEMORY, SINGLE_RECALL)  # v2 arms intentionally excluded
+# v3 authoritative-composition experiment (EXPERIMENTAL; opt-in only). Simulates what an
+# authoritative typed View would do during recall composition, in the bench:
+#   _v3_coarse        = coarse (near-oracle) grouping + current-only typed snippets. Isolates
+#                       the grouping ceiling (if clustering were perfect, does supersession help?).
+#   _v3_authoritative = coarse grouping + current-only + SUPPRESS untyped Menhir snippets that
+#                       carry a superseded value (the full "typed value is authoritative" test).
+VALUE_RECALL_V3_COARSE = "menhir_value_recall_v3_coarse"
+VALUE_RECALL_V3_AUTHORITATIVE = "menhir_value_recall_v3_authoritative"
+DEFAULT_MEMORY_ARMS = (NO_MEMORY, SINGLE_RECALL)  # v2/v3 arms intentionally excluded
 
 _PLANNER_SYSTEM = (
     "You turn a user's question into focused memory-search queries. The memory system is a "
@@ -176,6 +184,49 @@ def _value_augmented_recall_v2(
     return "\n".join(merged)
 
 
+def _snippet_has_stale(snippet: str, stale: set[str]) -> bool:
+    """True if the untyped snippet contains a superseded value token (word-bounded)."""
+    low = snippet.lower()
+    for value in stale:
+        if value and re.search(rf"(?<!\w){re.escape(value)}(?!\w)", low):
+            return True
+    return False
+
+
+def _value_augmented_recall_v3(
+    adapter: "MemoryQAAdapter",
+    item: dict,
+    recalled: list[str],
+    question: str,
+    recall_limit: int,
+    task_id: str,
+    *,
+    suppress: bool,
+) -> str:
+    """v3 authoritative composition: coarse (near-oracle) grouping, current-only typed
+    snippets, and (when ``suppress``) drop untyped Menhir snippets that reintroduce a
+    superseded value. Same total top-k cap as v1/v2."""
+    graph = SupersededValueGraph.from_item(
+        f"value3-{task_id}", item, adapter.sessions(item), grouping="coarse"
+    )
+    value_limit = min(4, max(1, recall_limit // 3))
+    value_snippets = graph.recall(question, limit=value_limit, emit_history=False)
+    backfill = recalled
+    if suppress:
+        stale = graph.stale_value_strings(question)
+        backfill = [s for s in recalled if not _snippet_has_stale(s, stale)]
+    merged: list[str] = []
+    seen: set[str] = set()
+    for snippet in [*value_snippets, *backfill]:
+        if snippet in seen:
+            continue
+        seen.add(snippet)
+        merged.append(snippet)
+        if len(merged) >= recall_limit:
+            break
+    return "\n".join(merged)
+
+
 def _value_context_for_arm(
     arm: str,
     adapter: "MemoryQAAdapter",
@@ -195,6 +246,14 @@ def _value_context_for_arm(
     if arm == VALUE_RECALL_V2_HISTORY:
         return _value_augmented_recall_v2(
             adapter, item, recalled, question, recall_limit, task_id, emit_history=True
+        )
+    if arm == VALUE_RECALL_V3_COARSE:
+        return _value_augmented_recall_v3(
+            adapter, item, recalled, question, recall_limit, task_id, suppress=False
+        )
+    if arm == VALUE_RECALL_V3_AUTHORITATIVE:
+        return _value_augmented_recall_v3(
+            adapter, item, recalled, question, recall_limit, task_id, suppress=True
         )
     return "\n".join(recalled)
 

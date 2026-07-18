@@ -145,9 +145,35 @@ def _content_tokens(text: str) -> list[str]:
 class SupersededValueGraph(ValueGraph):
     """v1 extraction + supersession-aware CURRENT selection (bench-only, frozen arm)."""
 
-    def __init__(self, namespace: str) -> None:
+    def __init__(self, namespace: str, *, grouping: str = "lexical") -> None:
         super().__init__(namespace)
         self._meta: dict[str, _V2Meta] = {}
+        # "lexical": entity/attribute/scope/kind key (v2).
+        # "coarse": drop the fragmenting context tokens, cluster by
+        # (attribute, kind, unit, entity-noun) only. Near-oracle for single-attribute
+        # knowledge-update items; used by the v3 authoritative-composition experiment
+        # to isolate the ceiling from lexical clustering quality.
+        self.grouping = grouping
+
+    @classmethod
+    def from_sessions(cls, namespace, sessions, *, grouping: str = "lexical"):  # type: ignore[override]
+        graph = cls(namespace, grouping=grouping)
+        for session_index, session in enumerate(sessions):
+            graph._add_session(session, session_index=session_index)
+        return graph
+
+    @classmethod
+    def from_item(cls, namespace, item, sessions, *, grouping: str = "lexical"):  # type: ignore[override]
+        graph = cls(namespace, grouping=grouping)
+        session_list = list(sessions)
+        dates = list(item.get("haystack_dates") or [])
+        order = sorted(
+            range(len(session_list)),
+            key=lambda index: (dates[index] if index < len(dates) else "", index),
+        )
+        for session_index in order:
+            graph._add_session(session_list[session_index], session_index=session_index)
+        return graph
 
     def _add_assertion(  # type: ignore[override]
         self,
@@ -176,17 +202,46 @@ class SupersededValueGraph(ValueGraph):
     def _cluster_key(self, sentence: str, kind: ValueKind, unit: str | None) -> tuple:
         words = _words(sentence)
         attribute = self._attribute(words)
+        entity_unit = _singular((unit or "").lower())
+        if entity_unit in {"usd", "local_time", "weekday"}:
+            entity_unit = ""
+        entity_unit = _ALIAS.get(entity_unit, entity_unit)
+        unit_bucket = self._unit_bucket(kind, unit)
+        if self.grouping == "coarse":
+            # Ignore fragmenting context tokens: cluster by attribute + kind + unit +
+            # entity noun only (near-oracle for single-attribute KU items).
+            return (attribute, kind.value, unit_bucket, entity_unit)
         toks = [
             _ALIAS.get(t, t)
             for t in _content_tokens(sentence)
             if t not in _DROP_STRUCTURAL and t not in _NOISE and t not in _ATTR_VERBS
         ]
-        entity_unit = _singular((unit or "").lower())
-        if entity_unit and entity_unit not in {"usd", "local_time", "weekday"}:
-            toks.append(_ALIAS.get(entity_unit, entity_unit))
+        if entity_unit:
+            toks.append(entity_unit)
         scope = frozenset(toks)
-        unit_bucket = self._unit_bucket(kind, unit)
         return (attribute, scope, kind.value, unit_bucket)
+
+    def stale_value_strings(self, query: str) -> set[str]:
+        """Display strings of NON-current values for clusters whose kind the question
+        asks about. Used by v3 authoritative composition to suppress untyped recall
+        snippets that reintroduce a superseded value."""
+        kinds = _query_kind_boosts(query)
+        current_ids, _ = self._current_edge_ids()
+        current_disp = {
+            self.values[e.target_node_id].display.lower()
+            for e in self.edges if e.edge_id in current_ids
+        }
+        stale: set[str] = set()
+        for edge in self.edges:
+            if edge.edge_id in current_ids:
+                continue
+            value = self.values[edge.target_node_id]
+            if kinds and value.kind not in kinds:
+                continue
+            disp = value.display.lower()
+            if disp and disp not in current_disp:
+                stale.add(disp)
+        return stale
 
     @staticmethod
     def _attribute(words: list[str]) -> str:

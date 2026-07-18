@@ -149,3 +149,43 @@ value) and should carry two claim forms - **absolute** (`collection_size = 37`) 
 (`collection_size += 1`) - so it can derive 38 while preserving both supporting episodes.
 The narrowed production question: can Menhir derive entity-linked scalar state from episodes
 and make that state authoritative during recall?
+
+## v3 authoritative-composition result (MIXED - mechanism works, net-negative as-is; 2026-07-18)
+
+Bench simulation of an authoritative typed View: coarse (near-oracle, within-item) grouping
+to fix v2's clustering fragmentation, then `_v3_coarse` (current-only typed) and
+`_v3_authoritative` (current-only + suppress untyped snippets carrying a superseded value).
+Artifacts: `results/lme-ku-buildout/value-arm-v3-verify-20260718/`.
+
+| Arm | Overall | 29-loss | Other 49 | Abstention (6) | 5 targets |
+|-----|---------|---------|----------|----------------|-----------|
+| menhir_recall | 0.359 | 0/29 | 28/49 | 5/6 | 0/5 |
+| menhir_value_recall (v1, additive) | **0.705** | 22/29 | 33/49 | 5/6 | 1/5 |
+| v3_coarse (grouping only) | 0.641 | 22/29 | 28/49 | 4/6 | 3/5 |
+| v3_authoritative (grouping + suppression) | 0.679 | 23/29 | 30/49 | 5/6 | 4/5 |
+
+(Same-run paired baseline; v1 ran 0.705 here vs 0.679 prior = answer/judge variance.)
+
+**The mechanism is validated but nets negative as an unconditional rule:**
+- v3 recovers the targeted misses: v3_coarse 3/5, v3_authoritative **4/5** supersession/competition
+  targets (`b6019101`, `dad224aa`, `f9e8c073`, `59524333`) that additive v1 missed.
+- The suppression lever is net-positive: v3_authoritative (0.679) > v3_coarse (0.641) - suppressing
+  stale untyped snippets helped (also won `852ce960`, a money item).
+- But coarse GROUPING over-merges distinct series, and authoritative single-pick then selects the
+  WRONG current value and suppresses the right one. v3_authoritative: +4 wins, **-6 real regressions**
+  (all v1-correct this run): `71315a70` (5-6h picked over gold 10-12h), `dfde3500` (Thursday/Maria
+  over gold Wednesday/Juan), `e66b632c` (26:30 over gold 27:45), `89941a93`/`89941a94` (bike
+  count/compose), `945e3d21`.
+
+**Key lesson: authoritativeness is double-edged.** Additive v1 is robust because it shows multiple
+candidates and lets the answer model choose; authoritative composition removes that safety net, so a
+wrong current-pick is *worse* than additive (`71315a70` is the poster child: v1 showed 5-6h AND 10-12h
+-> model answered 10-12; v3 showed only 5-6h -> model answered 5-6). `69fee5aa` (arithmetic) and the
+bike-count items remain unreachable - selection can't derive unstated values.
+
+**Refined design principle (next iteration): confidence-gated authoritativeness.** Collapse to a single
+current value + suppress competitors ONLY when the View is confident (clean cluster, unambiguous recency
+or explicit correction marker); otherwise fall back to additive candidate display. That keeps the 4 wins
+while avoiding the 6 wrong-pick regressions. This is the same confidence-tiering the derivation
+(assumptions/delta) layer needs. Arithmetic/filtered-count/coreference remain out of scope for any
+selection mechanism and require reducer/aggregation/coref primitives.

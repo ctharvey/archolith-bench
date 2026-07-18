@@ -5,6 +5,9 @@ from __future__ import annotations
 from archolith_bench.harness.memory_ab import (
     VALUE_RECALL_V2_CURRENT,
     VALUE_RECALL_V2_HISTORY,
+    VALUE_RECALL_V3_AUTHORITATIVE,
+    VALUE_RECALL_V3_COARSE,
+    _snippet_has_stale,
     run_memory_ab,
 )
 from archolith_bench.harness.value_nodes_v2 import SupersededValueGraph
@@ -244,3 +247,68 @@ def test_v2_history_arm_includes_prior_value() -> None:
     arm = result.arms[VALUE_RECALL_V2_HISTORY]
     assert arm.score == 1.0
     assert "[typed-value count was]" in arm.results[0].recalled
+
+
+# --- v3 coarse grouping + authoritative composition --------------------------------
+
+def test_coarse_grouping_merges_across_noisy_context() -> None:
+    # Long multi-clause turns that lexical grouping fragments should still merge under
+    # coarse grouping (attribute+kind+unit+entity only).
+    graph = SupersededValueGraph.from_sessions(
+        "t",
+        _sessions(
+            "I've been waking up around 8:30 am on Saturdays, which gives me time for coffee.",
+            "Considering my jog, I now like to wake up at 7:30 am on Saturdays before breakfast.",
+        ),
+        grouping="coarse",
+    )
+    assert _current_values(graph) == ["07:30"]
+
+
+def test_stale_value_strings_targets_question_kind() -> None:
+    graph = SupersededValueGraph.from_sessions(
+        "t",
+        _sessions("I have 37 coins.", "I now have 38 coins."),
+        grouping="coarse",
+    )
+    stale = graph.stale_value_strings("How many coins do I have now?")
+    assert "37 coins" in stale
+    assert "38 coins" not in stale
+
+
+def test_snippet_has_stale_is_word_bounded() -> None:
+    assert _snippet_has_stale("User mentioned 37 coins earlier.", {"37 coins"})
+    # substring-of-a-number must not spuriously match
+    assert not _snippet_has_stale("A 1937 nickel is valuable.", {"37"})
+
+
+def test_v3_authoritative_suppresses_stale_untyped_snippet() -> None:
+    class _StaleUntypedAdapter(_ValueAdapter):
+        def load_items(self, subset, limit, fixture_path):  # noqa: ANN001
+            return [
+                {
+                    "question_id": "v3-1",
+                    "answer": "38",
+                    "question_type": "knowledge-update",
+                    "question": "How many coins do I have now?",
+                    "sessions": _sessions("I have 37 coins.", "I now have 38 coins."),
+                }
+            ]
+
+    class _StaleUntypedClient(_StaleBlindClient):
+        def recall(self, group_id: str, query: str, limit: int = 10) -> list[str]:
+            return ["The user has 37 coins in their collection."]  # stale untyped mention
+
+    result = run_memory_ab(
+        _StaleUntypedAdapter(),
+        arms=(VALUE_RECALL_V3_COARSE, VALUE_RECALL_V3_AUTHORITATIVE),
+        client=_StaleUntypedClient(),
+        send_fn=_send_fn,
+        recall_limit=6,
+    )
+    coarse_ctx = result.arms[VALUE_RECALL_V3_COARSE].results[0].recalled
+    auth_ctx = result.arms[VALUE_RECALL_V3_AUTHORITATIVE].results[0].recalled
+    # coarse keeps the stale untyped snippet; authoritative suppresses it.
+    assert "37 coins in their collection" in coarse_ctx
+    assert "37 coins in their collection" not in auth_ctx
+    assert "38 coins" in auth_ctx

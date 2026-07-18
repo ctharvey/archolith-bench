@@ -189,3 +189,46 @@ or explicit correction marker); otherwise fall back to additive candidate displa
 while avoiding the 6 wrong-pick regressions. This is the same confidence-tiering the derivation
 (assumptions/delta) layer needs. Arithmetic/filtered-count/coreference remain out of scope for any
 selection mechanism and require reducer/aggregation/coref primitives.
+
+## v4 advisory composition (OFFLINE prototype - advise, don't delete; 2026-07-18)
+
+Direct implementation of the confidence-gated principle, resolved toward its safe extreme:
+instead of *deciding* (collapse + suppress), the typed layer *advises* and the answer model
+decides. Arm `menhir_value_recall_v4_advisory` (`SupersededValueGraph.advisory_recall`,
+grouping="coarse"): additive candidate set (reuses v1 ranking, so answer-support >= v1 - it
+can never drop the correct value), each multi-value cluster annotated, and the answer LLM makes
+the final pick. Rationale from the v3 evidence: **every v3 regression came from DELETING the
+correct candidate**, not from a bad label - so the fix is to stop deleting.
+
+Confidence tiers (deterministic):
+- **Delete + assert `current`** only for an unambiguous BINARY supersession: an explicit
+  author rejection (`used to` / `no longer` / `previously` / `..., not <value>`) AND exactly one
+  distinct value surviving to replace it. A bare present marker (`now`) is NOT enough (regex is
+  noisy on multi-clause turns; `now` does not identify which sibling went stale - this drove the
+  v3 wrong-`current` picks). Over-merged clusters (>1 surviving value, e.g. dfde3500's
+  Juan/Wednesday merged with Maria/Thursday) fail the second condition and delete nothing.
+- **`candidate` (advise only)** for every other multi-value cluster: alternatives for the same
+  slot, no deletion, no unearned recency claim. The untyped Menhir backfill is left fully intact
+  (unlike v3, advisory never suppresses untyped recall).
+
+Offline validation (deterministic, no paid calls; `tests/test_value_nodes_v2.py`, real-fixture
+probe over all 78 items):
+- The three v3 deletion-regressions are structurally fixed - advisory RETAINS the correct value
+  with zero mislabels: `71315a70` keeps 10-12h (all candidate), `dfde3500` keeps Wednesday (all
+  candidate), `e66b632c` keeps its context (all candidate; the "previous"-value question is left
+  to the model). `dad224aa` retains 7:30.
+- **Corpus footprint (key finding): the clean-binary-supersession tier fires 0 times across all
+  78 items - zero deletions, zero `current` labels.** 33 items get `candidate` annotations; the
+  rest are single-value/plain. On this fixture advisory therefore reduces to *additive v1 + a
+  candidate hint on 33 items, deleting nothing*, so its answer score is predicted ~= v1 (~0.70),
+  with a strictly safer profile (no wrong-pick regressions possible) but no deletion-based wins
+  (it does not reproduce v3's `b6019101`/`59524333`/`852ce960` suppression wins).
+
+**Meta-conclusion (consistent v2 -> v3 -> v4): clean deterministic supersession is essentially
+unreachable with lexical/coarse grouping on real multi-clause turns.** Coarse grouping over-merges
+referents (a second value always survives -> never "binary"); lexical grouping fragments (never
+merges). The deterministic tier needs the graph's real entity resolution, not sentence tokens -
+exactly the v2/v3 finding. The robust, always-available lever is the advisory/candidate path: it
+never regresses and hands the disambiguation to the strong answer model. A paid answer-level run
+is NOT yet justified (predicted ~= v1); the offline result is the deliverable. Not wired into any
+default config; opt-in via `--arms menhir_value_recall_v4_advisory`.

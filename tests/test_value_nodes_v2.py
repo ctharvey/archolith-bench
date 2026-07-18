@@ -7,6 +7,7 @@ from archolith_bench.harness.memory_ab import (
     VALUE_RECALL_V2_HISTORY,
     VALUE_RECALL_V3_AUTHORITATIVE,
     VALUE_RECALL_V3_COARSE,
+    VALUE_RECALL_V4_ADVISORY,
     _snippet_has_stale,
     run_memory_ab,
 )
@@ -312,3 +313,83 @@ def test_v3_authoritative_suppresses_stale_untyped_snippet() -> None:
     assert "37 coins in their collection" in coarse_ctx
     assert "37 coins in their collection" not in auth_ctx
     assert "38 coins" in auth_ctx
+
+
+# --- v4 advisory composition (annotate, don't delete) ------------------------------
+
+def test_advisory_marker_cluster_marks_current_and_drops_rejected() -> None:
+    # Explicit correction ("used to" on 37, "now" on 38): the author rejected 37, so it is
+    # the one deletion that cannot backfire. 38 is annotated current.
+    graph = SupersededValueGraph.from_sessions(
+        "t",
+        _sessions("I used to have 37 coins.", "I now have 38 coins."),
+        grouping="coarse",
+    )
+    joined = "\n".join(graph.advisory_recall("How many coins do I have now?", limit=4))
+    assert "[typed-value count current]" in joined
+    assert "38 coins" in joined
+    assert "37 coins" not in joined  # author-rejected -> dropped
+
+
+def test_advisory_keeps_all_candidates_when_no_correction_marker() -> None:
+    # 71315a70 shape: two durations for the same attribute, NO correction marker. Advisory
+    # must keep BOTH (never delete the correct one) and label them neutral candidates -
+    # latest-mention is not asserted as latest-truth without a marker.
+    graph = SupersededValueGraph.from_sessions(
+        "t",
+        _sessions(
+            "I've spent 5-6 hours on my abstract ocean sculpture.",
+            "I've spent 10-12 hours on my abstract ocean sculpture.",
+        ),
+        grouping="coarse",
+    )
+    joined = "\n".join(graph.advisory_recall("How many hours on my sculpture?", limit=4))
+    assert "5-6 hours" in joined
+    assert "10-12 hours" in joined  # correct answer never dropped
+    assert "[typed-value duration candidate]" in joined
+    assert "current" not in joined  # no unearned recency claim
+
+
+def test_advisory_keeps_distinct_referents_as_candidates() -> None:
+    # dfde3500 shape: two weekdays for two different people that coarse grouping merges.
+    # Advisory keeps both as candidates so the answer model can use the named referent.
+    graph = SupersededValueGraph.from_sessions(
+        "t",
+        _sessions(
+            "My language exchange class with Juan is on Wednesday evening.",
+            "I'm actually meeting Maria on Thursday.",
+        ),
+        grouping="coarse",
+    )
+    joined = "\n".join(graph.advisory_recall("What day do I meet Juan?", limit=4))
+    assert "Wednesday" in joined  # correct referent's value retained
+    assert "Thursday" in joined
+    assert joined.count("[typed-value weekday candidate]") == 2
+
+
+def test_advisory_single_value_cluster_has_no_role_label() -> None:
+    graph = SupersededValueGraph.from_sessions(
+        "t", _sessions("I have 42 coins."), grouping="coarse"
+    )
+    joined = "\n".join(graph.advisory_recall("How many coins?", limit=4))
+    assert "[typed-value count]" in joined
+    assert "candidate" not in joined and "current" not in joined
+
+
+def test_advisory_arm_does_not_suppress_untyped_backfill() -> None:
+    # Unlike v3_authoritative, advisory never removes untyped recall snippets - it only
+    # annotates the typed sidecar. The stale untyped mention survives; the model decides.
+    class _StaleUntypedClient(_StaleBlindClient):
+        def recall(self, group_id: str, query: str, limit: int = 10) -> list[str]:
+            return ["The user has 37 coins in their collection."]
+
+    result = run_memory_ab(
+        _ValueAdapter(),
+        arms=(VALUE_RECALL_V4_ADVISORY,),
+        client=_StaleUntypedClient(),
+        send_fn=_send_fn,
+        recall_limit=6,
+    )
+    ctx = result.arms[VALUE_RECALL_V4_ADVISORY].results[0].recalled
+    assert "37 coins in their collection" in ctx  # untyped backfill left intact
+    assert "38 coins" in ctx  # typed current candidate present

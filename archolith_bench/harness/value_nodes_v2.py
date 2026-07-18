@@ -347,3 +347,105 @@ class SupersededValueGraph(ValueGraph):
         value = self.values[edge.target_node_id]
         state = "current" if edge.current else "was"
         return f"[typed-value {value.kind.value} {state}] {edge.fact}"
+
+    # --- v4 advisory composition -----------------------------------------------------
+    # The v3 experiment showed authoritative single-pick + suppression nets negative:
+    # every regression came from DELETING the correct candidate (71315a70 wrong recency
+    # pick, dfde3500 over-merged referents, e66b632c previous-value question). The typed
+    # layer's recency signal was right; the act of deletion lost the answer. The advisory
+    # arm therefore ADVISES instead of decides: keep every candidate (additive, so it can
+    # never drop the right value), annotate each with its cluster role, and hard-suppress
+    # ONLY an author-rejected value (explicit correction marker on the cluster) - the one
+    # deletion that cannot backfire because the user themselves rejected it.
+
+    def _advisory_labels(self) -> tuple[dict[str, str], set[str]]:
+        """Per-edge advisory role labels and the set of author-rejected edge ids to drop.
+
+        Recency is asserted (and a value deleted) ONLY for an unambiguous BINARY supersession:
+        the author explicitly rejected a competing value (an explicit-past / ``not X`` marker -
+        ``used to``, ``no longer``, ``previously``, ``..., not <value>``) AND exactly one distinct
+        value survives to replace it. Two conditions, both required:
+          * A bare present marker (``now``, ``currently``) is NOT enough - the marker regex is
+            noisy on multi-clause turns and a present marker does not identify *which* sibling
+            went stale (this drove the v3 wrong-``current`` picks, e.g. 71315a70's 5-6h).
+          * If more than one distinct value survives, the (coarse) cluster is over-merged across
+            referents (dfde3500 merges Juan/Wednesday with Maria/Thursday); asserting a single
+            ``current`` there tags the wrong referent, so the whole cluster degrades to a
+            candidate list and nothing is deleted.
+        Labels, for clusters with >1 distinct display value:
+          * clean binary supersession -> replacement value(s) = ``current``, rejected = DROPPED;
+          * otherwise every member = ``candidate`` (the answer model disambiguates - no unearned
+            recency claim, no deletion).
+        Single-value clusters get no label (plain typed snippet).
+        """
+        by_id = {edge.edge_id: edge for edge in self.edges}
+        clusters: dict[tuple, list[str]] = {}
+        for edge in self.edges:
+            meta = self._meta.get(edge.edge_id)
+            if meta is None:
+                continue
+            clusters.setdefault(meta.cluster_key, []).append(edge.edge_id)
+        labels: dict[str, str] = {}
+        drop: set[str] = set()
+        for eids in clusters.values():
+            displays = {self.values[by_id[e].target_node_id].display for e in eids}
+            if len(displays) <= 1:
+                continue  # nothing to disambiguate
+            rejected = [e for e in eids if self._meta[e].past]
+            survivors = [e for e in eids if not self._meta[e].past]
+            survivor_values = {self.values[by_id[e].target_node_id].display for e in survivors}
+            # Clean binary supersession only: explicit rejection + a single surviving value.
+            # Anything else (no rejection, or multiple surviving values = over-merged cluster)
+            # degrades to a neutral candidate list with no deletion.
+            if rejected and len(survivor_values) == 1:
+                for e in rejected:
+                    labels[e] = "superseded"
+                    drop.add(e)
+                for e in survivors:
+                    labels[e] = "current"
+            else:
+                for e in eids:
+                    labels[e] = "candidate"
+        return labels, drop
+
+    def advisory_recall(self, query: str, limit: int = 4) -> list[str]:
+        """Additive v1-style ranking (never drops a candidate) with advisory role labels.
+
+        Reuses v1's exact ranking so answer-support is >= additive v1; the only additions
+        are (a) role annotations from ``_advisory_labels`` and (b) removal of author-rejected
+        values (explicit correction markers only). A small nudge floats a marker-confirmed
+        ``current`` above its ``earlier`` siblings without displacing unrelated snippets."""
+        if limit <= 0:
+            return []
+        labels, drop = self._advisory_labels()
+        query_tokens = _tokens(query)
+        kind_boosts = _query_kind_boosts(query)
+        ranked: list[tuple[float, object]] = []
+        for edge in self.edges:
+            if edge.edge_id in drop:
+                continue
+            subject = self.subjects[edge.source_node_id]
+            value = self.values[edge.target_node_id]
+            overlap = len(query_tokens & _tokens(f"{subject.text} {edge.fact}"))
+            score = float(overlap * 10)
+            score += 8 if value.kind in kind_boosts else 0
+            score += 2 if labels.get(edge.edge_id) == "current" else 0
+            score += edge.ordinal / 1_000_000
+            if score > 0:
+                ranked.append((score, edge))
+        ranked.sort(key=lambda item: item[0], reverse=True)
+        snippets: list[str] = []
+        seen_facts: set[str] = set()
+        for _, edge in ranked:
+            if edge.fact in seen_facts:
+                continue
+            seen_facts.add(edge.fact)
+            snippets.append(self._advisory_snippet(edge, labels.get(edge.edge_id)))
+            if len(snippets) >= limit:
+                break
+        return snippets
+
+    def _advisory_snippet(self, edge, label: str | None) -> str:
+        value = self.values[edge.target_node_id]
+        tag = f"{value.kind.value} {label}" if label else value.kind.value
+        return f"[typed-value {tag}] {edge.fact}"

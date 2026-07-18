@@ -58,7 +58,15 @@ VALUE_RECALL_V2_HISTORY = "menhir_value_recall_v2_history"
 #                       carry a superseded value (the full "typed value is authoritative" test).
 VALUE_RECALL_V3_COARSE = "menhir_value_recall_v3_coarse"
 VALUE_RECALL_V3_AUTHORITATIVE = "menhir_value_recall_v3_authoritative"
-DEFAULT_MEMORY_ARMS = (NO_MEMORY, SINGLE_RECALL)  # v2/v3 arms intentionally excluded
+# v4 advisory composition (EXPERIMENTAL; opt-in only). The v3 result showed authoritative
+# single-pick + suppression nets negative because every regression came from DELETING the
+# correct candidate. v4 instead ADVISES: coarse grouping to find the same candidate set, but
+# keep every candidate (additive, so answer-support >= v1), annotate each with its cluster
+# role (current/earlier/superseded when an explicit correction marker is present; otherwise
+# "candidate"), and hard-drop ONLY an author-rejected value. The answer LLM makes the final
+# pick. Determinism is reserved for author-stated corrections; everything else is a hint.
+VALUE_RECALL_V4_ADVISORY = "menhir_value_recall_v4_advisory"
+DEFAULT_MEMORY_ARMS = (NO_MEMORY, SINGLE_RECALL)  # v2/v3/v4 arms intentionally excluded
 
 _PLANNER_SYSTEM = (
     "You turn a user's question into focused memory-search queries. The memory system is a "
@@ -227,6 +235,35 @@ def _value_augmented_recall_v3(
     return "\n".join(merged)
 
 
+def _value_augmented_recall_v4(
+    adapter: "MemoryQAAdapter",
+    item: dict,
+    recalled: list[str],
+    question: str,
+    recall_limit: int,
+    task_id: str,
+) -> str:
+    """v4 advisory composition: coarse grouping to find the candidate set, then additive
+    (never drops a candidate) recall with per-cluster advisory role labels; only an
+    author-rejected value (explicit correction marker) is suppressed. The untyped Menhir
+    backfill is left intact - advisory never suppresses untyped recall. Same total top-k."""
+    graph = SupersededValueGraph.from_item(
+        f"value4-{task_id}", item, adapter.sessions(item), grouping="coarse"
+    )
+    value_limit = min(4, max(1, recall_limit // 3))
+    value_snippets = graph.advisory_recall(question, limit=value_limit)
+    merged: list[str] = []
+    seen: set[str] = set()
+    for snippet in [*value_snippets, *recalled]:
+        if snippet in seen:
+            continue
+        seen.add(snippet)
+        merged.append(snippet)
+        if len(merged) >= recall_limit:
+            break
+    return "\n".join(merged)
+
+
 def _value_context_for_arm(
     arm: str,
     adapter: "MemoryQAAdapter",
@@ -254,6 +291,10 @@ def _value_context_for_arm(
     if arm == VALUE_RECALL_V3_AUTHORITATIVE:
         return _value_augmented_recall_v3(
             adapter, item, recalled, question, recall_limit, task_id, suppress=True
+        )
+    if arm == VALUE_RECALL_V4_ADVISORY:
+        return _value_augmented_recall_v4(
+            adapter, item, recalled, question, recall_limit, task_id
         )
     return "\n".join(recalled)
 

@@ -1,0 +1,25 @@
+{
+  "baseline_version": "2026-07-19-v1-stub",
+  "baseline_commit": "UNCOMMITTED",
+  "stratified_slice_hash": "sha256:stub-replace-with-real-hash-after-first-run",
+  "graph_snapshot": "longmemeval-2026-07-19.dump",
+  "snapshot_hash": "sha256:stub-replace-with-real-hash",
+  "questions_per_type": 20,
+  "total_questions": 120,
+  "scoring_method": "llm_judge_gpt-4o-mini",
+  "results": {
+    "overall": 0.230,
+    "by_type": {
+      "single-session": 0.350,
+      "multi-session": 0.180,
+      "long-preference": 0.220,
+      "long-entity": 0.300,
+      "long-deduction": 0.150,
+      "long-counting": 0.180
+    },
+    "per_question": []
+  },
+  "promoted_at": "2026-07-19T00:00:00Z",
+  "promoted_by": "stub",
+  "notes": "STUB baseline — replace with real numbers from a verified run before using as a CI gate. Run `python -m archolith_bench.ci.promote_baseline` after the first successful stratified run to pin real numbers."
+}

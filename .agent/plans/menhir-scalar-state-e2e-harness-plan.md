@@ -179,6 +179,22 @@ Harness additions for this: `third_party_scalar_state_cases()` + `--scalar-fixtu
 (runner `SS_FIXTURE`); the inspector now emits the four-checkpoint bundle (processing state, linked
 non-View entities, MENTIONS direction, assertions, Views).
 
+### Bounded root-cause pass -> HANDED OFF (2026-07-20)
+
+Per-call MENTIONS capture (`scripts/diagnose_mentions_provenance.py`, `SS_DIAG=1` runner mode): ingested
+the three Alice statements one at a time and snapshotted after each. The Graphiti extraction payloads
+(server logs) pinpoint the FIRST incorrect boundary: **a lone `"Alice owns 37 coins."` persists ZERO
+entities** — the extractor emits a derived possessive entity (`Alice's coins`) + an edge sourced at
+`Alice` (absent from `extracted_entities`), graphiti_core resolves to zero nodes, and menhir logs
+`Zero-extraction (success)`. The subject only materializes when a LATER episode pulls prior episodes as
+context and re-extracts them attributed to the latest episode (bucket 4: context/provenance contract);
+plus a whole-batch `CombinedExtraction` ValidationError can zero an episode on one malformed edge. This
+is an INGESTION/PROVENANCE defect at the menhir<->Graphiti extraction boundary, NOT a Piece C reopen (the
+bind/fold/View machinery is proven). Full handoff (reproducer, per-call args, per-call graph state,
+earliest incorrect state, suspected owning functions, minimal regression, invariant):
+`menhir/.agent/for-review/HANDOFF-2026-07-20-scalar-state-mentions-provenance-defect.md`. Levers remain
+paused (no self entity, no perceiver tuning, no Phase D). Bench task complete — do not fix in Bench.
+
 ## Verification (this plan's own acceptance)
 
 - Offline: `pytest tests/test_menhir_scalar_state.py -q` green (stub-driven).

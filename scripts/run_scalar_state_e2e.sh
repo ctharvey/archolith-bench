@@ -109,22 +109,32 @@ log "starting throwaway menhir on ${MENHIR_URL} (scheduler ON, scalar flag ON, i
 ( cd "${MENHIR_MAIN}" && "${MENHIR_MAIN_BIN}" serve --port "${SS_PORT}" --host 127.0.0.1 ) & MENHIR_PID=$!
 for _ in $(seq 1 90); do curl -sf "${MENHIR_URL}/api/health" >/dev/null 2>&1 && break; sleep 2; done
 curl -sf "${MENHIR_URL}/api/health" >/dev/null 2>&1 || die "menhir not healthy"
-log "menhir healthy. running the scalar-state harness..."
+if [ "${SS_DIAG:-0}" = "1" ]; then
+  # Bounded provenance root-cause pass: per-call MENTIONS capture instead of the harness.
+  log "menhir healthy. running the MENTIONS provenance diagnostic..."
+  "${BENCH_PY}" "$(dirname "${BASH_SOURCE[0]}")/diagnose_mentions_provenance.py" \
+    --menhir-url "${MENHIR_URL}" \
+    --neo4j-uri "${BOLT_URI}" --neo4j-password "${SS_NEO4J_PW}" \
+    "${EXTRA_ARGS[@]}"
+  RC=$?
+else
+  log "menhir healthy. running the scalar-state harness..."
 
-# When --keep is set, also preserve the seeded namespace so the graph can be inspected over bolt.
-KEEP_NS_ARGS=()
-[ "${KEEP}" = "true" ] && KEEP_NS_ARGS=(--scalar-no-cleanup)
+  # When --keep is set, also preserve the seeded namespace so the graph can be inspected over bolt.
+  KEEP_NS_ARGS=()
+  [ "${KEEP}" = "true" ] && KEEP_NS_ARGS=(--scalar-no-cleanup)
 
-# ---- run the harness ----
-"${BENCH_PY}" -m archolith_bench.cli harness menhir-scalar-state \
-  --menhir-url "${MENHIR_URL}" \
-  --neo4j-uri "${BOLT_URI}" --neo4j-password "${SS_NEO4J_PW}" \
-  --scalar-max-wait-s "${SS_MAX_WAIT_S}" \
-  --scalar-fixture "${SS_FIXTURE}" \
-  --confirm-menhir-reset \
-  --format "${SS_FORMAT}" --out "${SS_OUT}" \
-  "${KEEP_NS_ARGS[@]}" "${EXTRA_ARGS[@]}"
-RC=$?
+  # ---- run the harness ----
+  "${BENCH_PY}" -m archolith_bench.cli harness menhir-scalar-state \
+    --menhir-url "${MENHIR_URL}" \
+    --neo4j-uri "${BOLT_URI}" --neo4j-password "${SS_NEO4J_PW}" \
+    --scalar-max-wait-s "${SS_MAX_WAIT_S}" \
+    --scalar-fixture "${SS_FIXTURE}" \
+    --confirm-menhir-reset \
+    --format "${SS_FORMAT}" --out "${SS_OUT}" \
+    "${KEEP_NS_ARGS[@]}" "${EXTRA_ARGS[@]}"
+  RC=$?
+fi
 
 log "done (harness rc=${RC}). evidence: ${SS_OUT}"
 exit ${RC}

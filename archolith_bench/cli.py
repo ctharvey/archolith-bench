@@ -1016,7 +1016,10 @@ def _run_scalar_state_harness(args: argparse.Namespace, adapter) -> None:  # noq
                   "pass --confirm-menhir-reset", file=sys.stderr)
             sys.exit(1)
         print(f"Harness: {adapter.name} — live scalar-state e2e against {args.menhir_url}")
-        menhir_key = os.getenv("MENHIR_AGENT_KEY") or os.getenv("MENHIR_API_KEY") or API_KEY
+        # A throwaway scalar-state menhir is keyless (or uses a real MENHIR_*_KEY). Do NOT fall back
+        # to API_KEY here: that is the upstream LLM proxy key (UPSTREAM_API_KEY), never a menhir
+        # bearer, so sending it makes a keyless throwaway reject the ingest with 401.
+        menhir_key = os.getenv("MENHIR_AGENT_KEY") or os.getenv("MENHIR_API_KEY") or ""
         print(f"  auth: {'bearer set' if menhir_key else 'no key (expects an auth-disabled instance)'}")
         print(f"  bolt: {args.neo4j_uri} (throwaway; refuses prod port 7687)")
         client = HttpMenhirClient(args.menhir_url, api_key=menhir_key)

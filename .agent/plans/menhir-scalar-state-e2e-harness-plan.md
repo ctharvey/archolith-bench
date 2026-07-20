@@ -195,9 +195,50 @@ earliest incorrect state, suspected owning functions, minimal regression, invari
 `menhir/.agent/for-review/HANDOFF-2026-07-20-scalar-state-mentions-provenance-defect.md`. Levers remain
 paused (no self entity, no perceiver tuning, no Phase D). Bench task complete — do not fix in Bench.
 
+### Post-fix verification re-run -> BOTH DEFECTS CONFIRMED FIXED (2026-07-20)
+
+The ingestion/provenance fix landed in another session on top of the handoff:
+`menhir` `bddf0fc` (close combined-extraction edge endpoints and detect collapse) +
+`7fe480c` (create extraction receipt in the parent task, before the wait_for boundary). Both present
+in the served tree (menhir HEAD `7fe480c`). The queued Bench re-run was executed against it:
+
+1. **`SS_DIAG=1` per-call provenance matrix (decisive invariant) -- CLEAN.** Ingesting the three Alice
+   statements one at a time now persists each subject on its OWN episode and does NOT cross-attribute:
+   - coins episode -> `Alice`, `Alice's coins`   (previously: ZERO entities -- "Zero-extraction success")
+   - books episode -> `Alice`, `12 books`         (no coins bleed-in)
+   - wake episode  -> `Alice`, `7:30 AM`          (no books/coins bleed-in)
+   `Alice` accumulates MENTIONS to all three episodes (she is named in all three) -- canonical-subject
+   behavior, NOT the old single-episode consolidation bug. clock_time View materialized with
+   `ss_value='07:30' ss_display='07:30'`; `view_value=0.0` confirmed the intended numeric mirror (authority
+   is `ss_value`/`ss_display`), not the defect.
+2. **Third-party fixture harness -- verdict PASS (rc=0).** `controls_clean=True`, `dup_keys=0`,
+   `dup_slots=0`, `non_agent_tiers=none`, `default_leak=0`. `Alice` binds as a real KG `:Entity` on all
+   three episodes; one clean typed assertion materialized (`Alice/wake_time/clock_time="07:30"`,
+   `binding_pending=false`, `projection_pending=false`). No correctness regressions.
+
+**New observations (report-only; levers stay paused -- NOT fixed in Bench):**
+- **Self-perception pollutes the test namespace.** The longer harness run (120s, 5s scheduler ticks)
+  materialized menhir's own config/admission scaffolding as `:Entity` nodes in the seeded ns
+  (`"menhir-config's api port: 8097"`, `"experience counter enabled: 1"`, `"structure watcher enabled: 1"`,
+  `"Admission granted: remote-api claimed user"`). The isolated per-call SS_DIAG namespace stayed clean.
+- **Partial coverage (1/3 assertions) looks budget-starved, not purely stochastic.** With
+  `MENHIR_MAX_LLM_CALLS_PER_JOB=20`, self-config perceptions compete for the per-job call budget; coins/books
+  did not emit typed assertions this run while the isolated SS_DIAG run got all three. Owner lever
+  (perceiver yield / self-config isolation), still paused.
+
+**Bench-side fixes made during verification (harness correctness, not menhir):**
+- `cli.py` scalar-state auth: dropped the `or API_KEY` fallback. `API_KEY` is the upstream LLM-proxy key
+  (`UPSTREAM_API_KEY`), never a menhir bearer; sending it made a keyless throwaway 401. The throwaway is
+  keyless (or uses a real `MENHIR_*_KEY`), so resolve from `MENHIR_AGENT_KEY`/`MENHIR_API_KEY` only.
+- **401 root cause on :8099 was a port collision, not menhir.** `com.docker.backend` (Docker Desktop's
+  port proxy) was squatting on host port 8099 and answering `/api/memory` with 401; the runner's fresh
+  menhir could not bind it. Clean-port runs (8097/8098) produced correct keyless `AuthMode.NONE` instances.
+  FOLLOW-UP (Bench): add a pre-flight "port free" check to `run_scalar_state_e2e.sh` for `SS_PORT` and the
+  Neo4j host ports so a squatter fails fast instead of silently redirecting the harness.
+
 ## Verification (this plan's own acceptance)
 
 - Offline: `pytest tests/test_menhir_scalar_state.py -q` green (stub-driven).
 - Live: one real run against throwaway :7688 + real LLM producing a PASS evidence artifact with >=1
   current `scalar_state` View in the seeded ns, tier=agent, zero default-silo Views, zero duplicate
-  current keys.
+  current keys. **DONE 2026-07-20** -- third-party fixture PASS + SS_DIAG provenance matrix clean (above).

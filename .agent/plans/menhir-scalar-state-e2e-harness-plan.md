@@ -90,6 +90,32 @@ control that must produce nothing. Keep prompts verbatim + hashed (`fixture_hash
 - Stochastic perception -> assert invariants, pin temp low-but->0; don't hard-assert exact values.
 - Piece D (recall authority) is out of scope.
 
+## Live run findings (2026-07-20)
+
+First live run (throwaway menhir :8098, fresh ephemeral Neo4j bolt :7691, gpt-4o-mini). Surfaced two
+LAUNCH-PROFILE blockers (both fixed in `scripts/run_scalar_state_e2e.sh`) and one Menhir BEHAVIORAL
+result:
+
+1. **Docker daemon must be up** (obvious, but the script fails fast if not).
+2. **Scheduler-lease collision (non-obvious, important).** The maintenance-scheduler lease is a
+   cross-process SQLite lease (`scheduler_lease.py`) in a SHARED telemetry DB
+   (`.agent/mcp_telemetry.db`, override `MENHIR_MCP_TELEMETRY_DB`), keyed by `lease_name`. The
+   operator's LIVE menhir (pid holding the lease) blocks a throwaway that shares the DB -> the
+   throwaway's scheduler never starts -> zero consolidation -> zero scalar Views. Fix: the script
+   exports a per-run `MENHIR_MCP_TELEMETRY_DB` so the throwaway gets its own empty lease table.
+3. **Behavioral result (open):** with the scheduler running, perception produced only **2 typed
+   assertions from 9 view-episodes, both `binding_pending` (unbound)** -> **0 committed Views**,
+   verdict FAIL. Controls/advisory cases behaved correctly. This is the entity-resolution wall the
+   sidecar research (`TYPED-VALUE-ARM.md`) predicted: typed scalars perceived but not bound to
+   resolved entities. Root cause not yet isolated (perception yield vs binding vs model). Needs a
+   `--keep` graph inspection + DEBUG perception logs; possibly a stronger extraction model than
+   gpt-4o-mini, and/or grounding that guarantees resolvable entities. NOT a harness defect -- the
+   harness correctly reported the negative result over bolt.
+
+Secondary (cosmetic): uvicorn access-log emits a `client_addr` KeyError under menhir's log format
+(noise, unrelated to scalar); the harness picks up a stray bearer key even against an auth-disabled
+server (harmless).
+
 ## Verification (this plan's own acceptance)
 
 - Offline: `pytest tests/test_menhir_scalar_state.py -q` green (stub-driven).

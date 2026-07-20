@@ -80,6 +80,13 @@ curl -sf "http://localhost:${SS_HTTP}" >/dev/null 2>&1 || die "Neo4j not ready"
 # ---- throwaway menhir: scheduler ON (benchmark mode OFF) + scalar flag ON ----
 EMPTY_ENV="$(mktemp)"; export ENV_FILE="${EMPTY_ENV}"
 export MENHIR_LOG_DIR="${LME_RESULTS_DIR}/scalar-e2e-logs"; mkdir -p "${MENHIR_LOG_DIR}"
+# ISOLATE the scheduler lease. The maintenance-scheduler lease is a cross-process SQLite lease
+# keyed by lease_name in a SHARED telemetry DB (default .agent/mcp_telemetry.db), so a throwaway
+# that shares it is BLOCKED by the operator's live menhir which already holds the lease -> the
+# scheduler never starts -> no consolidation -> no scalar Views. A per-run telemetry DB gives this
+# instance its own (empty) lease table so its scheduler acquires the lease and ticks.
+export MENHIR_MCP_TELEMETRY_DB="${MENHIR_LOG_DIR}/scalar-e2e-telemetry-$$.db"
+rm -f "${MENHIR_MCP_TELEMETRY_DB}" 2>/dev/null || true
 export MENHIR_API_HOST=127.0.0.1 MENHIR_API_PORT="${SS_PORT}"
 # THE difference from build_graph.sh: scheduler must run, and the scalar path must be enabled.
 export MENHIR_BENCHMARK_MODE=0

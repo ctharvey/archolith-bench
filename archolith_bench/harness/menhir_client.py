@@ -631,3 +631,126 @@ class StubPhase3Client:
 
     def _corrections_applied(self, namespace: str) -> int:
         return self._fold(namespace)[1]
+
+
+class StubScalarStateClient:
+    """Deterministic in-memory ScalarStateView backend -- a NETWORK-FREE stand-in for CI smoke.
+
+    Implements BOTH roles the `run_scalar_state` driver needs (ingest client + bolt reader) so the
+    whole harness -- driver, invariant validators, reporter -- runs without a live menhir, a real LLM,
+    or Neo4j. It models the HAPPY Piece C consumer: it recognizes the default fixture prompts, and on
+    read folds them into current `scalar_state` Views + a durable `:TypedAssertion` log (tier `agent`,
+    one current View per slot, correct namespace). The no-entity prompt becomes a pending `unbound:`
+    advisory; the non-scalar control produces nothing.
+
+    It is NOT a substitute for the live benchmark -- it cannot reveal real LLM perception defects,
+    binding races, or scheduler timing -- it exists so `--offline` smoke can guard the harness itself.
+    """
+
+    # prompt-substring -> (value_kind, value, ss_unit, subject_display, ss_attribute)
+    _RECOGNIZERS: list[tuple[str, str, Any, str | None, str, str]] = [
+        ("37 rare coins", "count", 37.0, None, "coins", "coin_count"),
+        ("$250", "money", 250.0, "USD", "headphones", "headphones_price"),
+        ("180 centimeters", "measurement", 180.0, "cm", "height", "height_measurement"),
+        ("45 minutes", "duration", 45.0, "min", "commute", "commute_duration"),
+        ("gym 3 times a week", "frequency", 3.0, "per_week", "gym", "gym_frequency"),
+        ("7:30", "clock_time", "07:30", None, "wake up", "wake_time"),
+        ("day off is wednesday", "weekday", "Wednesday", None, "day off", "day_off_weekday"),
+        ("car is red", "status", "red", None, "car", "car_status"),
+        ("finished reading dune", "boolean", True, None, "Dune", "dune_finished"),
+    ]
+    _ADVISORY_MARKER = "there are 12 of them"  # no uniquely-resolvable subject
+    _NONSCALAR_MARKER = "went for a walk"  # a one-off happening, not a current property
+
+    def __init__(self) -> None:
+        """Initialize empty per-namespace ingest state."""
+        self._episodes: dict[str, list[str]] = {}
+
+    # ---- ingest-client role ------------------------------------------------------------------
+
+    def new_group(self) -> str:
+        """Return a fresh isolated namespace id."""
+        return uuid.uuid4().hex
+
+    def record_turn_evidence(self, namespace: str, text: str, **_: Any) -> dict[str, Any]:
+        """Record a grounding turn (returns a fake turn_id the ingest can cite)."""
+        return {"turn_id": uuid.uuid4().hex, "created": True, "recorded_at": "stub"}
+
+    def ingest(self, group_id: str, role: str, content: str, **_: Any) -> None:
+        """Store the ingested episode body for later folding."""
+        if content:
+            self._episodes.setdefault(group_id, []).append(content)
+
+    def reset(self, group_id: str) -> None:
+        """Drop all state for the namespace."""
+        self._episodes.pop(group_id, None)
+
+    def close(self) -> None:
+        """No-op (in-memory)."""
+
+    # ---- bolt-reader role --------------------------------------------------------------------
+
+    def _recognize(self, namespace: str) -> list[dict[str, Any]]:
+        """Fold the ingested prompts into (kind, value, subject) recognitions for this namespace."""
+        out: list[dict[str, Any]] = []
+        for prompt in self._episodes.get(namespace, []):
+            p = prompt.lower()
+            for marker, kind, value, unit, subject, attribute in self._RECOGNIZERS:
+                if marker in p:
+                    out.append({
+                        "subject_uuid": f"stub-{attribute}",
+                        "subject_display": subject,
+                        "attribute": attribute,
+                        "value_kind": kind,
+                        "value": value,
+                        "ss_unit": unit,
+                    })
+                    break
+        return out
+
+    def read_typed_assertions(self, namespace: str) -> list[dict[str, Any]]:
+        """Current `:TypedAssertion` rows (perception tier is always `agent`) + the advisory row."""
+        rows: list[dict[str, Any]] = []
+        for r in self._recognize(namespace):
+            rows.append({
+                "subject_uuid": r["subject_uuid"],
+                "subject_display": r["subject_display"],
+                "attribute": r["attribute"],
+                "value_kind": r["value_kind"],
+                "value": r["value"],
+                "evidence_tier": "agent",
+                "binding_pending": False,
+                "source_key": f"stub:{r['attribute']}",
+            })
+        return rows
+
+    def read_scalar_state_views(self, namespace: str) -> list[dict[str, Any]]:
+        """Current materialized `scalar_state` Views -- one per recognized slot in this namespace."""
+        if namespace == "default":
+            return []  # the stub never leaks to the default silo
+        views: list[dict[str, Any]] = []
+        for r in self._recognize(namespace):
+            views.append({
+                "subject_uuid": r["subject_uuid"],
+                "ss_attribute": r["attribute"],
+                "ss_kind": r["value_kind"],
+                "ss_unit": r["ss_unit"],
+                "value": r["value"],
+                "group_id": namespace,
+                "view_key": f"{namespace}:{r['subject_uuid']}:{r['attribute']}",
+            })
+        return views
+
+    def read_pending_advisories(self, namespace: str) -> list[dict[str, Any]]:
+        """The no-entity prompt surfaces as a pending `unbound:` advisory."""
+        advisories: list[dict[str, Any]] = []
+        for prompt in self._episodes.get(namespace, []):
+            if self._ADVISORY_MARKER in prompt.lower():
+                advisories.append({
+                    "subject_display": "unbound:stub-advisory",
+                    "source_key": "stub:advisory",
+                    "attribute": "unknown_count",
+                    "value_kind": "count",
+                    "value": 12.0,
+                })
+        return advisories

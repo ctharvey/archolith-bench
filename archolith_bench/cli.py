@@ -269,6 +269,16 @@ def main(argv: list[str] | None = None) -> None:
                            help="Run offline against a bundled fixture JSON (no API calls)")
     harness_p.add_argument("--menhir-url", default=None,
                            help="Memory benchmarks: throwaway menhir base URL (refuses prod-looking targets)")
+    harness_p.add_argument("--neo4j-uri", default="bolt://localhost:7688",
+                           help="menhir-scalar-state: throwaway Neo4j bolt URI to verify shadow Views "
+                                "over (refuses prod port 7687; default bolt://localhost:7688)")
+    harness_p.add_argument("--neo4j-user", default="neo4j",
+                           help="menhir-scalar-state: throwaway Neo4j user (default neo4j)")
+    harness_p.add_argument("--neo4j-password", default="benchthrowaway",
+                           help="menhir-scalar-state: throwaway Neo4j password (default benchthrowaway)")
+    harness_p.add_argument("--scalar-max-wait-s", type=float, default=180.0,
+                           help="menhir-scalar-state: max seconds to wait for the background scheduler "
+                                "to materialize scalar_state Views (default 180)")
     harness_p.add_argument("--recall-limit", type=int, default=10,
                            help="Memory benchmarks: how many memory snippets to recall per question "
                                 "(default 10; raise for multi-fact temporal-reasoning questions)")
@@ -955,6 +965,129 @@ def _run_phase3_harness(args: argparse.Namespace, adapter) -> None:  # noqa: ANN
         sys.exit(1)
 
 
+def _run_scalar_state_harness(args: argparse.Namespace, adapter) -> None:  # noqa: ANN001
+    """Drive the Menhir ScalarStateView e2e benchmark (live, throwaway menhir + scalar scheduler ON).
+
+    Ingests known typed-scalar episodes over HTTP, waits for the BACKGROUND consolidation scheduler
+    to materialize `scalar_state` Views, and verifies invariants over bolt (shadow Views are not
+    recall-visible). Requires --menhir-url (throwaway, scheduler on) + --neo4j-uri (same throwaway
+    Neo4j) + --confirm-menhir-reset. See benchmarks/RUNBOOK-scalar-state-e2e.md for the launch profile.
+    """
+    from .harness import (
+        HttpMenhirClient,
+        ScalarBoltReader,
+        StubScalarStateClient,
+        assert_not_production,
+        run_scalar_state,
+        scalar_state_result_to_dict,
+        write_scalar_state_evidence,
+    )
+
+    # Offline smoke: --offline-fixture runs the FULL driver + invariants + report against a
+    # deterministic in-memory stub (both ingest client and bolt reader) — no menhir, no Neo4j, no
+    # network. CI-safe; guards the harness itself, NOT menhir (it cannot reveal real perception defects).
+    offline = args.offline_fixture is not None
+    if offline:
+        print(f"Harness: {adapter.name} — OFFLINE smoke (deterministic stub; not a live menhir run)")
+        stub = StubScalarStateClient()
+        client = stub
+        bolt = stub
+        source_label = "offline-stub"
+        neo4j_label = "offline-stub"
+    else:
+        if not args.menhir_url:
+            print("ERROR: menhir-scalar-state needs --menhir-url (a throwaway menhir with the scalar "
+                  "scheduler ON), or --offline-fixture for a network-free smoke", file=sys.stderr)
+            sys.exit(1)
+        assert_not_production(args.menhir_url)
+        if not args.confirm_menhir_reset:
+            print("ERROR: menhir-scalar-state writes to and tears down a throwaway namespace; "
+                  "pass --confirm-menhir-reset", file=sys.stderr)
+            sys.exit(1)
+        print(f"Harness: {adapter.name} — live scalar-state e2e against {args.menhir_url}")
+        menhir_key = os.getenv("MENHIR_AGENT_KEY") or os.getenv("MENHIR_API_KEY") or API_KEY
+        print(f"  auth: {'bearer set' if menhir_key else 'no key (expects an auth-disabled instance)'}")
+        print(f"  bolt: {args.neo4j_uri} (throwaway; refuses prod port 7687)")
+        client = HttpMenhirClient(args.menhir_url, api_key=menhir_key)
+        # ScalarBoltReader.__post_init__ refuses a prod-looking bolt URI before connecting.
+        bolt = ScalarBoltReader(
+            args.neo4j_uri, user=args.neo4j_user, password=args.neo4j_password
+        )
+        source_label = args.menhir_url
+        neo4j_label = args.neo4j_uri
+
+    try:
+        result = run_scalar_state(
+            client,
+            bolt,
+            cases=adapter.cases(),
+            reset_confirmed=True,
+            max_wait_s=0.0 if offline else args.scalar_max_wait_s,
+            poll_interval_s=0.0 if offline else 3.0,
+            menhir_url=source_label,
+            neo4j_uri=neo4j_label,
+            # Perception runs the consolidation LLM SERVER-SIDE (menhir's personal-memory model);
+            # the harness --model is not the model under test here.
+            model="offline-stub" if offline else "menhir-personal-memory (server-side)",
+        )
+    finally:
+        client.close()
+        if not offline:
+            bolt.close()
+
+    print(f"\n{adapter.name}: verdict={'PASS' if result.verdict else 'FAIL'}  "
+          f"namespace={result.namespace}")
+    for cr in result.cases:
+        status = "MATCH" if cr.matched else ("MISS" if cr.outcome == "view" else "FAIL")
+        tail = f" — {cr.notes}" if cr.notes else ""
+        print(f"  [{status}] {cr.case_id} ({cr.outcome}){tail}")
+    inv = result.invariants
+    m = result.metrics
+    print(f"  views_current={inv['views_current']} assertions={inv['assertions_current']} "
+          f"dup_keys={inv['duplicate_current_keys']} dup_slots={inv['duplicate_slots']} "
+          f"non_agent_tiers={inv['non_agent_tiers'] or 'none'} default_leak={inv['default_silo_leak']}")
+    print(f"  view_slots_committed={m['view_slots_committed']}/{m['expected_view_slots']} "
+          f"advisories_pending={m['advisories_pending']} controls_clean={m['controls_clean']} "
+          f"waited_s={m['waited_s']}")
+    for w in result.warnings:
+        print(f"  ! {w}")
+
+    suffix = "json" if args.format == "json" else "md"
+    out_path = args.out or (args.output_dir / f"harness_{adapter.benchmark_id}.{suffix}")
+    write_scalar_state_evidence(result, out_path, output_format=args.format)
+    print(f"  Evidence written to {out_path}")
+
+    result_data = scalar_state_result_to_dict(result)
+    _publish_cli_evidence(
+        args,
+        title=f"Harness evidence: {adapter.name}",
+        product="menhir",
+        ability="ScalarStateView typed-scalar personal-memory consolidation",
+        fixture_or_live_source=source_label,
+        model_provider=args.model,
+        environment_caveats=[
+            "OFFLINE stub smoke exercises the harness only — not a live menhir result."
+            if offline else
+            "ScalarStateView is a live e2e integration test against a throwaway menhir + Neo4j; "
+            "perception is LLM-driven and stochastic, so the verdict gates on structural invariants, "
+            "not exact values.",
+            "Shadow build: scalar_state Views are not recall-visible and are verified over bolt.",
+            "Requires the throwaway menhir launched with the scalar scheduler ON "
+            "(MENHIR_BENCHMARK_MODE=0, CONSOLIDATION_ENABLED=1, SCALAR_STATE_ENABLED=1).",
+            "Public launch copy requires current tracked launch evidence.",
+        ],
+        metric_rows=[
+            {"metric": key, "value": value}
+            for key, value in {**inv, **m}.items()
+            if not isinstance(value, (list, dict))
+        ],
+        artifact=result_data,
+    )
+
+    if not result.verdict:
+        sys.exit(1)
+
+
 def _run_harness(args: argparse.Namespace) -> None:
     from .harness import (
         ADAPTERS,
@@ -970,6 +1103,7 @@ def _run_harness(args: argparse.Namespace) -> None:
         is_external,
         is_memory,
         is_phase3,
+        is_scalar_state,
         run_ab,
         run_external_ab,
         run_memory_ab,
@@ -981,6 +1115,8 @@ def _run_harness(args: argparse.Namespace) -> None:
         for bid, adapter in sorted(ADAPTERS.items()):
             if is_phase3(adapter):
                 kind = "phase3"
+            elif is_scalar_state(adapter):
+                kind = "scalar-state"
             elif is_memory(adapter):
                 kind = "memory"
             elif is_external(adapter):
@@ -1002,6 +1138,10 @@ def _run_harness(args: argparse.Namespace) -> None:
 
     if is_phase3(adapter):
         _run_phase3_harness(args, adapter)
+        return
+
+    if is_scalar_state(adapter):
+        _run_scalar_state_harness(args, adapter)
         return
 
     arms = [a.strip() for a in args.arms.split(",") if a.strip()]

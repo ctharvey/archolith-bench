@@ -117,6 +117,15 @@ if [ "${SS_DIAG:-0}" = "1" ]; then
     --neo4j-uri "${BOLT_URI}" --neo4j-password "${SS_NEO4J_PW}" \
     "${EXTRA_ARGS[@]}"
   RC=$?
+elif [ "${SS_PHASE_D:-0}" = "1" ]; then
+  # Phase D counterfactual recall: seed stale->current, then baseline recall vs View-aware answer.
+  log "menhir healthy. running the Phase D counterfactual recall evaluation..."
+  "${BENCH_PY}" "$(dirname "${BASH_SOURCE[0]}")/scalar_phase_d.py" \
+    --menhir-url "${MENHIR_URL}" \
+    --neo4j-uri "${BOLT_URI}" --neo4j-password "${SS_NEO4J_PW}" \
+    --max-wait-s "${SS_MAX_WAIT_S}" --out "${SS_OUT%.md}-phase-d.json" \
+    "${EXTRA_ARGS[@]}"
+  RC=$?
 else
   log "menhir healthy. running the scalar-state harness..."
 

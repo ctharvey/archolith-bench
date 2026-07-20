@@ -282,6 +282,10 @@ def main(argv: list[str] | None = None) -> None:
     harness_p.add_argument("--scalar-no-cleanup", action="store_true",
                            help="menhir-scalar-state: do NOT tear down the seeded namespace after the "
                                 "run, so the graph can be inspected over bolt (debugging)")
+    harness_p.add_argument("--scalar-fixture", choices=["default", "third-party"], default="default",
+                           help="menhir-scalar-state: fixture set -- 'default' (first-person, 9 kinds + "
+                                "advisory/control) or 'third-party' (named 'Alice' subject, Lever 3 "
+                                "binder-isolation experiment)")
     harness_p.add_argument("--recall-limit", type=int, default=10,
                            help="Memory benchmarks: how many memory snippets to recall per question "
                                 "(default 10; raise for multi-fact temporal-reasoning questions)")
@@ -977,6 +981,7 @@ def _run_scalar_state_harness(args: argparse.Namespace, adapter) -> None:  # noq
     Neo4j) + --confirm-menhir-reset. See benchmarks/RUNBOOK-scalar-state-e2e.md for the launch profile.
     """
     from .harness import (
+        SCALAR_FIXTURE_SETS,
         HttpMenhirClient,
         ScalarBoltReader,
         StubScalarStateClient,
@@ -985,6 +990,9 @@ def _run_scalar_state_harness(args: argparse.Namespace, adapter) -> None:  # noq
         scalar_state_result_to_dict,
         write_scalar_state_evidence,
     )
+
+    fixture_name = getattr(args, "scalar_fixture", "default")
+    cases = SCALAR_FIXTURE_SETS[fixture_name]()
 
     # Offline smoke: --offline-fixture runs the FULL driver + invariants + report against a
     # deterministic in-memory stub (both ingest client and bolt reader) — no menhir, no Neo4j, no
@@ -1020,10 +1028,11 @@ def _run_scalar_state_harness(args: argparse.Namespace, adapter) -> None:  # noq
         neo4j_label = args.neo4j_uri
 
     try:
+        print(f"  fixture: {fixture_name} ({len(cases)} cases)")
         result = run_scalar_state(
             client,
             bolt,
-            cases=adapter.cases(),
+            cases=cases,
             reset_confirmed=True,
             cleanup=not getattr(args, "scalar_no_cleanup", False),
             max_wait_s=0.0 if offline else args.scalar_max_wait_s,

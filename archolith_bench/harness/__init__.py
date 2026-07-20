@@ -58,6 +58,7 @@ from .menhir_client import (
     StubScalarStateClient,
 )
 from .menhir_scalar_state import (
+    SCALAR_FIXTURE_SETS,
     MenhirScalarStateAdapter,
     ScalarStateCase,
     ScalarStateResult,
@@ -65,6 +66,7 @@ from .menhir_scalar_state import (
     is_scalar_state,
     run_scalar_state,
     scalar_state_result_to_dict,
+    third_party_scalar_state_cases,
     write_scalar_state_evidence,
 )
 from .scalar_bolt import ScalarBoltReader, assert_not_prod
@@ -162,10 +164,12 @@ __all__ = [
     "ScalarStateResult",
     "Scenario",
     "ScenarioResult",
+    "SCALAR_FIXTURE_SETS",
     "assert_not_prod",
     "default_phase3_cases",
     "default_scalar_state_cases",
     "default_scenarios",
+    "third_party_scalar_state_cases",
     "is_phase3",
     "is_scalar_state",
     "phase3_result_to_dict",

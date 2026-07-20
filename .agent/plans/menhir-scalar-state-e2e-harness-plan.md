@@ -141,6 +141,44 @@ harness correctly reported it over bolt. The Piece-C gaps this surfaces, for the
 self/"user" entity to bind first-person scalars, and/or stronger extraction; a fixture with named
 third-party subjects would test binding independent of the self-entity gap.
 
+### Lever 3 result: named third-party fixture (2026-07-20) -- FIRST MATERIALIZED VIEW
+
+Ran the `third-party` fixture (`Alice owns 37 coins` / `Alice has read 12 books` / `Alice wakes up at
+7:30 AM`) live with `--keep`, four-checkpoint bolt inspection. **Piece C's bind->fold->View machinery
+is PROVEN to work end to end** -- but a precise multi-fact linkage blocker was isolated:
+
+Checkpoint results:
+- **Graphiti entity extraction WORKS.** Plain KG `:Entity` nodes `Alice`, `37 coins`, `12 books` were
+  extracted (so Lever 0 -- "no entity extraction" -- is REFUTED). (`:Episodic` nodes carry no
+  status/enrichment fields on this path, so `processing_completed_at` is not a usable control; entity
+  existence is the processing evidence.)
+- **MENTIONS linkage is consolidated onto ONE episode.** ALL three entities are `MENTIONS`-linked from
+  the LAST episode ("Alice wakes up..."), NOT from the episodes that stated them. Episodes 1-2 have zero
+  linked entities.
+- **Binding + View WORK when the entity is linked to the assertion's episode.** The `wake_time`
+  assertion (episode 3, which owns the Alice link) bound to a real Alice UUID
+  (`binding_pending=false`) and **materialized a `scalar_state` View** -- the first View this harness
+  has ever produced. The `coins` assertion (episode 1, no linked entity) stayed `unbound`, and the
+  episode-scoped `repair_pending_bindings` pass CANNOT rescue it (it re-resolves against episode-1's
+  links, which are empty). Verified stable across two inspections minutes apart -- permanent, not a
+  timing artifact.
+
+Refined conclusions for the menhir/Piece-C owner:
+1. **Machinery is sound** -- bind -> fold -> `scalar_state` View works against a real linked entity.
+2. **The multi-fact binding blocker is entity->episode MENTIONS LINKAGE**, not extraction: Graphiti
+   attaches all batch entities to one episode, so typed-scalar assertions on the other source episodes
+   have an empty binding-candidate set and go permanently unbound. This is the top lever now.
+3. **First-person additionally needs a self/"user" entity** (no `user` KG entity is ever extracted) --
+   but do NOT implement it before the linkage issue: a self-entity would mask the linkage gap.
+4. **Yield still partial**: `12 books` produced a counter View but NO typed assertion (2/3 typed
+   assertions emitted).
+5. **Bug (new):** the materialized clock_time View has `view_value=0.0` -- the `07:30` clock_time did
+   not carry into the numeric `view_value`. Possible clock_time View-materialization defect.
+
+Harness additions for this: `third_party_scalar_state_cases()` + `--scalar-fixture {default,third-party}`
+(runner `SS_FIXTURE`); the inspector now emits the four-checkpoint bundle (processing state, linked
+non-View entities, MENTIONS direction, assertions, Views).
+
 ## Verification (this plan's own acceptance)
 
 - Offline: `pytest tests/test_menhir_scalar_state.py -q` green (stub-driven).

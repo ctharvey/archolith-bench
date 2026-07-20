@@ -125,6 +125,36 @@ def default_scalar_state_cases() -> list[ScalarStateCase]:
     ]
 
 
+def third_party_scalar_state_cases() -> list[ScalarStateCase]:
+    """Named third-party subject fixtures (Lever 3): constant identity 'Alice', multiple ValueKinds.
+
+    Isolates the binder from the first-person self-entity gap: every subject is a nameable KG entity
+    ('Alice'), so IF Graphiti extracts + links an 'Alice' :Entity, `_bind_subject` should bind and a
+    View should materialize. If nothing binds, the blocker is upstream entity extraction/linkage, not
+    the self-entity gap. Kept tiny + constant-identity on purpose (multiple kinds, one entity).
+    """
+    return [
+        ScalarStateCase(
+            case_id="tp-alice-coins", outcome="view", expect_kind="count", expect_value=37.0,
+            prompt="Alice owns 37 coins.", subject_needles=("alice",),
+        ),
+        ScalarStateCase(
+            case_id="tp-alice-books", outcome="view", expect_kind="count", expect_value=12.0,
+            prompt="Alice has read 12 books.", subject_needles=("alice",),
+        ),
+        ScalarStateCase(
+            case_id="tp-alice-wake", outcome="view", expect_kind="clock_time", expect_value="07:30",
+            prompt="Alice wakes up at 7:30 AM.", subject_needles=("alice",),
+        ),
+    ]
+
+
+SCALAR_FIXTURE_SETS = {
+    "default": default_scalar_state_cases,
+    "third-party": third_party_scalar_state_cases,
+}
+
+
 def fixture_hash(cases: list[ScalarStateCase]) -> str:
     """Stable digest of the fixture set (prompts + expectations) for reproducibility."""
     blob = json.dumps([asdict(c) for c in cases], sort_keys=True, ensure_ascii=False)

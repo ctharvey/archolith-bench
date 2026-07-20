@@ -42,30 +42,45 @@ def main() -> None:
         ns = ns_rows[0]["ns"]
         print(f"\n== inspecting namespace: {ns} ==")
 
-        # 1. user episodes (producer shape)
+        # 1. FOUR-CHECKPOINT bundle per episode:
+        #    (a) Graphiti processed/completed (control), (b) linked NON-View KG entities (the exact
+        #    binder candidate set), so "no entity" can be told apart from "never processed".
         eps = s.run(
             "MATCH (e:Episodic {group_id:$ns}) "
-            "RETURN e.content AS content, "
+            "OPTIONAL MATCH (e)-[]-(n:Entity) "
+            "  WHERE NOT coalesce(n.is_view,false) AND NOT coalesce(n.is_quantstate,false) "
+            "        AND n.view_kind IS NULL "
+            "WITH e, collect(DISTINCT {uuid:n.uuid, name:n.name}) AS linked "
+            "RETURN e.uuid AS uuid, e.content AS content, "
             "       (e.content STARTS WITH 'user:') AS is_user, "
-            "       toString(e.created_at) AS created_at "
+            "       toString(e.processing_completed_at) AS completed_at, "
+            "       e.processing_steps_completed AS steps_done, e.processing_steps_total AS steps_total, "
+            "       [x IN linked WHERE x.uuid IS NOT NULL] AS linked "
             "ORDER BY e.created_at",
             ns=ns,
         ).data()
-        print(f"\n-- Episodic ({len(eps)}) --")
+        print(f"\n-- Episodic + Graphiti processing + linked KG entities ({len(eps)}) --")
         for e in eps:
-            print(f"  [user={e['is_user']}] {e['content']!r}")
+            done = "COMPLETED" if e["completed_at"] else "NOT-COMPLETED"
+            linked = e["linked"]
+            names = [x["name"] for x in linked]
+            print(f"  [{done} {e['steps_done']}/{e['steps_total']}] {e['content']!r}")
+            print(f"       linked non-View entities: {names or '(none)'}")
 
-        # 2. resolved entities (binding targets)
+        # 2. all entities (binding-target census; flag the plain KG ones)
         ents = s.run(
             "MATCH (n:Entity {group_id:$ns}) "
-            "RETURN labels(n) AS labels, n.name AS name, n.view_kind AS view_kind "
-            "ORDER BY n.name",
+            "RETURN n.name AS name, n.view_kind AS view_kind, "
+            "       (n.view_kind IS NULL AND NOT coalesce(n.is_view,false) "
+            "        AND NOT coalesce(n.is_quantstate,false)) AS is_plain_kg "
+            "ORDER BY is_plain_kg DESC, n.name",
             ns=ns,
         ).data()
-        print(f"\n-- Entity nodes ({len(ents)}) --")
+        plain = [n for n in ents if n["is_plain_kg"]]
+        print(f"\n-- Entity nodes ({len(ents)}; plain KG binding targets: {len(plain)}) --")
         for n in ents:
-            extra = f" view_kind={n['view_kind']}" if n.get("view_kind") else ""
-            print(f"  {n['name']!r} labels={n['labels']}{extra}")
+            tag = " <-- PLAIN KG (bindable)" if n["is_plain_kg"] else f" view_kind={n['view_kind']}"
+            print(f"  {n['name']!r}{tag}")
 
         # 3. TypedAssertion rows in full
         tas = s.run(

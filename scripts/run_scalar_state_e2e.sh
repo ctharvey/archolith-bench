@@ -25,6 +25,7 @@ SS_INTERVAL_S="${SS_INTERVAL_S:-5}"        # consolidation tick interval (short 
 SS_PERCEIVER_VERSION="${SS_PERCEIVER_VERSION:-v1}"
 SS_CHAT_MODEL="${SS_CHAT_MODEL:-${LME_EXTRACT_MODEL}}"   # gpt-4o-mini by default
 SS_MAX_WAIT_S="${SS_MAX_WAIT_S:-120}"
+SS_FIXTURE="${SS_FIXTURE:-default}"       # default | third-party (Lever 3 binder-isolation)
 SS_OUT="${SS_OUT:-${BENCH_DIR}/results/menhir_scalar_state_e2e.md}"
 SS_FORMAT="${SS_FORMAT:-markdown}"
 
@@ -119,6 +120,7 @@ KEEP_NS_ARGS=()
   --menhir-url "${MENHIR_URL}" \
   --neo4j-uri "${BOLT_URI}" --neo4j-password "${SS_NEO4J_PW}" \
   --scalar-max-wait-s "${SS_MAX_WAIT_S}" \
+  --scalar-fixture "${SS_FIXTURE}" \
   --confirm-menhir-reset \
   --format "${SS_FORMAT}" --out "${SS_OUT}" \
   "${KEEP_NS_ARGS[@]}" "${EXTRA_ARGS[@]}"

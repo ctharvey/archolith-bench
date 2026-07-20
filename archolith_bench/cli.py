@@ -279,6 +279,9 @@ def main(argv: list[str] | None = None) -> None:
     harness_p.add_argument("--scalar-max-wait-s", type=float, default=180.0,
                            help="menhir-scalar-state: max seconds to wait for the background scheduler "
                                 "to materialize scalar_state Views (default 180)")
+    harness_p.add_argument("--scalar-no-cleanup", action="store_true",
+                           help="menhir-scalar-state: do NOT tear down the seeded namespace after the "
+                                "run, so the graph can be inspected over bolt (debugging)")
     harness_p.add_argument("--recall-limit", type=int, default=10,
                            help="Memory benchmarks: how many memory snippets to recall per question "
                                 "(default 10; raise for multi-fact temporal-reasoning questions)")
@@ -1022,6 +1025,7 @@ def _run_scalar_state_harness(args: argparse.Namespace, adapter) -> None:  # noq
             bolt,
             cases=adapter.cases(),
             reset_confirmed=True,
+            cleanup=not getattr(args, "scalar_no_cleanup", False),
             max_wait_s=0.0 if offline else args.scalar_max_wait_s,
             poll_interval_s=0.0 if offline else 3.0,
             menhir_url=source_label,

@@ -110,6 +110,10 @@ for _ in $(seq 1 90); do curl -sf "${MENHIR_URL}/api/health" >/dev/null 2>&1 && 
 curl -sf "${MENHIR_URL}/api/health" >/dev/null 2>&1 || die "menhir not healthy"
 log "menhir healthy. running the scalar-state harness..."
 
+# When --keep is set, also preserve the seeded namespace so the graph can be inspected over bolt.
+KEEP_NS_ARGS=()
+[ "${KEEP}" = "true" ] && KEEP_NS_ARGS=(--scalar-no-cleanup)
+
 # ---- run the harness ----
 "${BENCH_PY}" -m archolith_bench.cli harness menhir-scalar-state \
   --menhir-url "${MENHIR_URL}" \
@@ -117,7 +121,7 @@ log "menhir healthy. running the scalar-state harness..."
   --scalar-max-wait-s "${SS_MAX_WAIT_S}" \
   --confirm-menhir-reset \
   --format "${SS_FORMAT}" --out "${SS_OUT}" \
-  "${EXTRA_ARGS[@]}"
+  "${KEEP_NS_ARGS[@]}" "${EXTRA_ARGS[@]}"
 RC=$?
 
 log "done (harness rc=${RC}). evidence: ${SS_OUT}"

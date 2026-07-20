@@ -116,6 +116,31 @@ Secondary (cosmetic): uvicorn access-log emits a `client_addr` KeyError under me
 (noise, unrelated to scalar); the harness picks up a stray bearer key even against an auth-disabled
 server (harmless).
 
+### Root cause of the 0-View result (--keep graph inspection, 2026-07-20)
+
+Inspected the preserved namespace over bolt (`scripts/inspect_scalar_state_graph.py`, added
+`--scalar-no-cleanup` to keep the namespace). Definitive two-part cause:
+
+1. **Low typed-scalar perception yield.** All 11 episodes are correct `:Episodic` `user:` bodies and
+   the scalar watermark advanced (the pass ran), but the typed-scalar perceiver emitted only **2**
+   assertions: `finished_reading=Dune` (status) and `remaining_books=12` (count, misread from "there
+   are 12 of them left"). The clean first-person "my X is N" statements (height 180, commute 45, gym
+   3x, wake 7:30, weekday Wednesday, car red) produced NO typed scalar. Meanwhile the NUMERIC counter
+   path captured coins=37 and headphones spend=250 as `view_kind=counter` Views -- so extraction works,
+   the *typed-scalar* perceiver is what under-fires.
+2. **No bindable entity -> 0 Views.** Both emitted assertions have `subject_display='user'` and
+   `subject_uuid='unbound:<hash>'` (`binding_pending=true`). The namespace contains ONLY 13 `:Entity`
+   nodes (11 `admission_audit` bookkeeping + 2 `counter` Views) besides the 11 episodes and two
+   watermarks -- there is NO resolved subject/self entity to bind to. So self-referential ("user"/"my")
+   typed scalars cannot bind, and nothing folds into a `scalar_state` View.
+
+Net: on a first-person fixture in this config the scalar_state e2e path materializes 0 Views. The
+harness correctly reported it over bolt. The Piece-C gaps this surfaces, for the menhir owner:
+(a) typed-scalar perception yield is low vs the counter path; (b) the binder has no resolved entity
+-- especially no "user"/self entity -- to attach user-property scalars to. Likely next levers: a
+self/"user" entity to bind first-person scalars, and/or stronger extraction; a fixture with named
+third-party subjects would test binding independent of the self-entity gap.
+
 ## Verification (this plan's own acceptance)
 
 - Offline: `pytest tests/test_menhir_scalar_state.py -q` green (stub-driven).

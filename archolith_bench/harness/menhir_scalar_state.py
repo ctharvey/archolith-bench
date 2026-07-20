@@ -70,19 +70,21 @@ class ScalarStateCase:
 
 
 def default_scalar_state_cases() -> list[ScalarStateCase]:
-    """Known-input fixtures spanning the nine ValueKinds plus advisory + non-scalar controls.
+    """Known-input fixtures: 7 eligible POSITIVE "view" cases + 4 negative/edge controls.
 
-    Every "view" case names a single unambiguous subject so binding is deterministic; values are
-    chosen distinct so a stochastic result row maps unambiguously back to its fixture.
+    Positive denominator is 7, not 9: two prompts are explicit NEGATIVE CONTROLS, not Views —
+    "My car is red" (`advisory`: a possessed object must NOT bind to the canonical self entity or
+    materialize a self View) and "I paid $250 ..." (`nothing`: a one-off past event is not a standing
+    property, so no assertion and no View). Report positives as x/7 and controls as y/2 (plus the two
+    long-standing controls: the no-entity advisory and the non-scalar happening). Every "view" case
+    names a single unambiguous subject and a distinct value so a stochastic row maps back to its fixture.
+    The nine ValueKinds are all still exercised (money via the money-event control, status via the
+    car-advisory control).
     """
     return [
         ScalarStateCase(
             case_id="ss-count-coins", outcome="view", expect_kind="count", expect_value=37.0,
             prompt="I own 37 rare coins.", subject_needles=("coin",),
-        ),
-        ScalarStateCase(
-            case_id="ss-money-headphones", outcome="view", expect_kind="money", expect_value=250.0,
-            prompt="I paid $250 for my new headphones.", subject_needles=("headphone",),
         ),
         ScalarStateCase(
             case_id="ss-measurement-height", outcome="view", expect_kind="measurement", expect_value=180.0,
@@ -105,12 +107,24 @@ def default_scalar_state_cases() -> list[ScalarStateCase]:
             prompt="My day off is Wednesday.", subject_needles=("day off", "dayoff"),
         ),
         ScalarStateCase(
-            case_id="ss-status-car", outcome="view", expect_kind="status", expect_value="red",
-            prompt="My car is red.", subject_needles=("car",),
-        ),
-        ScalarStateCase(
             case_id="ss-boolean-book", outcome="view", expect_kind="boolean", expect_value=True,
             prompt="I have finished reading Dune.", subject_needles=("dune", "book", "read"),
+        ),
+        # NEGATIVE CONTROL (possessed object, NOT the self speaker): "my car" is not a first-person
+        # self reference and has no uniquely-resolvable :Entity, so a correct perceiver leaves it an
+        # unbound advisory. The ONLY failure is binding it to self / materializing a status='red' View
+        # (that would mean a possessed object wrongly resolved to the canonical self entity). Expect
+        # kind/value are kept so the validator can DETECT such a stray self View, not to demand one.
+        ScalarStateCase(
+            case_id="ss-control-car-advisory", outcome="advisory", expect_kind="status", expect_value="red",
+            prompt="My car is red.", subject_needles=("car",),
+        ),
+        # NEGATIVE CONTROL (one-off past EVENT, not a standing property): "I paid $250" is a completed
+        # transaction, not a current state, so a correct perceiver emits NO standing money assertion and
+        # NO current View. kind/value kept so a stray money=250 assertion/View is caught as over-perception.
+        ScalarStateCase(
+            case_id="ss-control-money-event", outcome="nothing", expect_kind="money", expect_value=250.0,
+            prompt="I paid $250 for my new headphones.", subject_needles=("headphone", "paid"),
         ),
         # No uniquely-resolvable subject -> pending `unbound:` advisory OR a safe abstain (both ok).
         ScalarStateCase(

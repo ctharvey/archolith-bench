@@ -9,9 +9,15 @@ kind, so a drop is localized to the exact stage it happens at:
     3. view_materialized  -- a current scalar_state View node exists for that kind
     4. fold_correct       -- that View's ss_value equals the expected value (the fold computed right)
 
-Read-only over bolt; refuses a prod-looking URI. Run AFTER a `--keep` fixture run against the seeded
-namespace. Optionally aggregate several namespaces (repeated runs) to get a per-kind yield rate that
-feeds the step-5 perceiver-yield work. This instrument changes nothing; it only characterizes.
+The positive denominator is 7 (the eligible "view" cases), NOT 9: the fixture's two NEGATIVE CONTROLS
+(possessed-object "my car is red"; one-off-event "I paid $250") are reported separately as controls
+clean/violated, never as missing positives. Read-only over bolt; refuses a prod-looking URI.
+
+METHODOLOGY (frozen): every measured run MUST use a FRESH ISOLATED menhir+neo4j stack. Stacking multiple
+`--keep` rounds on ONE stack is INVALID for comparative yield -- later rounds' episodes come back
+unenriched (processing_state=None as the enrichment worker degrades under pile-up), producing false
+low-yield outliers. Bring up one throwaway per run, read its matrix before teardown, then aggregate the
+per-run namespaces here. This instrument changes nothing; it only characterizes.
 """
 
 from __future__ import annotations
@@ -85,6 +91,27 @@ def coverage_for_namespace(session, namespace: str, fixture: str) -> list[dict]:
     return rows
 
 
+def controls_for_namespace(session, namespace: str, fixture: str) -> list[dict]:
+    """Check the fixture's NEGATIVE CONTROLS: each must NOT produce a stray current View for its
+    (kind, value). Returns one row per control with `clean` True/False. A control is a case whose
+    outcome is 'advisory' (must not bind to a concrete View — e.g. a possessed object binding to self)
+    or 'nothing' (must not materialize at all — e.g. a one-off event), and which carries an expect_kind
+    so a violation is detectable."""
+    controls = [c for c in SCALAR_FIXTURE_SETS[fixture]()
+                if c.outcome in ("advisory", "nothing") and c.expect_kind]
+    views = _read_views(session, namespace)
+    rows: list[dict] = []
+    for c in controls:
+        stray = [v for v in views if str(v["ss_kind"]) == c.expect_kind
+                 and _value_matches(c.expect_value, v["ss_value"])]
+        rows.append({
+            "case_id": c.case_id, "outcome": c.outcome, "kind": c.expect_kind,
+            "expect": c.expect_value, "clean": not stray,
+            "violation": f"stray {c.expect_kind}={c.expect_value} View" if stray else None,
+        })
+    return rows
+
+
 def _fmt(b: bool) -> str:
     return "PASS" if b else "----"
 
@@ -106,6 +133,8 @@ def main() -> None:
     n = len(args.namespace)
     hits: dict[str, dict[str, int]] = {}
     order: list[tuple[str, str, object]] = []
+    control_hits: dict[str, dict[str, int]] = {}   # case_id -> {clean: k, total: n}
+    control_order: list[str] = []
     try:
         with driver.session(database="neo4j") as s:
             for ns in args.namespace:
@@ -116,6 +145,13 @@ def main() -> None:
                         order.append((cid, row["kind"], row["expect"]))
                     for st in STAGES:
                         hits[cid][st] += int(row[st])
+                for crow in controls_for_namespace(s, ns, args.fixture):
+                    cid = crow["case_id"]
+                    if cid not in control_hits:
+                        control_hits[cid] = {"clean": 0, "total": 0}
+                        control_order.append(cid)
+                    control_hits[cid]["total"] += 1
+                    control_hits[cid]["clean"] += int(crow["clean"])
     finally:
         driver.close()
 
@@ -141,12 +177,27 @@ def main() -> None:
             cells = " ".join(f"{hits[cid][st]:>8}" for st in STAGES)
             print(f"{cid:22} {str(kind):12} {cells}")
 
-    # per-stage totals (how many kinds reached each stage, summed over runs / max = kinds*runs)
+    # per-stage totals (how many positive kinds reached each stage, summed over runs / max = kinds*runs)
     kinds = len(order)
-    print("\n-- per-stage totals (reached / possible) --")
+    print("\n-- per-stage totals (eligible positives reached / possible) --")
     for st in STAGES:
         got = sum(hits[cid][st] for cid, _k, _e in order)
         print(f"   {st:20} {got}/{kinds * n}")
+
+    # headline honest scoring: eligible positive Views x/7 (avg per run) + negative controls y/2
+    fold_total = sum(hits[cid]["fold_correct"] for cid, _k, _e in order)
+    print("\n-- HEADLINE (per-run averages) --")
+    print(f"   eligible positive Views (fold_correct): {fold_total}/{kinds * n}  "
+          f"= {fold_total / n:.1f}/{kinds} per run")
+    if control_order:
+        ctl_clean = sum(control_hits[c]['clean'] for c in control_order)
+        ctl_total = sum(control_hits[c]['total'] for c in control_order)
+        print(f"   negative controls clean:                {ctl_clean}/{ctl_total}  "
+              f"= {ctl_clean / n:.1f}/{len(control_order)} per run")
+        print("\n-- negative controls (must stay clean) --")
+        for cid in control_order:
+            ch = control_hits[cid]
+            print(f"   {cid:26} clean {ch['clean']}/{ch['total']}")
     print()
 
 

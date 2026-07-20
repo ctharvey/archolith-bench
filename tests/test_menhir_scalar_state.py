@@ -33,12 +33,24 @@ from archolith_bench.harness.scalar_bolt import ProdBoltRefused, assert_not_prod
 # ---------------------------------------------------------------------------- fixtures
 
 
-def test_default_cases_span_the_nine_value_kinds():
+def test_positive_denominator_is_seven_kinds():
+    # Contract: 7 eligible POSITIVE "view" kinds. money + status are exercised as NEGATIVE CONTROLS
+    # (a one-off payment event; a possessed object that must not bind to self), not Views.
     cases = default_scalar_state_cases()
     view_kinds = {c.expect_kind for c in cases if c.outcome == "view"}
-    assert view_kinds == set(VALUE_KINDS), "every ValueKind must have a view fixture"
+    assert view_kinds == set(VALUE_KINDS) - {"money", "status"}
+    assert sum(1 for c in cases if c.outcome == "view") == 7
+    # money + status still exercised, but as negative controls
+    control_kinds = {c.expect_kind for c in cases if c.outcome in ("advisory", "nothing")}
+    assert {"money", "status"} <= control_kinds
     assert any(c.outcome == "advisory" for c in cases)
     assert any(c.outcome == "nothing" for c in cases)
+
+
+def test_negative_controls_are_explicit():
+    cases = {c.case_id: c for c in default_scalar_state_cases()}
+    assert cases["ss-control-car-advisory"].outcome == "advisory"
+    assert cases["ss-control-money-event"].outcome == "nothing"
 
 
 def test_fixture_hash_is_stable_and_sensitive():
@@ -93,12 +105,12 @@ def test_stub_happy_path_passes_all_invariants():
     assert inv["non_agent_tiers"] == []
     assert inv["wrong_namespace_views"] == 0
     assert inv["default_silo_leak"] == 0
-    # all nine view slots recognized by the stub, controls + advisory clean
-    assert inv["views_current"] == 9
-    assert result.metrics["view_slots_committed"] == 9
-    assert result.metrics["expected_view_slots"] == 9
-    assert result.metrics["controls_clean"] is True
-    assert result.metrics["advisories_clean"] is True
+    # 7 eligible positive view slots recognized by the stub; both negative controls clean
+    assert inv["views_current"] == 7
+    assert result.metrics["view_slots_committed"] == 7
+    assert result.metrics["expected_view_slots"] == 7
+    assert result.metrics["controls_clean"] is True     # money-event + non-scalar produced nothing
+    assert result.metrics["advisories_clean"] is True    # car-advisory + no-entity did not bind to a View
     assert result.metrics["advisories_pending"] == 1
 
 
@@ -228,7 +240,7 @@ def test_write_json_evidence(tmp_path):
     data = json.loads(out.read_text(encoding="utf-8"))
     assert data["verdict"] == "pass"
     assert data["menhir_url_safety_class"] == "throwaway"
-    assert data["invariants"]["views_current"] == 9
+    assert data["invariants"]["views_current"] == 7
     assert data == scalar_state_result_to_dict(result)
 
 

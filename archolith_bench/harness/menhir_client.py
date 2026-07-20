@@ -648,15 +648,17 @@ class StubScalarStateClient:
     """
 
     # prompt-substring -> (value_kind, value, ss_unit, subject_display, ss_attribute)
+    # Models the CORRECT consumer of the fixture contract: 7 eligible positive Views only. The two
+    # NEGATIVE CONTROLS are deliberately NOT recognized -- "I paid $250" is a one-off event (no standing
+    # money View) and "my car is red" is a possessed object that must not bind to self (no self View) --
+    # so the happy-path stub leaves both un-materialized, exactly as a correct perceiver would.
     _RECOGNIZERS: list[tuple[str, str, Any, str | None, str, str]] = [
         ("37 rare coins", "count", 37.0, None, "coins", "coin_count"),
-        ("$250", "money", 250.0, "USD", "headphones", "headphones_price"),
         ("180 centimeters", "measurement", 180.0, "cm", "height", "height_measurement"),
         ("45 minutes", "duration", 45.0, "min", "commute", "commute_duration"),
         ("gym 3 times a week", "frequency", 3.0, "per_week", "gym", "gym_frequency"),
         ("7:30", "clock_time", "07:30", None, "wake up", "wake_time"),
         ("day off is wednesday", "weekday", "Wednesday", None, "day off", "day_off_weekday"),
-        ("car is red", "status", "red", None, "car", "car_status"),
         ("finished reading dune", "boolean", True, None, "Dune", "dune_finished"),
     ]
     _ADVISORY_MARKER = "there are 12 of them"  # no uniquely-resolvable subject

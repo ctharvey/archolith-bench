@@ -100,6 +100,15 @@ def phase_d_cases() -> list[PhaseDCase]:
             question="What is my current mood?", current_answer="happy", stale_answer=None,
             subject_needles=("mood",),  # never ingested -> no View, no assertion
         ),
+        # EXPIRED (used-to with NO replacement): "I used to live in Dallas" with no current residence.
+        # Correct outcome is EXPIRED-with-current-unknown: NO current residence View. A lingering stale
+        # 'Dallas' View is the defect (the expire did not end the value). current_answer is a sentinel:
+        # there is no current value, so the View must be ABSENT, not any concrete value.
+        PhaseDCase(
+            case_id="pd-residence-expired", kind="expired", slot_attribute="residence", expect_kind="status",
+            question="Where do I live now?", current_answer="(none)", stale_answer="Dallas",
+            stale_prompt="I used to live in Dallas.", current_prompt=None, subject_needles=("dallas", "live"),
+        ),
     ]
 
 
@@ -253,8 +262,10 @@ def score_question(
     if case.kind == "historical":
         # correct answer is the stale value; applying the current View would suppress it.
         wrongful_suppression = apply_view and not value_matches(case.stale_answer, view_value)
-    elif case.kind == "noview":
-        # no eligible View may exist; if one is (wrongly) applied with a non-current value, that is wrongful.
+    elif case.kind in ("noview", "expired"):
+        # no eligible current View should exist (noview: never ingested; expired: "used to" ended it).
+        # If a View is (wrongly) present and applied with a non-current value, that is wrongful -- for an
+        # expired slot a lingering stale View means the expire did not end the value.
         wrongful_suppression = apply_view and not value_matches(case.current_answer, view_value)
     else:  # current
         # applying the current View is correct; wrongful only if the View is WRONG yet applied as truth.
@@ -301,8 +312,9 @@ def aggregate_phase_d(results: list[PhaseDQuestionResult]) -> dict[str, Any]:
     coverage["view_correct"] = sum(r.view_status == "correct" for r in results)
     coverage["total_questions"] = len(results)
 
-    # Controls: historical + no-View must never be wrongfully suppressed.
-    controls = [r for r in results if r.kind in ("historical", "noview")]
+    # Controls: historical + no-View + expired must never be wrongfully suppressed (for an expired slot
+    # that means no lingering stale View).
+    controls = [r for r in results if r.kind in ("historical", "noview", "expired")]
     control_violations = [r.case_id for r in controls if r.wrongful_suppression]
 
     return {
@@ -487,6 +499,9 @@ class StubPhaseDClient:
         "wake_time": ["I used to wake up at 9:00 every morning.", "I wake up at 7:30 every morning."],
         "day_off": ["My day off used to be Monday.", "My day off is Wednesday."],
         "mood": [],  # no-View control: nothing ingested
+        # expired control: baseline still surfaces the past residence, but the correct consumer holds
+        # NO current residence View (it was expired), so view-aware must NOT answer "Dallas".
+        "residence": ["I used to live in Dallas."],
     }
 
     def __init__(self) -> None:
@@ -504,7 +519,8 @@ class StubPhaseDClient:
         q = query.lower()
         for attr, snippets in self._BASELINE.items():
             key = attr.replace("_", " ")
-            if key in q or (attr == "owned" and "coin" in q) or (attr == "day_off" and "day off" in q):
+            if (key in q or (attr == "owned" and "coin" in q) or (attr == "day_off" and "day off" in q)
+                    or (attr == "residence" and "live" in q)):
                 return list(snippets)[:limit]
         return []
 

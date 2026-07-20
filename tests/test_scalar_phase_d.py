@@ -120,6 +120,28 @@ def test_historical_control_violation_when_misdetected():
     assert r.wrongful_suppression is True
 
 
+def test_expired_control_clean_when_no_view_lingers():
+    # "I used to live in Dallas" with no current residence -> correct state is NO current View.
+    case = PhaseDCase(
+        case_id="e", kind="expired", slot_attribute="residence", expect_kind="status",
+        question="Where do I live now?", current_answer="(none)", stale_answer="Dallas",
+    )
+    r = score_question(case, ["I used to live in Dallas."], [], [])   # no current View
+    assert r.view_status == "absent"
+    assert r.wrongful_suppression is False
+
+
+def test_expired_control_violated_when_stale_view_lingers():
+    # a lingering stale 'Dallas' residence View means the expire did NOT end the value -> violation.
+    case = PhaseDCase(
+        case_id="e", kind="expired", slot_attribute="residence", expect_kind="status",
+        question="Where do I live now?", current_answer="(none)", stale_answer="Dallas",
+    )
+    r = score_question(case, ["I used to live in Dallas."], [_view("residence", "status", "Dallas")], [])
+    assert r.slot_overlap is True and r.view_status == "wrong"
+    assert r.wrongful_suppression is True
+
+
 def test_noview_control_falls_back_never_fabricates_authority():
     case = PhaseDCase(
         case_id="n", kind="noview", slot_attribute="mood", expect_kind="status",

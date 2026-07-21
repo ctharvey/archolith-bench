@@ -94,6 +94,9 @@ export MENHIR_BENCHMARK_MODE=0
 export MENHIR_PERSONAL_MEMORY_CONSOLIDATION_ENABLED=1
 export MENHIR_PERSONAL_MEMORY_SCALAR_STATE_ENABLED=1
 export MENHIR_PERSONAL_MEMORY_SCALAR_STATE_PERCEIVER_VERSION="${SS_PERCEIVER_VERSION}"
+# Step 7 current-state View authority canary (default OFF; SS_VIEW_AUTHORITY=1 turns the live
+# recall suppression hook ON for the SS_VIEW_AUTHORITY_AB branch).
+export MENHIR_PERSONAL_MEMORY_SCALAR_VIEW_AUTHORITY_ENABLED="${SS_VIEW_AUTHORITY:-0}"
 export MENHIR_PERSONAL_MEMORY_CONSOLIDATION_INTERVAL_S="${SS_INTERVAL_S}"
 export MENHIR_MAX_LLM_CALLS_PER_JOB=20
 export OTEL_SDK_DISABLED=true LANGFUSE_TRACING_ENABLED=false LANGFUSE_PUBLIC_KEY="" LANGFUSE_SECRET_KEY="" LANGFUSE_HOST=""
@@ -115,6 +118,16 @@ if [ "${SS_DIAG:-0}" = "1" ]; then
   "${BENCH_PY}" "$(dirname "${BASH_SOURCE[0]}")/diagnose_mentions_provenance.py" \
     --menhir-url "${MENHIR_URL}" \
     --neo4j-uri "${BOLT_URI}" --neo4j-password "${SS_NEO4J_PW}" \
+    "${EXTRA_ARGS[@]}"
+  RC=$?
+elif [ "${SS_VIEW_AUTHORITY_AB:-0}" = "1" ]; then
+  # Step 7c live A/B: drive PRODUCTION recall (suppression hook) with current->current fixtures.
+  log "menhir healthy. running the live View-authority A/B (flag=${MENHIR_PERSONAL_MEMORY_SCALAR_VIEW_AUTHORITY_ENABLED})..."
+  "${BENCH_PY}" "$(dirname "${BASH_SOURCE[0]}")/scalar_view_authority_live.py" \
+    --menhir-url "${MENHIR_URL}" \
+    --neo4j-uri "${BOLT_URI}" --neo4j-password "${SS_NEO4J_PW}" \
+    --label "flag-${MENHIR_PERSONAL_MEMORY_SCALAR_VIEW_AUTHORITY_ENABLED}" \
+    --max-wait-s "${SS_MAX_WAIT_S}" --out "${SS_OUT%.md}-view-authority-${MENHIR_PERSONAL_MEMORY_SCALAR_VIEW_AUTHORITY_ENABLED}.json" \
     "${EXTRA_ARGS[@]}"
   RC=$?
 elif [ "${SS_PHASE_D:-0}" = "1" ]; then

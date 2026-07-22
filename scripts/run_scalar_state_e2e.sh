@@ -120,6 +120,18 @@ if [ "${SS_DIAG:-0}" = "1" ]; then
     --neo4j-uri "${BOLT_URI}" --neo4j-password "${SS_NEO4J_PW}" \
     "${EXTRA_ARGS[@]}"
   RC=$?
+elif [ "${SS_LEADS:-0}" = "1" ]; then
+  # LEADS measurement: seed via :TurnEvidence (declarant='user') so a View can trace to a real
+  # declarant foundation (G14 bridge), then measure whether it LEADS in recall exactly when founded
+  # (wrongful-authority = 0). Complements the Episodic A/B, which only exercises the advisory arm.
+  log "menhir healthy. running the authority LEADS live measurement (flag=${MENHIR_PERSONAL_MEMORY_SCALAR_VIEW_AUTHORITY_ENABLED})..."
+  "${BENCH_PY}" "$(dirname "${BASH_SOURCE[0]}")/scalar_leads_authority_live.py" \
+    --menhir-url "${MENHIR_URL}" \
+    --neo4j-uri "${BOLT_URI}" --neo4j-password "${SS_NEO4J_PW}" \
+    --label "flag-${MENHIR_PERSONAL_MEMORY_SCALAR_VIEW_AUTHORITY_ENABLED}" \
+    --max-wait-s "${SS_MAX_WAIT_S}" --out "${SS_OUT%.md}-leads-${MENHIR_PERSONAL_MEMORY_SCALAR_VIEW_AUTHORITY_ENABLED}.json" \
+    "${EXTRA_ARGS[@]}"
+  RC=$?
 elif [ "${SS_VIEW_AUTHORITY_AB:-0}" = "1" ]; then
   # Step 7c live A/B: drive PRODUCTION recall (suppression hook) with current->current fixtures.
   log "menhir healthy. running the live View-authority A/B (flag=${MENHIR_PERSONAL_MEMORY_SCALAR_VIEW_AUTHORITY_ENABLED})..."

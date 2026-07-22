@@ -1,5 +1,13 @@
 # archolith-bench Changelog
 
+## 2026-07-22 - Scalar authority-leads e2e verdict
+
+Added the `SS_LEADS=1` scalar-state e2e branch and a deterministic verdict evaluator that checks
+materialization, current anchors, user foundations, and wrongful authority. Clock values compare
+canonically (`7:30` equals `07:30`) without weakening ordinary numeric boundaries. The saved live
+measurement proves both `owned=37` and `wake_time=7:30` lead with user foundations and zero wrongful
+authority; focused tests cover both public authority representations and the process exit-code contract.
+
 ## 2026-07-16 — Isolated LME fixture for combined extraction
 
 Added a one-item Rachel/Chicago/suburbs regression fixture and a fresh-graph runner that isolates

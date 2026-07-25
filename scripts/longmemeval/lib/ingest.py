@@ -1,6 +1,6 @@
 """Throwaway: RESUMABLE ingest of LongMemEval haystacks into a PERSISTENT menhir/Neo4j under
 STABLE namespaces (lme-<question_id>), no per-item reset on success -- so recall-only A/B
-(main vs frontier) can run against the pre-ingested graph without re-ingesting. Not committed.
+(main vs frontier) can run against the pre-ingested graph without re-ingesting.
 
 Resumability:
 - An incremental manifest (results/lme-ingest/manifest.json) records each FULLY-ingested AND
@@ -17,9 +17,11 @@ Enrichment completeness (why a per-item DRAIN exists):
   single background worker. Marking an item "done" the instant its last turn POST returns would
   record a HALF-ENRICHED namespace -- recall would then run against an incomplete graph.
 - So after ingesting an item's turns we DRAIN: poll until menhir's queue_depth==0 (authoritative
-  unprocessed-work count, from /api/stats) AND no episode is ENRICHING (real in-flight, read from
-  Neo4j) -- stable across two polls -- before writing the manifest. This makes "manifest done" mean
-  "fully enriched", and keeps resume correct.
+  unprocessed-work count, from /api/stats) AND no episode is PENDING or ENRICHING (the two
+  non-terminal lifecycle states, read from Neo4j) -- stable across two polls -- before writing the
+  manifest. This makes "manifest done" mean "fully enriched", and keeps resume correct. (Gating on
+  ENRICHING alone let the drain settle while a PENDING backlog the worker had not yet claimed still
+  existed, which then slipped an unenriched namespace into scalar consolidation and aborted the run.)
 - Benchmark mode disables the scheduler, so FAILED episodes are never auto-retried. After draining
   we run one best-effort FAILED-retry pass (force_reset_failed_episode + re-drain) to recover the
   episodes that hit the per-job LLM budget.
@@ -43,6 +45,9 @@ from pathlib import Path
 BENCH_ROOT = Path(__file__).resolve().parents[3]
 if str(BENCH_ROOT) not in sys.path:
     sys.path.insert(0, str(BENCH_ROOT))
+LIB_ROOT = Path(__file__).resolve().parent
+if str(LIB_ROOT) not in sys.path:
+    sys.path.insert(0, str(LIB_ROOT))
 
 DEFAULT_MANIFEST = os.getenv(
     "LME_MANIFEST_PATH",
@@ -54,9 +59,24 @@ import httpx  # noqa: E402
 from archolith_bench.harness.longmemeval import LongMemEvalMemoryAdapter  # noqa: E402
 from archolith_bench.harness.menhir_client import HttpMenhirClient  # noqa: E402
 
+from claim_segmenter import (  # noqa: E402
+    ClaimSegment,
+    SegmentationMode,
+    _heuristic_extract_claims,
+    segmentation_mode as decide_segmentation,
+)
+
+
+def _heuristic_extract_claims_sync(content: str, role: str) -> list[ClaimSegment]:
+    """Synchronous wrapper for Stage B heuristic claim extraction."""
+    return _heuristic_extract_claims(content, role)
+
 # Throwaway lme Neo4j (must match _lme_build_db.sh).
 NEO4J_CONTAINER = os.getenv("LME_NEO4J_CONTAINER", "menhir-lme-neo4j")
 NEO4J_PW = os.getenv("LME_NEO4J_PW", "lmedata123")
+REQUIRE_TURN_EVIDENCE = os.getenv("LME_REQUIRE_TURN_EVIDENCE", "0").strip().lower() in {
+    "1", "true", "yes", "on",
+}
 
 # Sentence splitting — long multi-topic messages bury factual claims in geographic
 # noise, causing Graphiti's node resolution to collapse distinct entities (e.g.
@@ -131,8 +151,11 @@ def _ingest_turn(
                 break
             except (httpx.HTTPError,) as exc:
                 if attempt == tries - 1:
-                    # Evidence capture failed — fall back to ungrounded ingest
-                    # (will be downgraded to agent_inference by the admission gate).
+                    if REQUIRE_TURN_EVIDENCE:
+                        raise RuntimeError(
+                            f"turn-evidence capture failed after {tries} attempts"
+                        ) from exc
+                    # Legacy compatibility for non-scalar diagnostic builds.
                     print(f"    turn-evidence failed after {tries} attempts: {exc.__class__.__name__}; "
                           "ingesting without grounding", flush=True)
                 wait = 2 ** (attempt + 1)
@@ -184,19 +207,88 @@ def _cypher(query: str) -> list[list[str]]:
 
 
 def _ns_state_counts(ns: str) -> dict[str, int]:
-    """Per-namespace processing-state counts from Neo4j (ENRICHING is the in-flight signal)."""
+    """Per-namespace processing-state counts from Neo4j. PENDING and ENRICHING are the two
+    non-terminal lifecycle states (in-flight); READY and FAILED are terminal (see menhir
+    episode_lifecycle.mark_episode_ready/_failed). Episodic nodes with a NULL processing_state are
+    graphiti-derived resolved nodes, not ingest episodes, and are deliberately excluded from the
+    in-flight signal so the drain never waits on them forever."""
     rows = _cypher(
         f"MATCH (e:Episodic {{namespace:'{ns}'}}) RETURN "
+        "sum(CASE WHEN e.processing_state='PENDING' THEN 1 ELSE 0 END) AS pending, "
         "sum(CASE WHEN e.processing_state='READY' THEN 1 ELSE 0 END) AS ready, "
         "sum(CASE WHEN e.processing_state='ENRICHING' THEN 1 ELSE 0 END) AS enriching, "
         "sum(CASE WHEN e.processing_state='FAILED' THEN 1 ELSE 0 END) AS failed, "
         "count(*) AS total;"
     )
-    if not rows or len(rows[0]) < 4:
-        return {"ready": -1, "enriching": -1, "failed": -1, "total": -1}
+    if not rows or len(rows[0]) < 5:
+        return {"pending": -1, "ready": -1, "enriching": -1, "failed": -1, "total": -1}
     r = rows[0]
-    return {"ready": int(r[0] or 0), "enriching": int(r[1] or 0),
-            "failed": int(r[2] or 0), "total": int(r[3] or 0)}
+    return {"pending": int(r[0] or 0), "ready": int(r[1] or 0), "enriching": int(r[2] or 0),
+            "failed": int(r[3] or 0), "total": int(r[4] or 0)}
+
+
+def _cypher_count(query: str) -> int:
+    rows = _cypher(query)
+    if not rows or not rows[0]:
+        return -1
+    return int(rows[0][0] or 0)
+
+
+def _scalar_counts(ns: str) -> dict[str, int]:
+    """Return the materialization/provenance counts needed to trust a scalar snapshot."""
+    return {
+        "turn_evidence": _cypher_count(
+            f"MATCH (t:TurnEvidence {{namespace:'{ns}'}}) RETURN count(t);"
+        ),
+        "typed_assertions": _cypher_count(
+            f"MATCH (a:TypedAssertion {{namespace:'{ns}'}}) RETURN count(a);"
+        ),
+        "scalar_views": _cypher_count(
+            f"MATCH (v:Entity {{group_id:'{ns}', view_kind:'scalar_state'}}) "
+            "WHERE coalesce(v.view_current, true) RETURN count(v);"
+        ),
+        "user_founded_scalar_views": _cypher_count(
+            f"MATCH (t:TurnEvidence {{namespace:'{ns}', declarant:'user'}})-[:FOUNDS]->"
+            f"(a:TypedAssertion {{namespace:'{ns}'}})<-[:CURRENT_ANCHOR]-"
+            f"(v:Entity {{group_id:'{ns}', view_kind:'scalar_state'}}) "
+            "WHERE coalesce(v.view_current, true) RETURN count(DISTINCT v);"
+        ),
+    }
+
+
+def _consolidate_scalar(
+    admin: httpx.Client,
+    menhir_url: str,
+    namespace: str,
+    *,
+    k: int,
+    call_budget: int,
+) -> dict:
+    response = admin.post(
+        menhir_url.rstrip("/") + "/api/phase3/run",
+        json={
+            "namespace": namespace,
+            "k": k,
+            "source": "longmemeval-scalar-build",
+            "call_budget": call_budget,
+            "counter_state": False,
+        },
+        timeout=1800.0,
+    )
+    response.raise_for_status()
+    result = response.json()
+    if not result.get("scalar_enabled"):
+        raise RuntimeError("Menhir did not enable scalar consolidation")
+    if int(result.get("scalar_namespaces_processed", 0)) != 1:
+        raise RuntimeError(f"scalar consolidation did not finish namespace {namespace}: {result}")
+    # A scalar namespace can legitimately abstain from materializing an assertion, but it cannot
+    # claim consolidation without exercising the k-sample perception boundary. This also catches
+    # stale servers whose scheduler used to snapshot llm_calls before the scalar pass.
+    if int(result.get("llm_calls", 0)) < k:
+        raise RuntimeError(
+            f"scalar consolidation did not exercise {k} LLM samples for {namespace}: {result}"
+        )
+    return result
 
 
 def _failed_uuids(ns: str, limit: int = 2000) -> list[str]:
@@ -228,19 +320,28 @@ def _backend(admin: httpx.Client, menhir_url: str, op: str, body: dict | None = 
 
 def _drain(ns: str, admin: httpx.Client, menhir_url: str, *,
            idle_polls: int = 2, poll_s: float = 2.0, timeout_s: float = 1800.0) -> dict:
-    """Block until enrichment for the current namespace is fully settled: queue_depth==0 AND
-    no ENRICHING episode, stable for `idle_polls` consecutive checks (or `timeout_s` elapses).
-    Returns the last state-count snapshot (with timed_out flag)."""
+    """Block until enrichment for the current namespace is fully settled: queue_depth==0 AND no
+    episode in a non-terminal lifecycle state (PENDING or ENRICHING), stable for `idle_polls`
+    consecutive checks (or `timeout_s` elapses). Returns the last state-count snapshot (with
+    timed_out flag).
+
+    PENDING is gated on, not just ENRICHING: an episode the single background worker has not yet
+    claimed sits in PENDING with enriching==0, so gating on ENRICHING alone let the drain settle
+    while an unenriched backlog remained -- that empty namespace then reached scalar consolidation,
+    which hard-fails when phase3 finds nothing dirty and aborts the whole run. Waiting on PENDING
+    closes the hole; `timeout_s` still bounds a namespace whose backlog genuinely never clears."""
     t0 = time.time()
     settled = 0
-    last = {"ready": -1, "enriching": -1, "failed": -1, "total": -1}
+    last = {"pending": -1, "ready": -1, "enriching": -1, "failed": -1, "total": -1}
     while time.time() - t0 < timeout_s:
         qd = _queue_depth(admin, menhir_url)
         last = _ns_state_counts(ns)
-        # enriching==-1 means cypher timed out / Neo4j temporarily unreachable.
-        # Treat unknown as "1 in-flight" so we keep polling rather than settling early.
-        # Only settle when cypher confirms enriching==0.
-        in_flight = last["enriching"] if last["enriching"] >= 0 else 1
+        # pending/enriching==-1 means cypher timed out / Neo4j temporarily unreachable. Treat
+        # unknown as in-flight so we keep polling rather than settling early; only settle when
+        # cypher confirms both non-terminal counts are 0.
+        pending = last["pending"] if last["pending"] >= 0 else 1
+        enriching = last["enriching"] if last["enriching"] >= 0 else 1
+        in_flight = pending + enriching
         if qd == 0 and in_flight == 0:
             settled += 1
             if settled >= idle_polls:
@@ -286,6 +387,22 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     ap.add_argument("--drain-timeout", type=float, default=1800.0,
                     help="max seconds to wait for an item's enrichment to settle")
+    ap.add_argument("--consolidate-scalar", action="store_true",
+                    help="run scalar-only Phase 3 consolidation before manifesting each namespace")
+    ap.add_argument("--consolidation-k", type=int, default=3)
+    ap.add_argument("--consolidation-call-budget", type=int, default=50)
+    ap.add_argument(
+        "--segmentation",
+        choices=["none", "sentence", "user-sentence", "adaptive"],
+        default=os.getenv("LME_SEGMENTATION", "sentence"),
+        help=(
+            "Turn segmentation strategy: "
+            "'none' = no splitting (arm A), "
+            "'sentence' = blind sentence split (arm B, default/legacy), "
+            "'user-sentence' = split only user turns (arm C), "
+            "'adaptive' = claim-aware segmentation (arm D)"
+        ),
+    )
     return ap.parse_args(argv)
 
 def _load_items(
@@ -351,18 +468,83 @@ def main(argv: list[str] | None = None) -> int:
             s_date = haystack_dates[s_idx] if s_idx < len(haystack_dates) else None
             s_id = haystack_session_ids[s_idx] if s_idx < len(haystack_session_ids) else None
             occurred_at = _parse_lme_date(s_date)
-            session_id = s_id or f"{ns}-s{s_idx}"
+            # Namespace-qualify the session id. The LongMemEval fixture reuses identical
+            # haystack_session_ids across temporal-variant question pairs (e.g. 89941a93/89941a94,
+            # 07741c44/07741c45); ingesting each item into its own namespace but sharing the raw
+            # session id lets Graphiti's entity resolution dedup the second item's nodes against the
+            # first item's already-resolved (cross-namespace) nodes, which menhir's namespace filter
+            # then drops -- leaving dangling edge endpoints, orphan-pruned nodes, and a collapsed
+            # (zero TurnEvidence) extraction. Qualifying by namespace guarantees per-item isolation.
+            session_id = f"{ns}-{s_id}" if s_id else f"{ns}-s{s_idx}"
             for turn in session:
                 content = turn.get("content", "")
-                if content:
-                    role = turn.get("role", "user")
+                if not content:
+                    continue
+                role = turn.get("role", "user")
+                seg = args.segmentation
+
+                if seg == "none":
+                    # Arm A: no splitting at all
+                    _ingest_turn(client, ns, role, content,
+                                 occurred_at=occurred_at, session_id=session_id)
+                    turns += 1
+
+                elif seg == "sentence":
+                    # Arm B: legacy blind sentence split
                     for sentence in _split_sentences(content):
-                        _ingest_turn(
-                            client, ns, role, sentence,
-                            occurred_at=occurred_at,
-                            session_id=session_id,
-                        )
+                        _ingest_turn(client, ns, role, sentence,
+                                     occurred_at=occurred_at, session_id=session_id)
                         turns += 1
+
+                elif seg == "user-sentence":
+                    # Arm C: split only user messages, assistant whole
+                    if role.strip().lower() == "user":
+                        for sentence in _split_sentences(content):
+                            _ingest_turn(client, ns, role, sentence,
+                                         occurred_at=occurred_at, session_id=session_id)
+                            turns += 1
+                    else:
+                        _ingest_turn(client, ns, role, content,
+                                     occurred_at=occurred_at, session_id=session_id)
+                        turns += 1
+
+                elif seg == "adaptive":
+                    # Arm D: claim-aware segmentation
+                    mode = decide_segmentation(role, content)
+
+                    if mode == SegmentationMode.SKIP:
+                        continue
+
+                    elif mode == SegmentationMode.CONTEXT_ONLY:
+                        # Ingest as context but don't extract — use wait=False
+                        # and mark as assistant/low-priority so extraction
+                        # treats it as background context
+                        _ingest_turn(client, ns, role, content,
+                                     occurred_at=occurred_at, session_id=session_id)
+                        turns += 1
+
+                    elif mode == SegmentationMode.EXTRACT_WHOLE:
+                        _ingest_turn(client, ns, role, content,
+                                     occurred_at=occurred_at, session_id=session_id)
+                        turns += 1
+
+                    elif mode == SegmentationMode.SEGMENT_CLAIMS:
+                        # Ingest the original turn first (preserves context)
+                        _ingest_turn(client, ns, role, content,
+                                     occurred_at=occurred_at, session_id=session_id)
+                        turns += 1
+                        # Then extract and ingest individual claim segments
+                        claims = _heuristic_extract_claims_sync(content, role)
+                        for claim in claims:
+                            _ingest_turn(client, ns, role, claim.text,
+                                         occurred_at=occurred_at, session_id=session_id)
+                            turns += 1
+
+                else:
+                    # Fallback: no splitting
+                    _ingest_turn(client, ns, role, content,
+                                 occurred_at=occurred_at, session_id=session_id)
+                    turns += 1
 
         # DRAIN: wait for this item's enrichment to fully settle before recording it as done,
         # so "manifest done" == "fully enriched" (recall A/B then sees a complete graph).
@@ -374,6 +556,20 @@ def main(argv: list[str] | None = None) -> int:
             if requeued:
                 drained = _drain(ns, admin, args.menhir_url, timeout_s=args.drain_timeout)
 
+        scalar_result: dict = {}
+        scalar_counts: dict[str, int] = {}
+        if args.consolidate_scalar:
+            scalar_result = _consolidate_scalar(
+                admin,
+                args.menhir_url,
+                ns,
+                k=args.consolidation_k,
+                call_budget=args.consolidation_call_budget,
+            )
+            scalar_counts = _scalar_counts(ns)
+            if scalar_counts["turn_evidence"] <= 0:
+                raise RuntimeError(f"no TurnEvidence captured for scalar namespace {ns}")
+
         manifest.append({
             "question_id": qid, "namespace": ns,
             "fixture": str(Path(args.fixture).resolve()) if args.fixture else None,
@@ -382,6 +578,14 @@ def main(argv: list[str] | None = None) -> int:
             "episodes": drained.get("total"), "ready": drained.get("ready"),
             "failed_remaining": drained.get("failed"), "failed_requeued": requeued,
             "drain_timed_out": drained.get("timed_out", False),
+            "scalar_consolidated": bool(
+                args.consolidate_scalar
+                and int(scalar_result.get("scalar_namespaces_processed", 0)) == 1
+                and int(scalar_result.get("llm_calls", 0)) >= args.consolidation_k
+            ),
+            "scalar_llm_calls": int(scalar_result.get("llm_calls", 0)),
+            "scalar_states_written": int(scalar_result.get("scalar_states_written", 0)),
+            **scalar_counts,
         })
         manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
         elapsed = time.time() - t_all

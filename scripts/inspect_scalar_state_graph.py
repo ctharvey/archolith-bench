@@ -1,6 +1,6 @@
 """Diagnostic: dump the scalar-state graph over bolt to explain unbound perception.
 
-Read-only. Auto-discovers the scalar-e2e namespace and prints, for the binding question:
+Read-only. Auto-discovers the matching namespace(s) and prints, for the binding question:
   * user :Episodic count + bodies (is the producer shape right? content STARTS WITH 'user:')
   * resolved :Entity nodes in the namespace (did Graphiti resolve entities to bind to?)
   * :TypedAssertion rows in full (what perception extracted; binding_pending; subject)
@@ -8,28 +8,45 @@ Read-only. Auto-discovers the scalar-e2e namespace and prints, for the binding q
   * current scalar_state Views
 
 Usage: python scripts/inspect_scalar_state_graph.py [bolt_uri] [password]
-Defaults: bolt://localhost:7691  scalarthrowaway
+                                                   [--ns-prefix PREFIX] [--all] [--quiet-episodes]
+Defaults: bolt://localhost:7691  scalarthrowaway  --ns-prefix scalar-e2e
+
+--ns-prefix retargets the discovery scan, so the same instrument works on any corpus that names
+its namespaces by prefix (e.g. --ns-prefix lme- for the LongMemEval builds). --all inspects every
+matching namespace instead of only the largest one -- required when the question is "which of my N
+namespaces failed to bind", not "why did this one namespace fail". --quiet-episodes drops the
+per-episode body dump, which is unreadable past a couple hundred episodes.
 """
 
 from __future__ import annotations
 
-import sys
+import argparse
 
 from neo4j import GraphDatabase
 
-URI = sys.argv[1] if len(sys.argv) > 1 else "bolt://localhost:7691"
-PW = sys.argv[2] if len(sys.argv) > 2 else "scalarthrowaway"
+
+def _parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(add_help=True)
+    p.add_argument("uri", nargs="?", default="bolt://localhost:7691")
+    p.add_argument("password", nargs="?", default="scalarthrowaway")
+    p.add_argument("--ns-prefix", default="scalar-e2e")
+    p.add_argument("--all", action="store_true", help="inspect every matching namespace")
+    p.add_argument("--quiet-episodes", action="store_true", help="skip the per-episode body dump")
+    return p.parse_args()
 
 
 def main() -> None:
+    args = _parse_args()
+    URI, PW = args.uri, args.password
     driver = GraphDatabase.driver(URI, auth=("neo4j", PW))
     with driver.session(database="neo4j") as s:
-        # discover the scalar-e2e namespace(s)
+        # discover the namespace(s)
         ns_rows = s.run(
-            "MATCH (e:Episodic) WHERE e.group_id STARTS WITH 'scalar-e2e' "
-            "RETURN e.group_id AS ns, count(*) AS episodes ORDER BY episodes DESC"
+            "MATCH (e:Episodic) WHERE e.group_id STARTS WITH $prefix "
+            "RETURN e.group_id AS ns, count(*) AS episodes ORDER BY episodes DESC",
+            prefix=args.ns_prefix,
         ).data()
-        print(f"== namespaces ({URI}) ==")
+        print(f"== namespaces ({URI}, prefix={args.ns_prefix!r}) ==")
         for r in ns_rows:
             print(f"  {r['ns']}: {r['episodes']} episodes")
         if not ns_rows:
@@ -39,7 +56,13 @@ def main() -> None:
                 n = s.run(f"MATCH (n:{label}) RETURN count(n) AS c").single()["c"]
                 print(f"  global {label}: {n}")
             return
-        ns = ns_rows[0]["ns"]
+        targets = [r["ns"] for r in ns_rows] if args.all else [ns_rows[0]["ns"]]
+        for ns in targets:
+            _inspect_namespace(s, ns, quiet_episodes=args.quiet_episodes)
+    driver.close()
+
+
+def _inspect_namespace(s, ns: str, *, quiet_episodes: bool = False) -> None:
         print(f"\n== inspecting namespace: {ns} ==")
 
         # 1. FOUR-CHECKPOINT bundle per episode:
@@ -59,13 +82,18 @@ def main() -> None:
             "ORDER BY e.created_at",
             ns=ns,
         ).data()
-        print(f"\n-- Episodic + Graphiti processing + linked KG entities ({len(eps)}) --")
-        for e in eps:
-            done = "COMPLETED" if e["completed_at"] else "NOT-COMPLETED"
-            linked = e["linked"]
-            names = [x["name"] for x in linked]
-            print(f"  [{done} {e['steps_done']}/{e['steps_total']}] {e['content']!r}")
-            print(f"       linked non-View entities: {names or '(none)'}")
+        unlinked = sum(1 for e in eps if not e["linked"])
+        print(f"\n-- Episodic + Graphiti processing + linked KG entities ({len(eps)}; "
+              f"{unlinked} with NO bindable entity) --")
+        if quiet_episodes:
+            print("  (per-episode dump suppressed by --quiet-episodes)")
+        else:
+            for e in eps:
+                done = "COMPLETED" if e["completed_at"] else "NOT-COMPLETED"
+                linked = e["linked"]
+                names = [x["name"] for x in linked]
+                print(f"  [{done} {e['steps_done']}/{e['steps_total']}] {e['content']!r}")
+                print(f"       linked non-View entities: {names or '(none)'}")
 
         # 2. all entities (binding-target census; flag the plain KG ones)
         ents = s.run(
@@ -124,7 +152,6 @@ def main() -> None:
         print(f"\n-- current scalar_state Views ({len(views)}) --")
         for v in views:
             print(f"  attr={v['attr']!r} kind={v['kind']} value={v['value']!r} subject={v['subject']!r}")
-    driver.close()
 
 
 if __name__ == "__main__":

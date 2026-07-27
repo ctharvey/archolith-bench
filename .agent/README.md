@@ -15,6 +15,21 @@ Unified benchmark suite for the archolith product family. Measures token savings
 - **audit** (Phase 4): MCP token-waste reduction before/after via archolith-audit
 - **industry** (Launch gate): Product-to-benchmark coverage matrix tying Archolith claims to trusted external benchmark families
 
+## menhir ScalarStateView instruments (live here, documented in menhir)
+
+`scripts/scalar_state_coverage.py` and its siblings (`run_scalar_state_e2e.sh`,
+`inspect_scalar_state_graph.py`, `scalar_view_authority_live.py`, `scalar_leads_authority_live.py`,
+`scalar_phase_d.py`) measure menhir's scalar/View ingest path. They live here because they import
+`archolith_bench.harness.menhir_scalar_state` fixtures and the `scalar_bolt` prod guard.
+
+Anyone working in menhir looks for them there and does not find them, then re-derives the answers by
+hand. The index that prevents that is
+`projects/archolith/menhir/.agent/workflows/scalar_state_measurement.md` — **keep it in sync when
+adding, renaming, or removing an instrument here.**
+
+Frozen methodology: every measured run uses a FRESH ISOLATED menhir+neo4j stack. Stacking rounds on
+one stack is invalid for comparative yield.
+
 ## How to Run
 ```bash
 pip install -e .
@@ -62,6 +77,14 @@ Before writing any percentage or token count into archolith.dev or a product REA
 1. Check `HEADLINE-NUMBERS.md` — if it isn't there, it isn't verified.
 2. Run the benchmark, paste the result row into the table, note the commit.
 3. Fixture data (from bundled `fixtures/`) is NOT a headline number — it demonstrates report format only.
+
+## KU-Buildout Ledger
+
+**`results/lme-ku-buildout/LEDGER.md` must be updated after every knowledge-update
+buildout run.** This includes the scoreboard, per-item results, fixture provenance,
+and infrastructure details. See `scripts/longmemeval/README.md` § "KU-Buildout Ledger"
+for the full checklist. Do not end a session that ran a buildout without updating the
+ledger.
 
 ## Launch Readiness
 

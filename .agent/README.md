@@ -15,6 +15,17 @@ Unified benchmark suite for the archolith product family. Measures token savings
 - **audit** (Phase 4): MCP token-waste reduction before/after via archolith-audit
 - **industry** (Launch gate): Product-to-benchmark coverage matrix tying Archolith claims to trusted external benchmark families
 
+## Before writing a script, read the index
+
+`projects/archolith/menhir/.agent/scripts-index.md` indexes **every durable script in both repos**
+by the question it answers, and defines the naming convention: `_name.py` is a throwaway (delete it
+once its finding is written down, never index it), `name.py` is a durable instrument (index it in
+the same commit that adds it). **Keep the bench half of that index in sync** when you add, rename,
+or remove a script here.
+
+Before writing a new analysis script, check it there first. Two sessions in a row re-derived results
+an existing instrument already produced.
+
 ## menhir ScalarStateView instruments (live here, documented in menhir)
 
 `scripts/scalar_state_coverage.py` and its siblings (`run_scalar_state_e2e.sh`,

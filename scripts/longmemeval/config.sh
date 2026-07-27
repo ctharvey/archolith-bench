@@ -16,7 +16,11 @@ _LONGMEMEVAL_DIR="$(cd "${SCRIPT_DIR}" && pwd)"
 BENCH_DIR="${BENCH_DIR:-$(git rev-parse --show-toplevel)}"
 ARCH_DIR="${ARCH_DIR:-${BENCH_DIR%/*}}"  # parent of archolith-bench
 MENHIR_MAIN="${MENHIR_MAIN:-${ARCH_DIR}/menhir}"
-MENHIR_FRONTIER="${MENHIR_FRONTIER:-${ARCH_DIR}/menhir-frontier}"
+# menhir-frontier merged into main (2026-07); that checkout no longer exists. Default
+# MENHIR_FRONTIER to MENHIR_MAIN so every consuming script (build_graph.sh, lme.sh
+# backfill-dates/presence/ir-gate, retry.sh, analysis/*) works without a manual override.
+# Still overridable if a real frontier fork ever returns.
+MENHIR_FRONTIER="${MENHIR_FRONTIER:-${MENHIR_MAIN}}"
 
 # ---- Neo4j (persistent LME graph) ----
 LME_NEO4J_NAME="${LME_NEO4J_NAME:-menhir-lme-neo4j}"
@@ -25,6 +29,12 @@ LME_HTTP="${LME_HTTP:-7476}"
 LME_NEO4J_PW="${LME_NEO4J_PW:-lmedata123}"
 LME_NEO4J_VOL="${LME_NEO4J_VOL:-menhir-lme-data}"
 LME_NEO4J_IMAGE="${LME_NEO4J_IMAGE:-neo4j:5.26-community}"
+# Heap for the build's Neo4j. This is sized against DOCKER'S VM limit, not host RAM -- Docker
+# Desktop here caps the whole VM at ~3.8 GiB, and menhir-full + menhir-full-neo4j already hold
+# ~0.8 GiB of it. Starting an additional 2G-heap Neo4j on top of a couple of existing graphs
+# exhausted that budget and wedged the daemon (every API call returning HTTP 500) on 2026-07-27.
+# A one-item smoke needs a tiny fraction of this; override it rather than paying full freight.
+LME_NEO4J_HEAP="${LME_NEO4J_HEAP:-2G}"
 
 # ---- Menhir serve ports (one per workflow) ----
 LME_PORT_BUILD="${LME_PORT_BUILD:-8102}"               # build_graph.sh
@@ -41,11 +51,65 @@ LME_PORT_BRIEF="${LME_PORT_BRIEF:-8118}"               # analysis/brief_ab.sh (B
 LME_PORT_ENTROPY="${LME_PORT_ENTROPY:-8119}"           # analysis/entropy.sh (D0 retrieval entropy)
 
 # ---- Models ----
-LME_EXTRACT_MODEL="${LME_EXTRACT_MODEL:-gpt-4.1-nano}"
+# gpt-4o-mini (not nano): matches what Zep/Graphiti and Mem0 both use for LongMemEval
+# extraction, so results are comparable to their published numbers. Confirmed via direct
+# A/B test 2026-07-15 that nano measurably under-extracts vs mini under sparse context
+# (see menhir/.agent/reviews/rca-lme-stale-fact-retention-2026-07-15.md) -- mini recovers
+# more entities but does NOT fully fix the RELEVANT_SCHEMA_LIMIT=10 recency-window bug;
+# see menhir/.agent/plans/menhir-extraction-prompt-recency-recall-research.md for the
+# follow-on prompt-level research. Slower/costlier full-corpus builds than nano was chosen
+# for; accept the tradeoff for comparability, same as Zep/Mem0 did.
+LME_EXTRACT_MODEL="${LME_EXTRACT_MODEL:-gpt-4o-mini}"
 LME_ANSWER_MODEL="${LME_ANSWER_MODEL:-gpt-4o}"
 LME_JUDGE_MODEL="${LME_JUDGE_MODEL:-gpt-4o-mini}"
 LME_EMBED_MODEL="${LME_EMBED_MODEL:-text-embedding-3-small}"
 LME_SCORER="${LME_SCORER:-llm-judge}"
+
+# ---- Ingest policy ----
+# Legacy sentence splitting inflated knowledge-update items by roughly 8x and was
+# abandoned in the full validation campaign. Adaptive is the frozen, evidenced
+# default; override explicitly when reproducing an older arm.
+LME_SEGMENTATION="${LME_SEGMENTATION:-adaptive}"
+LME_REQUIRE_FRESH="${LME_REQUIRE_FRESH:-0}"
+LME_REQUIRE_TURN_EVIDENCE="${LME_REQUIRE_TURN_EVIDENCE:-0}"
+LME_SCALAR_STATE_ENABLED="${LME_SCALAR_STATE_ENABLED:-0}"
+LME_SCALAR_CONSOLIDATION_K="${LME_SCALAR_CONSOLIDATION_K:-3}"
+LME_SCALAR_CALL_BUDGET="${LME_SCALAR_CALL_BUDGET:-50}"
+# ---- Typed-scalar consistency gate (menhir-side, all default-off in menhir itself) ----
+# The gate groups k samples by an exact identity label (subject/attribute/scope/kind/unit/op/value)
+# and commits only what recurs in >= threshold*k samples. The model smears one fact's identity
+# across those three free-text fields in arbitrary order, so exact-matching each independently
+# turns one AGREED fact into several single-vote claims that then veto each other. Reconciliation
+# votes on the identity TUPLE and picks the modal combination.
+#
+# Measured on the frozen LME panel (scripts/replay_fold_flags.py, correct current Views / 100):
+#   threshold 1.0, no reconcile ...... 20   <- the shipped default; what a build gets with these off
+#   threshold 2/3 + attribute ........ 65
+#   + scope .......................... 70
+#   + scope + subject ................ 72
+# THRESHOLD MUST BE THE RATIO `2/3`, never 0.67: 0.67 > 2/3, so at k=3 it still demands all three
+# votes and silently buys nothing. menhir parses the ratio form exactly for this reason.
+LME_SCALAR_THRESHOLD="${LME_SCALAR_THRESHOLD:-2/3}"
+LME_SCALAR_RECONCILE_ATTRIBUTE="${LME_SCALAR_RECONCILE_ATTRIBUTE:-1}"
+LME_SCALAR_RECONCILE_SCOPE="${LME_SCALAR_RECONCILE_SCOPE:-1}"
+LME_SCALAR_RECONCILE_SUBJECT="${LME_SCALAR_RECONCILE_SUBJECT:-1}"
+# Measured effect: ZERO cells in every configuration (the prompt already emits 'user' almost
+# always). Off by default here; flip on only to re-measure.
+LME_SCALAR_CANONICAL_SELF="${LME_SCALAR_CANONICAL_SELF:-0}"
+# A one-item plumbing smoke may validly abstain at the consistency gate. Canonical/full builds keep
+# this on so promotion refuses a corpus that produced no durable scalar assertion/View at all.
+LME_REQUIRE_SCALAR_OUTPUT="${LME_REQUIRE_SCALAR_OUTPUT:-1}"
+# ---- Temporal grounding repair ----
+# DEFAULT OFF as of 2026-07-27. This used to be a MANDATORY post-build step, on the belief that
+# graphiti-core ignored reference_time. It does not (graphiti.py:1110 sets valid_at=reference_time);
+# the real defect was menhir's claim query never PROJECTING reference_time, fixed in menhir 27d9bad.
+# Worse, the repair keys off e.session_id, which graphiti-written EpisodicNodes do not carry, so it
+# silently skipped 62% of the 2026-07-22 corpus while reporting success -- masking the very bug it
+# was compensating for. Leave this OFF so a build's dates are the INGEST's dates and a regression is
+# visible. Verify instead of repairing: menhir scripts/_verify_valid_at_repair.py checks every
+# episode against the fixture, including the ones this script cannot map. Set to 1 only to repair a
+# corpus built by a menhir that predates 27d9bad.
+LME_BACKFILL_DATES="${LME_BACKFILL_DATES:-0}"
 
 # ---- Dataset and limits ----
 LME_NS_PREFIX="${LME_NS_PREFIX:-lme-}"               # namespace prefix for all LME graphs (promote scope filter)
@@ -63,10 +127,37 @@ LME_ENTROPY_K="${LME_ENTROPY_K:-20}"                 # entropy: retriever depth 
 LME_BACKUP_DIR="${LME_BACKUP_DIR:-C:/Users/thron/menhir-lme-backup}"
 LME_RESULTS_DIR="${LME_RESULTS_DIR:-${BENCH_DIR}/results/lme-ingest}"
 
+# Resume manifest, scoped by container name so a differently-named build (e.g. a
+# throwaway smoke build with LME_NEO4J_NAME=menhir-lme-smoke) never shares dedup state
+# with the canonical persistent graph's manifest.json, and a later full build against
+# the real graph does not see the smoke items as "already done" (or vice versa).
+# Default container name keeps the original unscoped filename for backward compat with
+# existing manifests/status.sh history.
+if [ "${LME_NEO4J_NAME}" = "menhir-lme-neo4j" ]; then
+  LME_MANIFEST_PATH="${LME_MANIFEST_PATH:-${LME_RESULTS_DIR}/manifest.json}"
+else
+  LME_MANIFEST_PATH="${LME_MANIFEST_PATH:-${LME_RESULTS_DIR}/manifest-${LME_NEO4J_NAME}.json}"
+fi
+
+# Date-backfill revert snapshot, scoped the same way and for the same reason: two
+# differently-named graphs both running backfill-dates must not clobber each other's
+# only way to undo the mutation.
+if [ "${LME_NEO4J_NAME}" = "menhir-lme-neo4j" ]; then
+  LME_REVERT_SNAPSHOT_PATH="${LME_REVERT_SNAPSHOT_PATH:-${LME_RESULTS_DIR}/date-backfill-revert.json}"
+else
+  LME_REVERT_SNAPSHOT_PATH="${LME_REVERT_SNAPSHOT_PATH:-${LME_RESULTS_DIR}/date-backfill-revert-${LME_NEO4J_NAME}.json}"
+fi
+
 # ---- Virtual environment bins (derived from paths above) ----
 MENHIR_MAIN_PY="${MENHIR_MAIN_PY:-${MENHIR_MAIN}/.venv/Scripts/python.exe}"
-MENHIR_MAIN_BIN="${MENHIR_MAIN_BIN:-${MENHIR_MAIN}/.venv/Scripts/menhir}"
+_MENHIR_MAIN_BIN_DEFAULT="${MENHIR_MAIN}/.venv/Scripts/menhir"
+[ -f "${_MENHIR_MAIN_BIN_DEFAULT}.exe" ] && _MENHIR_MAIN_BIN_DEFAULT="${_MENHIR_MAIN_BIN_DEFAULT}.exe"
+MENHIR_MAIN_BIN="${MENHIR_MAIN_BIN:-${_MENHIR_MAIN_BIN_DEFAULT}}"
 MENHIR_FRONTIER_PY="${MENHIR_FRONTIER_PY:-${MENHIR_FRONTIER}/.venv/Scripts/python.exe}"
-MENHIR_FRONTIER_BIN="${MENHIR_FRONTIER_BIN:-${MENHIR_FRONTIER}/.venv/Scripts/menhir}"
+_MENHIR_FRONTIER_BIN_DEFAULT="${MENHIR_FRONTIER}/.venv/Scripts/menhir"
+[ -f "${_MENHIR_FRONTIER_BIN_DEFAULT}.exe" ] && _MENHIR_FRONTIER_BIN_DEFAULT="${_MENHIR_FRONTIER_BIN_DEFAULT}.exe"
+MENHIR_FRONTIER_BIN="${MENHIR_FRONTIER_BIN:-${_MENHIR_FRONTIER_BIN_DEFAULT}}"
 BENCH_PY="${BENCH_PY:-${BENCH_DIR}/.venv/Scripts/python.exe}"
-BENCH_BIN="${BENCH_BIN:-${BENCH_DIR}/.venv/Scripts/archolith-bench}"
+_BENCH_BIN_DEFAULT="${BENCH_DIR}/.venv/Scripts/archolith-bench"
+[ -f "${_BENCH_BIN_DEFAULT}.exe" ] && _BENCH_BIN_DEFAULT="${_BENCH_BIN_DEFAULT}.exe"
+BENCH_BIN="${BENCH_BIN:-${_BENCH_BIN_DEFAULT}}"

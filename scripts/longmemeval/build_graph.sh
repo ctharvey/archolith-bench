@@ -20,19 +20,67 @@ PY
 )"; [ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY"
 
 # ---- persistent Neo4j (reuse if already up) ----
+# Freshness provenance: "graph_fresh" must mean the DATA is new, not just that the
+# container object is new -- `docker run -v <name>:/data` silently reattaches an
+# existing named volume even for a brand-new container. Check the volume BEFORE the
+# docker run call (which would auto-create it and make the check always say "existed").
+VOLUME_PRE_EXISTED="false"
+docker volume inspect "${LME_NEO4J_VOL}" >/dev/null 2>&1 && VOLUME_PRE_EXISTED="true"
+
+CONTAINER_PRE_EXISTED="false"
+docker ps -a --format '{{.Names}}' | grep -qx "${LME_NEO4J_NAME}" && CONTAINER_PRE_EXISTED="true"
+if [ "${LME_REQUIRE_FRESH}" = "1" ]; then
+  [ "${VOLUME_PRE_EXISTED}" = "false" ] || die "fresh build refused: volume already exists: ${LME_NEO4J_VOL}"
+  [ "${CONTAINER_PRE_EXISTED}" = "false" ] || die "fresh build refused: container already exists: ${LME_NEO4J_NAME}"
+  [ ! -e "${LME_MANIFEST_PATH}" ] || die "fresh build refused: manifest already exists: ${LME_MANIFEST_PATH}"
+fi
+
+GRAPH_FRESH="false"
 if ! docker ps --format '{{.Names}}' | grep -qx "${LME_NEO4J_NAME}"; then
   if docker ps -a --format '{{.Names}}' | grep -qx "${LME_NEO4J_NAME}"; then
     log "starting existing ${LME_NEO4J_NAME}..."; docker start "${LME_NEO4J_NAME}" >/dev/null
   else
     log "creating persistent Neo4j ${LME_NEO4J_NAME} (bolt ${LME_BOLT})..."
     docker run -d --name "${LME_NEO4J_NAME}" -p ${LME_BOLT}:7687 -p ${LME_HTTP}:7474 \
-      -e NEO4J_AUTH=neo4j/${LME_NEO4J_PW} -e NEO4J_server_memory_heap_max__size=2G \
+      -e NEO4J_AUTH=neo4j/${LME_NEO4J_PW} -e NEO4J_server_memory_heap_max__size=${LME_NEO4J_HEAP} \
       -v ${LME_NEO4J_VOL}:/data ${LME_NEO4J_IMAGE} >/dev/null
+    [ "${VOLUME_PRE_EXISTED}" = "false" ] && GRAPH_FRESH="true"
   fi
 fi
 log "waiting for Neo4j HTTP (${LME_HTTP})..."
 for _ in $(seq 1 60); do curl -sf "http://localhost:${LME_HTTP}" >/dev/null 2>&1 && break; sleep 2; done
 curl -sf "http://localhost:${LME_HTTP}" >/dev/null 2>&1 || die "Neo4j not ready"
+
+# Record freshness provenance so `lme.sh ir-gate` doesn't have to trust a manually-set
+# LME_GRAPH_FRESH env var -- it reads this file for the container currently configured.
+mkdir -p "${LME_RESULTS_DIR}"
+GRAPH_PROVENANCE_PATH="${LME_RESULTS_DIR}/graph-provenance-${LME_NEO4J_NAME}.json"
+cat > "${GRAPH_PROVENANCE_PATH}" <<EOF
+{
+  "container": "${LME_NEO4J_NAME}",
+  "volume": "${LME_NEO4J_VOL}",
+  "volume_pre_existed": ${VOLUME_PRE_EXISTED},
+  "graph_fresh": ${GRAPH_FRESH},
+  "require_fresh": ${LME_REQUIRE_FRESH},
+  "dataset": "${LME_DATASET}",
+  "variant": "${LONGMEMEVAL_VARIANT}",
+  "fixture": "${LME_FIXTURE_PATH:-}",
+  "requested_items": ${LIMIT},
+  "namespace_prefix": "${LME_NS_PREFIX}",
+  "segmentation": "${LME_SEGMENTATION}",
+  "scalar_state_enabled": ${LME_SCALAR_STATE_ENABLED},
+  "scalar_consolidation_k": ${LME_SCALAR_CONSOLIDATION_K},
+  "scalar_threshold": "${LME_SCALAR_THRESHOLD}",
+  "scalar_reconcile_attribute": ${LME_SCALAR_RECONCILE_ATTRIBUTE},
+  "scalar_reconcile_scope": ${LME_SCALAR_RECONCILE_SCOPE},
+  "scalar_reconcile_subject": ${LME_SCALAR_RECONCILE_SUBJECT},
+  "scalar_canonical_self": ${LME_SCALAR_CANONICAL_SELF},
+  "scalar_output_required": ${LME_REQUIRE_SCALAR_OUTPUT},
+  "turn_evidence_required": ${LME_REQUIRE_TURN_EVIDENCE},
+  "build_started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+log "graph provenance recorded: ${GRAPH_PROVENANCE_PATH} (graph_fresh=${GRAPH_FRESH})"
 
 # ---- temp menhir for ingestion (stopped on exit; Neo4j persists) ----
 MENHIR_PID=""
@@ -49,6 +97,20 @@ export LME_NEO4J_CONTAINER="${LME_NEO4J_NAME}" LME_NEO4J_PW="${LME_NEO4J_PW}"
 # another menhir process (the cross-process WinError 32 on rollover is the log-noise source).
 export MENHIR_LOG_DIR="${LME_RESULTS_DIR}/menhir-logs"; mkdir -p "${MENHIR_LOG_DIR}"
 export MENHIR_BENCHMARK_MODE=1 MENHIR_API_HOST=127.0.0.1 MENHIR_API_PORT="${MENHIR_PORT}"
+export MENHIR_PERSONAL_MEMORY_CONSOLIDATION_ENABLED=0
+export MENHIR_PERSONAL_MEMORY_SCALAR_STATE_ENABLED="${LME_SCALAR_STATE_ENABLED}"
+export MENHIR_PERSONAL_MEMORY_SCALAR_VIEW_AUTHORITY_ENABLED=0
+# Typed-scalar gate relaxations. These are default-OFF inside menhir, so without these exports a
+# scalar build silently reproduces the unanimous-threshold baseline (20/100 correct current Views)
+# no matter what else changed. See config.sh for the measured grid and the 0.67-vs-2/3 trap.
+export MENHIR_PERSONAL_MEMORY_SCALAR_THRESHOLD="${LME_SCALAR_THRESHOLD}"
+export MENHIR_PERSONAL_MEMORY_SCALAR_RECONCILE_ATTRIBUTE="${LME_SCALAR_RECONCILE_ATTRIBUTE}"
+export MENHIR_PERSONAL_MEMORY_SCALAR_RECONCILE_SCOPE="${LME_SCALAR_RECONCILE_SCOPE}"
+export MENHIR_PERSONAL_MEMORY_SCALAR_RECONCILE_SUBJECT="${LME_SCALAR_RECONCILE_SUBJECT}"
+export MENHIR_PERSONAL_MEMORY_SCALAR_CANONICAL_SELF="${LME_SCALAR_CANONICAL_SELF}"
+export MENHIR_PERSONAL_MEMORY_CHAT_MODEL="${LME_EXTRACT_MODEL}"
+export MENHIR_PERSONAL_MEMORY_SUM_GROUNDING=1
+export LME_REQUIRE_TURN_EVIDENCE="${LME_REQUIRE_TURN_EVIDENCE}"
 # Raise the per-episode LLM extraction budget (default 10) so long turns finish enrichment
 # instead of hitting FAILED; the ingest script does a best-effort FAILED-retry for the rest.
 export MENHIR_MAX_LLM_CALLS_PER_JOB=20
@@ -66,7 +128,50 @@ for _ in $(seq 1 90); do curl -sf "${MENHIR_URL}/api/health" >/dev/null 2>&1 && 
 curl -sf "${MENHIR_URL}/api/health" >/dev/null 2>&1 || die "menhir not healthy"
 log "menhir healthy. ingesting ${LIMIT} items..."
 
-"${BENCH_PY}" "$(dirname "${BASH_SOURCE[0]}")/lib/ingest.py" --limit "${LIMIT}" --menhir-url "${MENHIR_URL}"
+INGEST_ARGS=(
+  --limit "${LIMIT}"
+  --menhir-url "${MENHIR_URL}"
+  --manifest "${LME_MANIFEST_PATH}"
+  --segmentation "${LME_SEGMENTATION}"
+)
+if [ "${LME_SCALAR_STATE_ENABLED}" = "1" ]; then
+  INGEST_ARGS+=(
+    --consolidate-scalar
+    --consolidation-k "${LME_SCALAR_CONSOLIDATION_K}"
+    --consolidation-call-budget "${LME_SCALAR_CALL_BUDGET}"
+  )
+fi
+"${BENCH_PY}" "$(dirname "${BASH_SOURCE[0]}")/lib/ingest.py" "${INGEST_ARGS[@]}"
+
+if [ "${LME_SCALAR_STATE_ENABLED}" = "1" ]; then
+  "${BENCH_PY}" - "${LME_MANIFEST_PATH}" "${LME_REQUIRE_SCALAR_OUTPUT}" "${LIMIT}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+rows = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+if not rows:
+    raise SystemExit("scalar ingest validation failed: empty manifest")
+expected = int(sys.argv[3])
+if len(rows) != expected:
+    raise SystemExit(
+        f"scalar ingest validation failed: manifest has {len(rows)} rows, expected {expected}"
+    )
+if any(not row.get("scalar_consolidated") for row in rows):
+    raise SystemExit("scalar ingest validation failed: at least one namespace was not consolidated")
+if sum(int(row.get("turn_evidence", 0)) for row in rows) <= 0:
+    raise SystemExit("scalar ingest validation failed: no TurnEvidence captured")
+if sum(int(row.get("scalar_llm_calls", 0)) for row in rows) <= 0:
+    raise SystemExit("scalar ingest validation failed: scalar perception made no LLM calls")
+require_output = int(sys.argv[2])
+if require_output:
+    if sum(int(row.get("typed_assertions", 0)) for row in rows) <= 0:
+        raise SystemExit("scalar ingest validation failed: no TypedAssertion materialized")
+    if sum(int(row.get("scalar_views", 0)) for row in rows) <= 0:
+        raise SystemExit("scalar ingest validation failed: no scalar_state View materialized")
+print("scalar ingest validation: PASS", flush=True)
+PY
+fi
 log "ingest complete. promoting SESSION -> PERSISTENT (regular memories)..."
 
 # Write the benchmark as regular memories: freshly-extracted nodes are SESSION-scoped and
@@ -74,4 +179,20 @@ log "ingest complete. promoting SESSION -> PERSISTENT (regular memories)..."
 # promote_persistent.sh for the full rationale.
 "$(dirname "${BASH_SOURCE[0]}")/promote_persistent.sh"
 
-log "build complete. Neo4j ${LME_NEO4J_NAME} (bolt ${LME_BOLT}) holds the data; manifest in results/lme-ingest/."
+# NO LONGER MANDATORY -- and off by default. The old comment here claimed graphiti-core does not
+# apply reference_time to valid_at; that is false (graphiti.py:1110 sets valid_at=reference_time).
+# The real defect was menhir dropping reference_time in its claim projection (fixed in 27d9bad), and
+# running this repair unconditionally HID that bug: it keys off e.session_id, which graphiti-written
+# EpisodicNodes lack, so it skipped 62% of the corpus and still printed success. A build's dates
+# should now come from the ingest. See config.sh LME_BACKFILL_DATES.
+if [ "${LME_BACKFILL_DATES}" = "1" ]; then
+  log "repairing temporal grounding (backfill-dates)... [LME_BACKFILL_DATES=1]"
+  LME_BOLT="${LME_BOLT}" LME_NEO4J_PW="${LME_NEO4J_PW}" LME_NS_PREFIX="${LME_NS_PREFIX}" \
+    LME_REVERT_SNAPSHOT="${LME_REVERT_SNAPSHOT:-${LME_REVERT_SNAPSHOT_PATH}}" \
+    "${MENHIR_MAIN_PY}" "$(dirname "${BASH_SOURCE[0]}")/lib/backfill_dates.py"
+else
+  log "backfill-dates SKIPPED (LME_BACKFILL_DATES=0): valid_at comes from the ingest."
+  log "  verify with menhir scripts/_verify_valid_at_repair.py before trusting this graph."
+fi
+
+log "build complete. Neo4j ${LME_NEO4J_NAME} (bolt ${LME_BOLT}) holds the data; manifest at ${LME_MANIFEST_PATH}."

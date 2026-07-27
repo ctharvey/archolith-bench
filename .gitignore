@@ -12,3 +12,8 @@ dist/
 build/
 .venv/
 logs/
+
+# Generated smoke fixtures (verbatim LongMemEval slices, ~360KB).
+# Regenerate: python scripts/longmemeval/lib/make_smoke_fixture.py {date|multi}
+scripts/longmemeval/fixtures/date-smoke-*.json
+scripts/longmemeval/fixtures/multi-smoke-*.json

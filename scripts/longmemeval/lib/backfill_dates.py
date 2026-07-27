@@ -65,10 +65,18 @@ def main():
         eps = s.run(f"MATCH (e:Episodic) WHERE e.group_id STARTS WITH '{PREFIX}' "
                     "RETURN e.uuid AS uuid, e.session_id AS sid, toString(e.valid_at) AS valid_at").data()
         ep_old_day = {}
+        unmappable = 0
         for r in eps:
             correct = sid2date.get(r["sid"])
             ep_old_day[r["uuid"]] = day(r["valid_at"])
-            if correct and day(r["valid_at"]) != day(correct):
+            if not correct:
+                # This repair keys off e.session_id, which ONLY menhir-written :Episodic nodes
+                # carry -- graphiti writes its own EpisodicNodes with no session_id, so they were
+                # skipped in silence. On the 2026-07-22 scalar-ku corpus that was 1760 of 2862
+                # episodes (62%), and the build reported success anyway. Never fail quiet again.
+                unmappable += 1
+                continue
+            if day(r["valid_at"]) != day(correct):
                 revert["episodes"][r["uuid"]] = r["valid_at"]
                 ep_updates.append({"uuid": r["uuid"], "valid_at": correct})
 
@@ -91,7 +99,15 @@ def main():
             else:
                 skipped_extracted += 1
 
-        print(f"episodes: {len(eps)} total, {len(ep_updates)} to backfill")
+        print(f"episodes: {len(eps)} total, {len(ep_updates)} to backfill, "
+              f"{unmappable} UNMAPPABLE (no session_id -> date)")
+        if unmappable:
+            share = 100.0 * unmappable / max(1, len(eps))
+            print(f"  !! WARNING: {share:.0f}% of episodes cannot be date-repaired by this script.",
+                  "\n  !! These are graphiti-written EpisodicNodes (no session_id). If menhir's",
+                  "\n  !! ingest backdating is working, their valid_at is already correct and this",
+                  "\n  !! is benign. If it is NOT, this build has fake temporal grounding and the",
+                  "\n  !! script cannot tell you which -- verify valid_at against the fixture.")
         print(f"edges: {len(edges)} total, {len(edge_updates)} to backfill, "
               f"{skipped_extracted} kept (extracted/non-default), {skipped_no_ep} no source-episode")
         if DRY:

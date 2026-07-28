@@ -82,11 +82,15 @@ LME_SCALAR_CALL_BUDGET="${LME_SCALAR_CALL_BUDGET:-50}"
 # turns one AGREED fact into several single-vote claims that then veto each other. Reconciliation
 # votes on the identity TUPLE and picks the modal combination.
 #
-# Measured on the frozen LME panel (scripts/replay_fold_flags.py, correct current Views / 100):
+# Historical pre-binding measurement on the frozen LME panel
+# (scripts/replay_fold_flags.py, correct current Views / 100):
 #   threshold 1.0, no reconcile ...... 20   <- the shipped default; what a build gets with these off
 #   threshold 2/3 + attribute ........ 65
 #   + scope .......................... 70
 #   + scope + subject ................ 72
+# DO NOT use this grid as the current baseline. It predates menhir's resolved-twin non-self
+# binding repair (1550c56) and the 2026-07-27 TurnEvidence/admission provenance work. A new run
+# must rebuild the knowledge-update corpus on current Menhir before comparing these flag arms.
 # THRESHOLD MUST BE THE RATIO `2/3`, never 0.67: 0.67 > 2/3, so at k=3 it still demands all three
 # votes and silently buys nothing. menhir parses the ratio form exactly for this reason.
 LME_SCALAR_THRESHOLD="${LME_SCALAR_THRESHOLD:-2/3}"

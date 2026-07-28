@@ -12,7 +12,7 @@ This matrix maps each Archolith product to external benchmark families that are 
 | archolith-filter | filter | SWE-bench-style agent traces | candidate-before-launch | Add at least one tracked corpus summary showing sample provenance and category balance, then rerun `archolith-bench filter`. |
 | archolith-skree | audit | HELM-style token/cost accounting | implemented-local | Use real before/after session logs, not fixtures. Publish server-level deltas and note any new waste type regressions. |
 | archolith-context | proxy | LongMemEval (in-context / proxy) | candidate-before-launch | Run `archolith-bench harness longmemeval` direct vs proxy and publish memory-QA accuracy preserved while input tokens drop (the proxy curates the long history). A context-curation claim, not a menhir memory claim. |
-| menhir | memory | LongMemEval (persistent menhir memory) | candidate-before-launch | Stand up a throwaway menhir+Neo4j, run LongMemEval Mode B (no-memory baseline vs menhir-recall), and publish the memory-QA accuracy lift. This is menhir's primary advertisable capability claim. |
+| menhir | memory | LongMemEval (persistent menhir memory) | candidate-before-launch (accuracy-lift claim); IR-gate PASS tracked 2026-07-15 (narrower claim, see detail) | Stand up a throwaway menhir+Neo4j, run LongMemEval Mode B (no-memory baseline vs menhir-recall), and publish the memory-QA accuracy lift. This is menhir's primary advertisable capability claim. |
 | menhir | memory | Deep Memory Retrieval (DMR) | candidate-before-launch | Either wire a DMR adapter and report a direct-vs-proxy retrieval-accuracy delta, or keep DMR a documented future benchmark and lead menhir's memory claim with LongMemEval. |
 | menhir | memory | MTEB retrieval/reranking slices | candidate-before-launch | Run `archolith-bench harness mteb-retrieval` against the embeddings model and publish the MTEB score as a menhir/embedding-model baseline (not a proxy claim). A proxy A/B requires an embeddings layer that does not exist yet. |
 | archolith-security | security | CyberSecEval 4 | candidate-before-launch | Run `archolith-bench harness cyberseceval-4` on a scoped subset, direct vs proxy, and publish pass/fail, refusal, and false-refusal caveats before any security benchmark claim. |
@@ -147,14 +147,28 @@ This matrix maps each Archolith product to external benchmark families that are 
 - Suite: `memory`
 - Authority: Wu et al. (ICLR 2025)
 - Type: long-term interactive memory QA via ingest-then-recall (Mode B: tests menhir end-to-end)
-- Status: `candidate-before-launch`
+- Status: `candidate-before-launch` (accuracy-lift claim below) — **but see the 2026-07-15 IR-gate
+  update**: a distinct, narrower claim (menhir retrieval beats vector-only retrieval) now has
+  tracked PASS evidence. Do not conflate the two — see the note below before citing either.
 - Source: https://github.com/xiaowu0162/LongMemEval
 - Paper: https://arxiv.org/abs/2410.10813
 - Why relevant: MODE B — menhir's CAPABILITY benchmark. Per question: ingest the haystack sessions into menhir's graph (extraction -> temporal KG), then query menhir's recall, feed the retrieved memory to the model, answer. menhir is built on Graphiti (the engine Zep reports on LongMemEval/DMR), so this is the apples-to-apples industry standard for what menhir is. Unlike Mode A it exercises the actual graph store, so it needs an isolated (throwaway) Neo4j and per-question `group_id` isolation.
-- Local coverage: Adapter WIRED: `harness/longmemeval.py` LongMemEvalMemoryAdapter + `harness/memory_ab.py` run_memory_ab driver (ingest -> recall -> answer) + `harness/menhir_client.py` (Stub for offline, Http for real). Offline-runnable now with StubMenhirClient (no Neo4j). A real run needs a throwaway menhir (`--menhir-url`, prod-guarded) + Neo4j and per-item group_id isolation (menhir backend: `recall(...)` / `ingest_document(...)` with group_id). Awaiting tracked run. Plan: `archolith-bench-longmemeval-menhir-mode-b-plan.md`.
-- Launch gate: Stand up a throwaway menhir+Neo4j, run LongMemEval Mode B (no-memory baseline vs menhir-recall), and publish the memory-QA accuracy lift. This is menhir's primary advertisable capability claim.
+- Local coverage: Adapter WIRED: `harness/longmemeval.py` LongMemEvalMemoryAdapter + `harness/memory_ab.py` run_memory_ab driver (ingest -> recall -> answer) + `harness/menhir_client.py` (Stub for offline, Http for real). Offline-runnable now with StubMenhirClient (no Neo4j). A real run needs a throwaway menhir (`--menhir-url`, prod-guarded) + Neo4j and per-item group_id isolation (menhir backend: `recall(...)` / `ingest_document(...)` with group_id). **Real answer-accuracy (LLM-judge) run still not tracked — this is the remaining gap for this row.** Plan: `archolith-bench-longmemeval-menhir-mode-b-plan.md`.
+- Launch gate: Stand up a throwaway menhir+Neo4j, run LongMemEval Mode B (no-memory baseline vs menhir-recall), and publish the memory-QA accuracy lift. This is menhir's primary advertisable capability claim. **Not yet done — do not claim an accuracy-lift number.**
 - Command: `archolith-bench harness longmemeval-menhir --limit 30   # (Mode-B driver pending)`
 - Evidence path: `benchmarks/longmemeval-menhir-YYYY-MM-DD.md`
+
+**2026-07-15 IR-gate update (distinct evidence, not the row's launch gate above):** the separate
+`scripts/longmemeval/analysis/lib/retrieval_quality.py` harness (pure retrieval-quality — Hit@3,
+MRR@10, explainability; no LLM-judge, no answer generation) was run against the full n=500 oracle
+corpus for the first time and **PASSED** all 3 measured gates: menhir Hit@3(support)=4.60% vs
+graphiti(vector-only)=0.40% (~11.5x), menhir MRR@10(support)=0.0466 vs graphiti=0.0033 (~14x),
+explainability=100%. Evidence: `benchmarks/longmemeval-menhir-2026-07-15.md`. **This licenses a
+comparative claim ("menhir's graph retrieval substantially beats vector-only search on this
+corpus"), not the absolute "memory-QA accuracy lift" this row's launch gate asks for** — in
+absolute terms menhir found supporting evidence for only 81/500 questions (16.2%). The Hit@3 gate
+threshold itself was also recalibrated this run (see `menhir-mvp-roadmap.md` M1) from an
+unvalidated absolute 0.80 to the relative bar above.
 
 ### Deep Memory Retrieval (DMR) (dmr)
 

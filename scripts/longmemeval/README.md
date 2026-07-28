@@ -44,14 +44,18 @@ The built-in analysis harnesses (`matrix`, `msc`, `ablation`) already loop acros
 - Docker (Neo4j 5.26, menhir serve)
 - `archolith-bench` venv with `[longmemeval]` extra
 - `menhir` venv (main branch, installed under `../../menhir` relative to bench root)
-- `menhir-frontier` venv (optional, for frontier A/B; defaults to `../../menhir-frontier`)
+- `menhir-frontier` venv (optional, for frontier A/B). **As of 2026-07-15, `MENHIR_FRONTIER`
+  defaults to `MENHIR_MAIN`** (the frontier branch merged to main, so `../../menhir-frontier` no
+  longer exists) — only set `MENHIR_FRONTIER` explicitly if a real frontier fork checkout returns.
 - OpenAI API key in `menhir/.env` as `OPENAI_API_KEY`
 - HuggingFace dataset: `xiaowu0162/longmemeval` (auto-cached)
 
 ## Quickstart
 
 ```bash
-# 1. Build the persistent graph once (takes ~1 day for 500-item oracle variant)
+# 1. Build the persistent graph once (~1 day for 500-item oracle variant was measured with
+#    LME_EXTRACT_MODEL=gpt-4.1-nano; now defaults to gpt-4o-mini (2026-07-15, comparability with
+#    Zep/Mem0) which is slower/costlier -- this estimate is stale until re-measured)
 ./lme.sh build 500
 
 # 2. Check graph status (read-only; safe to run mid-ingest)
@@ -68,6 +72,9 @@ The built-in analysis harnesses (`matrix`, `msc`, `ablation`) already loop acros
 ./lme.sh matrix      # answer accuracy
 ./lme.sh msc node_plain  # minimal sufficient context (main config)
 ./lme.sh ablation    # oracle component ablation
+
+# 6. M1 IR gate (retrieval-only, no answer-model spend; needs a menhir server on LME_PORT_RQ)
+LME_PER_TYPE=133 ./lme.sh ir-gate   # 133 = full 500-item corpus (max per-type count); default 15 = 90-item sample
 ```
 
 For individual types:
@@ -84,7 +91,10 @@ LME_RECALL_LIMIT=5 ./lme.sh recall-ab main 30 --subset temporal-reasoning
 4. **Recall A/B**: `lme.sh recall-ab <branch> [N]` — read-only against the persistent graph; never resets it.
 5. **Retry failed**: `lme.sh retry` — reset+drain episodic nodes in FAILED state.
 
-**Rule**: Never reset a built graph. The manifest (`results/lme-ingest/manifest.json`) tracks ingested items; a fresh build needs all 500 questions re-ingested.
+**Rule**: Never reset a built graph. The manifest (`results/lme-ingest/manifest.json` for the
+canonical `menhir-lme-neo4j` container; `manifest-<LME_NEO4J_NAME>.json` for any other container
+name, e.g. a throwaway smoke build — see `config.sh:LME_MANIFEST_PATH`) tracks ingested items; a
+fresh build needs all 500 questions re-ingested.
 
 ### Memory scope: regular vs. session
 
@@ -105,17 +115,18 @@ unlike consolidation) and does **not** change existing recall-only A/B results �
 pass `include_session=True`, so the nodes were always visible; promotion only *also* exposes them
 to `build_context` and plain recall.
 
-### ⚠️ Temporal grounding: dates need a backfill
+### ⚠️ Temporal grounding: dates need a backfill (now automatic as of 2026-07-15)
 
-**Known menhir bug (as of 2026-07-02):** the ingest path does **not** honor `occurred_at` —
-an episode ingested with the session's historical date still lands `valid_at = now()` (verified
-live: ingest with `occurred_at=2020-01-01` → node `valid_at` = today). `ingest.py` sends the
-correct session date and menhir accepts the field, but the world-time is lost before the graph
-node is written. So a **freshly built graph has fake temporal grounding** (every episode/edge
-stamped with the build date), which breaks temporal-reasoning and the BriefBuilder Timeline.
+**Known bug, still present in graphiti-core 0.29.2 (re-verified 2026-07-15):** the ingest path
+does **not** honor `occurred_at` on graphiti's own Episodic nodes/`RELATES_TO` edges — an episode
+ingested with the session's historical date still lands `valid_at = now()` even though menhir's
+own Episodic nodes correctly carry the backdated `reference_time`. So a **freshly built graph has
+fake temporal grounding on the graphiti side** (episodes/edges stamped with the build date), which
+breaks temporal-reasoning and the BriefBuilder Timeline.
 
-Repair without a ~1-day re-ingest — the real date is recoverable (`episode.session_id` → dataset
-haystack date; `edge.episodes[0]` → source episode):
+**As of 2026-07-15, `build_graph.sh` runs the backfill automatically as the last build step** —
+no manual follow-up needed for a normal `lme.sh build`. It's still available standalone for a
+partial/legacy build or to preview changes first:
 
 ```bash
 ./scripts/longmemeval/lme.sh backfill-dates --dry-run   # preview counts
@@ -124,8 +135,10 @@ haystack date; `edge.episodes[0]` → source episode):
 
 Only `valid_at` (world-time) is rewritten; `created_at`/`expired_at` (belief-time = ingestion) are
 correct as-is. Genuine LLM-extracted edge dates are preserved (only ingestion-defaulted edges are
-touched). Idempotent; a revert snapshot is written to `results/lme-ingest/date-backfill-revert.json`
-before any mutation. **Run this after every `build` until the menhir ingest path is fixed.**
+touched). Idempotent — safe to run again even if already backfilled (a fully-backfilled graph
+reports `0 to backfill`). A revert snapshot is written to `results/lme-ingest/date-backfill-revert.json`
+(or `date-backfill-revert-<LME_NEO4J_NAME>.json` for a non-canonical container — see
+`config.sh:LME_REVERT_SNAPSHOT_PATH`) before any mutation.
 
 ## run_manifest.json Contract
 
@@ -165,7 +178,7 @@ LME_PORT_ABL=8114               # analysis/ablation_sweep.sh
 LME_PORT_RQ=8109                # analysis/lib/retrieval_quality.py
 
 # Models
-LME_EXTRACT_MODEL=gpt-4.1-nano
+LME_EXTRACT_MODEL=gpt-4o-mini  # matches Zep/Mem0's published LongMemEval extraction model (2026-07-15)
 LME_ANSWER_MODEL=gpt-4o
 LME_JUDGE_MODEL=gpt-4o-mini
 LME_EMBED_MODEL=text-embedding-3-small
@@ -178,7 +191,8 @@ LME_RECALL_LIMIT=10         # recall top-k
 LME_PER_TYPE=15             # stratified sample per question type (analysis)
 
 # Paths (auto-derived from git root, but overridable)
-ARCH_DIR, BENCH_DIR, MENHIR_MAIN, MENHIR_FRONTIER
+ARCH_DIR, BENCH_DIR, MENHIR_MAIN, MENHIR_FRONTIER  # MENHIR_FRONTIER now defaults to MENHIR_MAIN
+LME_MANIFEST_PATH, LME_REVERT_SNAPSHOT_PATH        # derived, scoped by LME_NEO4J_NAME (config.sh)
 ```
 
 Override via environment:
@@ -234,6 +248,28 @@ With N=15/type (90 total), expect ±~0.13 standard error on the score. Report pe
 - **MSC plateaus at k=5**: ~400 tokens = 95% of ceiling. Bottleneck is brief construction (what to pack), not retrieval (ranking).
 
 See `menhir-frontier/.agent/plans/anecdotal-recall-oracle-ladder.md` for the oracle-routing roadmap those measurements feed.
+
+## KU-Buildout Ledger (mandatory)
+
+Every knowledge-update buildout run **must** be recorded in
+`results/lme-ku-buildout/LEDGER.md` before the session ends. The ledger is the
+single source of truth for what was tested, how it scored, and what fixture
+produced the graph.
+
+After any KU buildout run completes (or is killed):
+1. Add a row to the **Scoreboard** table with run ID, date, N, segmentation
+   mode, score (or `(killed)`), and extract model.
+2. If the run completed scoring, add a **Per-Item Results** section listing
+   PASS/FAIL question IDs.
+3. If a new fixture or detector snapshot was used, record its SHA256 in the
+   **Fixture** section and ensure the snapshot is saved in the run's results
+   directory.
+4. Update the **Run Infrastructure** table with container name and ports.
+5. Note any new **Known Issues** discovered during the run.
+
+The fixture file (`fixtures/longmemeval/knowledge_update_subset.json`) and any
+frozen detector snapshots (`claim_segmenter_frozen.py`) must be preserved in the
+results directory of each run that used them.
 
 ## Troubleshooting
 

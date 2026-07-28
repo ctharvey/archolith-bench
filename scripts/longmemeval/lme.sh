@@ -43,7 +43,7 @@ case "$COMMAND" in
   backfill-dates)
     [ "${2:-}" = "--dry-run" ] && export DRY_RUN=1
     LME_BOLT="${LME_BOLT}" LME_NEO4J_PW="${LME_NEO4J_PW}" LME_NS_PREFIX="${LME_NS_PREFIX}" \
-      LME_REVERT_SNAPSHOT="${LME_REVERT_SNAPSHOT:-${LME_RESULTS_DIR}/date-backfill-revert.json}" \
+      LME_REVERT_SNAPSHOT="${LME_REVERT_SNAPSHOT:-${LME_REVERT_SNAPSHOT_PATH}}" \
       "${MENHIR_FRONTIER_PY}" "${_LONGMEMEVAL_DIR}/lib/backfill_dates.py"
     ;;
   recall-ab)
@@ -76,7 +76,11 @@ case "$COMMAND" in
     "${_LONGMEMEVAL_DIR}/analysis/ablation_sweep.sh"
     ;;
   presence)
-    MENHIR_URL="http://localhost:${LME_PORT_RQ}" "${MENHIR_FRONTIER_PY}" "${_LONGMEMEVAL_DIR}/analysis/lib/retrieval_quality.py"
+    # Forward LME_BOLT/LME_NEO4J_PW so the harness's own graphiti-arm connection targets
+    # the SAME graph as MENHIR_URL, not retrieval_quality.py's hardcoded default -- see the
+    # normalization note at the top of that file for why an unforwarded bare port is unsafe.
+    MENHIR_URL="http://localhost:${LME_PORT_RQ}" LME_BOLT="${LME_BOLT}" LME_NEO4J_PW="${LME_NEO4J_PW}" \
+      "${MENHIR_FRONTIER_PY}" "${_LONGMEMEVAL_DIR}/analysis/lib/retrieval_quality.py"
     ;;
   brief-ab)
     [ "${2:-}" = "--score" ] && export RUN_SCORE=1
@@ -93,7 +97,16 @@ case "$COMMAND" in
     # Phase 4: M1 gate verdict + artifacts (JSON + Markdown)
     # Requires a running menhir server on LME_PORT_RQ and the persistent graph already built.
     # Emits gate verdict block + JSON/Markdown artifacts to results/lme-gate/
+    # graph_fresh: read from build_graph.sh's provenance file for the CURRENT LME_NEO4J_NAME
+    # rather than trusting a hand-set env var, unless the caller explicitly overrides it.
+    GRAPH_PROVENANCE_PATH="${LME_RESULTS_DIR}/graph-provenance-${LME_NEO4J_NAME}.json"
+    if [ -z "${LME_GRAPH_FRESH:-}" ] && [ -f "${GRAPH_PROVENANCE_PATH}" ]; then
+      LME_GRAPH_FRESH="$("${MENHIR_MAIN_PY}" -c \
+        "import json;print(str(json.load(open(r'${GRAPH_PROVENANCE_PATH}')).get('graph_fresh', False)).lower())" \
+        2>/dev/null || echo false)"
+    fi
     MENHIR_URL="http://localhost:${LME_PORT_RQ}" \
+      LME_BOLT="${LME_BOLT}" LME_NEO4J_PW="${LME_NEO4J_PW}" \
       MENHIR_MAIN="${MENHIR_MAIN}" \
       LME_RUN_ID="${LME_RUN_ID:-}" \
       LME_GRAPH_FRESH="${LME_GRAPH_FRESH:-false}" \

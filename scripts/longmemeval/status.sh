@@ -12,7 +12,7 @@ set -uo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
-MANIFEST="${LME_RESULTS_DIR}/manifest.json"
+MANIFEST="${LME_MANIFEST_PATH}"
 EXPECTED="${LME_RESULTS_DIR}/expected_turns.json"
 PROGRESS_LOG="${LME_RESULTS_DIR}/progress.log"
 

@@ -271,6 +271,36 @@ The fixture file (`fixtures/longmemeval/knowledge_update_subset.json`) and any
 frozen detector snapshots (`claim_segmenter_frozen.py`) must be preserved in the
 results directory of each run that used them.
 
+### Current-code scalar reingest
+
+`run_knowledge_update_buildout.sh` is the guarded 78-item scalar reingest. It refuses to run without
+an explicit unique run ID and one of two pinned arms:
+
+- `baseline`: current production gate (`3/3`, no attribute/scope/subject reconciliation);
+- `candidate`: true `2/3` plus attribute/scope/subject reconciliation.
+
+Both arms require a fresh graph, scalar consolidation, TurnEvidence, and View authority during
+recall scoring. The wrapper validates the frozen fixture, records its SHA-256 and all effective
+flags, enables consolidation and recall audit trails, refuses tracked dirty code, checks
+Docker/image/ports/container/volume/result isolation, and stops Neo4j after the run while preserving
+the stopped container and volume for inspection.
+
+Run the no-spend preflights first:
+
+```bash
+LME_KU_RUN_ID=scalar-current-baseline-20260728 LME_KU_ARM=baseline \
+  ./scripts/longmemeval/run_knowledge_update_buildout.sh --preflight-only
+LME_KU_RUN_ID=scalar-current-candidate-20260728 LME_KU_ARM=candidate \
+  ./scripts/longmemeval/run_knowledge_update_buildout.sh --preflight-only
+```
+
+Then run the two arms sequentially with the same commands minus `--preflight-only`. Do not compare
+against the 2026-07-22 graph: it predates the resolved-twin binding and admission-provenance fixes.
+Set `LME_KU_KEEP_NEO4J_UP=1` only when immediate live graph inspection is worth the Docker memory.
+Set `LME_KU_ALLOW_RESUME=1` only to continue the same interrupted run ID; it deliberately disables
+the fresh-storage guard for that resume. `LME_KU_ALLOW_DIRTY=1` is an explicit escape hatch for
+development probes; results produced with it are not canonical benchmark evidence.
+
 ## Troubleshooting
 
 ### "pre-built menhir-lme-neo4j not found"

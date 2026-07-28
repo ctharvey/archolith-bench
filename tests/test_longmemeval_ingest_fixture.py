@@ -63,6 +63,28 @@ def test_ingest_parser_accepts_scalar_consolidation_controls() -> None:
     assert args.consolidation_call_budget == 40
 
 
+def test_current_scalar_buildout_wrapper_is_fail_closed() -> None:
+    script = (
+        ROOT / "scripts" / "longmemeval" / "run_knowledge_update_buildout.sh"
+    ).read_text(encoding="utf-8")
+
+    assert 'LME_KU_RUN_ID is required' in script
+    assert "LME_KU_ARM must be exactly 'baseline' or 'candidate'" in script
+    assert 'export LME_REQUIRE_FRESH="1"' in script
+    assert 'export LME_SCALAR_STATE_ENABLED="1"' in script
+    assert 'export LME_REQUIRE_TURN_EVIDENCE="1"' in script
+    assert 'LME_KU_ALLOW_DIRTY' in script
+    assert 'status --porcelain --untracked-files=no' in script
+    assert '"fixture_sha256": "${FIXTURE_SHA256}"' in script
+    assert '"consolidation_audit_enabled": ${LME_CONSOLIDATION_AUDIT_ENABLED}' in script
+    assert '"recall_audit_enabled": ${LME_RECALL_AUDIT_ENABLED}' in script
+    assert (
+        'MENHIR_PERSONAL_MEMORY_SCALAR_VIEW_AUTHORITY_ENABLED="${LME_SCALAR_VIEW_AUTHORITY_ENABLED}"'
+        in script
+    )
+    assert '--preflight-only' in script
+
+
 def test_fixture_path_is_forwarded_to_adapter() -> None:
     calls: list[dict] = []
 

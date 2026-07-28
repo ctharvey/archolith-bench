@@ -3,10 +3,14 @@
 
 Unlike Phase D (which composes the View-aware answer OFFLINE in the harness), this drives the
 ACTUAL menhir recall endpoint, so it exercises the production suppression hook gated by
-MENHIR_PERSONAL_MEMORY_SCALAR_VIEW_AUTHORITY_ENABLED. It seeds a current->current REPLACEMENT
-(both statements present-tense; the older is backdated so it becomes a genuine superseded
-predecessor with a SUPERSEDES edge -- the only shape the provenance-linked gate can act on),
-waits for the View AND the superseded predecessor to materialize, then runs live recall for:
+MENHIR_PERSONAL_MEMORY_SCALAR_VIEW_AUTHORITY_ENABLED. It seeds a current->current REPLACEMENT in
+TWO SEPARATE consolidation passes (stale value first, wait for its View, then the current value):
+a dateless observation's valid_at is the perception batch's `learned_fallback` time, so seeding
+both in one pass gives them the SAME valid_at and the fold abstains (AMBIGUOUS_ANCHOR) -- retiring
+the slot's View. Two passes give the current value a strictly-later valid_at, so the fold picks it
+(LWW) while the stale absolute survives as the older, different-valued predecessor the
+provenance-linked gate can suppress. It then waits for a current View AND that older predecessor to
+materialize, and runs live recall for:
 
   * a CURRENT-STATE query  ("...do I own right now?")   -- the stale value MUST disappear when the
                                                            authority flag is ON (suppressed).
@@ -152,19 +156,38 @@ def main() -> None:
     print(f"== Step 7c live authority A/B [{args.label}] ==\n  menhir={args.menhir_url} "
           f"bolt={args.neo4j_uri} ns={ns}\n")
 
+    def _ingest(body: str) -> None:
+        ev = client.record_turn_evidence(ns, body, turn_key=f"{ns}:{body[:24]}")
+        turn_uuid = ev.get("turn_id") or ev.get("turn_evidence_uuid")
+        client.ingest(ns, "user", body, source="user", turn_evidence_uuid=turn_uuid, wait=True)
+
+    def _wait_for_view_attrs(want_attrs: set[str], budget_s: float) -> set[str]:
+        end = time.monotonic() + budget_s
+        got: set[str] = set()
+        while time.monotonic() < end:
+            got = {str(v["attribute"]) for v in bolt.views(ns)}
+            if want_attrs <= got:
+                return got
+            time.sleep(3.0)
+        return got
+
+    want = {s.attribute for s in SLOTS}
     if not args.no_ingest:
         client.reset(ns)
-        # For a dateless current-observation the bind assigns the EPISODE reference (~ingest time),
-        # not occurred_at, so `valid_at` ordering comes from INGEST ORDER: seed the stale value first,
-        # then the current one, so the current assertion carries the later valid_at (the fold's LWW
-        # pick) while the stale one survives as an older, non-selected sibling for the same slot.
+        # TWO-PASS SEED (see module docstring). A dateless observation's valid_at is the perception
+        # batch's `learned_fallback` time; seeding both absolutes in one pass ties their valid_at and
+        # the fold abstains (AMBIGUOUS_ANCHOR), retiring the slot's View. So: (pass 1) seed every
+        # STALE value and WAIT for its View to materialize -- proving pass 1 consolidated on its own
+        # `learned_at` (T1); then (pass 2) seed every CURRENT value in a fresh pass (`learned_at` T2 >
+        # T1). The fold now picks the current value (latest valid_at) and the stale absolute survives
+        # as the older, different-valued predecessor the gate can suppress.
         for slot in SLOTS:
-            for body in (slot.stale_prompt, slot.current_prompt):
-                ev = client.record_turn_evidence(ns, body, turn_key=f"{ns}:{body[:24]}")
-                turn_uuid = ev.get("turn_id") or ev.get("turn_evidence_uuid")
-                client.ingest(ns, "user", body, source="user",
-                              turn_evidence_uuid=turn_uuid, wait=True)
-        print(f"  seeded {2 * len(SLOTS)} episodes (current->current replacements)")
+            _ingest(slot.stale_prompt)
+        stale_views = _wait_for_view_attrs(want, args.max_wait_s / 2)
+        print(f"  pass1 (stale) seeded {len(SLOTS)}; stale views materialized={sorted(stale_views)}")
+        for slot in SLOTS:
+            _ingest(slot.current_prompt)
+        print(f"  pass2 (current) seeded {len(SLOTS)} replacements")
 
     # wait for BOTH a current View and a superseded predecessor per slot, then settle.
     start = time.monotonic()
@@ -173,7 +196,6 @@ def main() -> None:
     stable_since = None
     views: list = []
     supers: list = []
-    want = {s.attribute for s in SLOTS}
     while time.monotonic() < deadline:
         views = bolt.views(ns)
         supers = bolt.superseded(ns)

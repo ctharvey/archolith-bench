@@ -1,16 +1,13 @@
 """Run a stratified LongMemEval slice: N questions per question type.
 
 Calls the existing ``archolith-bench harness longmemeval-menhir`` CLI once per
-question type (e.g. ``--subset single-session --limit 20``), then aggregates
+question type (e.g. ``--subset temporal-reasoning --limit 20``), then aggregates
 the 6 result files into one ``results.json`` and computes the overall + per-type
 scores.
 
-The LongMemEval dataset question types (as of 2026-07-19) are:
-  single-session, multi-session, multi-session-reasoning, long-preference,
-  long-entity, long-deduction, long-counting, abstention
-
-For the CI slice we use the 6 main recall types (skip abstention which is
-binary and multi-session-reasoning which overlaps with multi-session).
+The locally cached official LongMemEval oracle dataset contains exactly these
+six question types. Keep this tuple aligned with ``answer_matrix.sh`` and fail
+closed if any requested slice is incomplete.
 """
 
 from __future__ import annotations
@@ -23,12 +20,12 @@ from pathlib import Path
 
 # The 6 stratified types for the CI slice. Override via env BENCH_SLICE_TYPES.
 DEFAULT_SLICE_TYPES = (
-    "single-session",
+    "temporal-reasoning",
     "multi-session",
-    "long-preference",
-    "long-entity",
-    "long-deduction",
-    "long-counting",
+    "knowledge-update",
+    "single-session-user",
+    "single-session-assistant",
+    "single-session-preference",
 )
 
 DEFAULT_QUESTIONS_PER_TYPE = 20
@@ -142,7 +139,10 @@ def _run_one_type(
             error=f"output file not written: {out_file}",
         )
 
-    return _parse_type_result(q_type, out_file)
+    result = _parse_type_result(q_type, out_file)
+    if result.error is None and result.n != limit:
+        result.error = f"incomplete slice: expected {limit} questions, got {result.n}"
+    return result
 
 
 def _parse_type_result(q_type: str, path: Path) -> TypeResult:

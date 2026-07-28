@@ -86,12 +86,21 @@ class Comparison:
     gate_reason: str = ""
 
 
-def load_baseline(path: str | Path) -> Baseline:
+def load_baseline(path: str | Path, *, allow_stub: bool = False) -> Baseline:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    baseline_version = str(raw.get("baseline_version", "unknown"))
+    graph_snapshot = raw.get("graph_snapshot", {})
+    snapshot_hash = str(
+        graph_snapshot.get("snapshot_hash", "")
+        if isinstance(graph_snapshot, dict)
+        else graph_snapshot
+    )
+    if not allow_stub and ("stub" in baseline_version.lower() or "stub" in snapshot_hash.lower()):
+        raise ValueError("baseline is a stub; promote a verified run before enabling the CI gate")
     results = raw.get("results", {})
     per_q = {q["id"]: q for q in results.get("per_question", [])}
     return Baseline(
-        baseline_version=raw.get("baseline_version", "unknown"),
+        baseline_version=baseline_version,
         baseline_commit=raw.get("baseline_commit", "unknown"),
         stratified_slice_hash=raw.get("stratified_slice_hash", ""),
         overall=float(results.get("overall", 0.0)),

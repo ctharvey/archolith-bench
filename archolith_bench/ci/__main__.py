@@ -17,9 +17,9 @@ def main() -> int:
     p.add_argument("--repo-root", default=".")
     p.add_argument("--menhir-port", type=int, default=8090)
     p.add_argument("--proxy-port", type=int, default=8765)
-    p.add_argument("--neo4j-uri", default="bolt://localhost:7687")
+    p.add_argument("--neo4j-uri", default="bolt://localhost:7689")
     p.add_argument("--neo4j-user", default="neo4j")
-    p.add_argument("--neo4j-password", default="password")
+    p.add_argument("--neo4j-password", default="lmedata123")
     p.add_argument("--upstream", default="https://api.openai.com")
     p.add_argument("--max-calls", type=int, default=200)
     p.add_argument("--max-usd", type=float, default=5.0)
@@ -28,6 +28,8 @@ def main() -> int:
     p.add_argument("--questions-per-type", type=int, default=20)
     p.add_argument("--baseline-file", default="benchmarks/longmemeval-baseline.json")
     p.add_argument("--runs-dir", default=".bench/runs")
+    p.add_argument("--menhir-dir")
+    p.add_argument("--menhir-python")
     p.add_argument("--menhir-startup-seconds", type=float, default=60.0)
     p.add_argument("--confirm", action="store_true")
     p.add_argument("--dry-run", action="store_true")
@@ -52,6 +54,8 @@ def main() -> int:
         questions_per_type=args.questions_per_type,
         baseline_file=args.baseline_file,
         runs_dir=args.runs_dir,
+        menhir_dir=args.menhir_dir,
+        menhir_python=args.menhir_python,
         confirm=args.confirm,
         dry_run=args.dry_run,
         skip_menhir_start=args.skip_menhir_start,

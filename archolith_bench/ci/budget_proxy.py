@@ -22,6 +22,7 @@ import json
 import os
 import threading
 import time
+from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -50,6 +51,7 @@ class BudgetState:
         max_seconds: float,
         price_input_per_1m: float = DEFAULT_PRICE_INPUT_PER_1M,
         price_output_per_1m: float = DEFAULT_PRICE_OUTPUT_PER_1M,
+        on_killed: Callable[[], None] | None = None,
     ) -> None:
         self.api_key = api_key
         self.upstream = upstream.rstrip("/")
@@ -65,13 +67,26 @@ class BudgetState:
         self.started_at = time.time()
         self.killed = False
         self.kill_reason: str | None = None
+        self._on_killed = on_killed
         self._lock = threading.Lock()
         self._trace_fp = trace_file.open("a", encoding="utf-8")
 
     def check_caps(self) -> str | None:
         """Return a kill reason if any cap is exceeded, else None."""
+        with self._lock:
+            return self._check_caps_unlocked()
+
+    def _check_caps_unlocked(self) -> str | None:
         if self.calls >= self.max_calls:
             return f"LLM call cap exceeded ({self.calls} / {self.max_calls})"
+        return self._check_runtime_caps_unlocked()
+
+    def check_runtime_caps(self) -> str | None:
+        """Check guards that may safely be polled while a request is in flight."""
+        with self._lock:
+            return self._check_runtime_caps_unlocked()
+
+    def _check_runtime_caps_unlocked(self) -> str | None:
         if self.usd >= self.max_usd:
             return f"USD cap exceeded (${self.usd:.4f} / ${self.max_usd:.2f})"
         elapsed = time.time() - self.started_at
@@ -79,9 +94,17 @@ class BudgetState:
             return f"Wall-clock cap exceeded ({elapsed:.0f}s / {self.max_seconds:.0f}s)"
         return None
 
-    def record_call(self, input_tokens: int, output_tokens: int) -> None:
+    def try_begin_call(self) -> str | None:
+        """Reserve one call before forwarding it, preventing concurrent overruns."""
         with self._lock:
+            reason = self._check_caps_unlocked()
+            if reason:
+                return reason
             self.calls += 1
+            return None
+
+    def record_usage(self, input_tokens: int, output_tokens: int) -> None:
+        with self._lock:
             cost = (
                 input_tokens / 1_000_000 * self.price_input_per_1m
                 + output_tokens / 1_000_000 * self.price_output_per_1m
@@ -96,24 +119,35 @@ class BudgetState:
             self._trace_fp.flush()
 
     def write_budget(self) -> None:
-        payload = {
-            "calls": self.calls,
-            "usd": round(self.usd, 6),
-            "max_calls": self.max_calls,
-            "max_usd": self.max_usd,
-            "max_seconds": self.max_seconds,
-            "elapsed_seconds": round(time.time() - self.started_at, 1),
-            "killed": self.killed,
-            "kill_reason": self.kill_reason,
-        }
+        with self._lock:
+            payload = {
+                "calls": self.calls,
+                "usd": round(self.usd, 6),
+                "max_calls": self.max_calls,
+                "max_usd": self.max_usd,
+                "max_seconds": self.max_seconds,
+                "elapsed_seconds": round(time.time() - self.started_at, 1),
+                "killed": self.killed,
+                "kill_reason": self.kill_reason,
+            }
         self.budget_file.parent.mkdir(parents=True, exist_ok=True)
         self.budget_file.write_text(json.dumps(payload, indent=2))
 
     def mark_killed(self, reason: str) -> None:
+        callback: Callable[[], None] | None = None
         with self._lock:
+            if self.killed:
+                return
             self.killed = True
             self.kill_reason = reason
+            callback = self._on_killed
         self.write_budget()
+        if callback is not None:
+            callback()
+
+    def is_killed(self) -> bool:
+        with self._lock:
+            return self.killed
 
     def close(self) -> None:
         self._trace_fp.close()
@@ -140,12 +174,8 @@ class _ProxyHandler(BaseHTTPRequestHandler):
         self._handle()
 
     def do_GET(self) -> None:  # noqa: N802
-        # Only allow GET on /v1/models (harmless) — reject everything else
-        if self.path == "/v1/models":
-            self._forward("GET", b"")
-        else:
-            self.state.write_trace({"blocked": self.path, "method": "GET", "reason": "path not allowed"})
-            self._send_json(403, {"error": f"only {sorted(ALLOWED_PATHS)} allowed by bench proxy"})
+        self.state.write_trace({"blocked": self.path, "method": "GET", "reason": "method not allowed"})
+        self._send_json(403, {"error": f"only POST to {sorted(ALLOWED_PATHS)} allowed by bench proxy"})
 
     def _handle(self) -> None:
         path = self.path.split("?")[0]
@@ -154,11 +184,11 @@ class _ProxyHandler(BaseHTTPRequestHandler):
             self._send_json(403, {"error": f"only {sorted(ALLOWED_PATHS)} allowed by bench proxy"})
             return
 
-        if self.state.killed:
+        if self.state.is_killed():
             self._send_json(429, {"error": f"budget cap exceeded: {self.state.kill_reason}"})
             return
 
-        cap_reason = self.state.check_caps()
+        cap_reason = self.state.try_begin_call()
         if cap_reason:
             self.state.mark_killed(cap_reason)
             self._send_json(429, {"error": f"budget cap exceeded: {cap_reason}"})
@@ -189,11 +219,11 @@ class _ProxyHandler(BaseHTTPRequestHandler):
             usage = resp_json.get("usage", {})
             in_tok = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
             out_tok = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
-            self.state.record_call(in_tok, out_tok)
+            self.state.record_usage(in_tok, out_tok)
         except (json.JSONDecodeError, ValueError, TypeError):
-            # Non-JSON response (error page, etc.) — count as one call with no tokens
-            with self.state._lock:
-                self.state.calls += 1
+            # The call was already reserved before forwarding it. Unknown usage
+            # remains a zero-cost observation, but still consumes a call slot.
+            pass
 
         self.state.write_trace({
             "path": upstream_path,
@@ -233,6 +263,7 @@ class BudgetProxy:
         max_calls: int = 200,
         max_usd: float = 5.0,
         max_seconds: float = 900.0,
+        on_killed: Callable[[], None] | None = None,
     ) -> None:
         self.state = BudgetState(
             api_key=api_key,
@@ -242,6 +273,7 @@ class BudgetProxy:
             max_calls=max_calls,
             max_usd=max_usd,
             max_seconds=max_seconds,
+            on_killed=on_killed,
         )
         self.port = port
         self._server: ThreadingHTTPServer | None = None
@@ -280,7 +312,14 @@ class BudgetProxy:
         return f"http://127.0.0.1:{self.port}"
 
     def is_killed(self) -> bool:
-        return self.state.killed
+        return self.state.is_killed()
+
+    def enforce_caps(self) -> str | None:
+        """Trip the proxy for elapsed-time or post-response spend exhaustion."""
+        reason = self.state.check_runtime_caps()
+        if reason:
+            self.state.mark_killed(reason)
+        return reason
 
     def kill_reason(self) -> str | None:
         return self.state.kill_reason

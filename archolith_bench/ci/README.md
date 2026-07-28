@@ -12,11 +12,11 @@ the LLM budget. This tool:
    `OPENAI_BASE_URL=http://127.0.0.1:8765/v1` (a local proxy) and a dummy key.
    The proxy holds the real key and forwards only `/v1/chat/completions` and
    `/v1/embeddings`.
-2. **Enforces hard budget caps** (200 calls / $5 / 15min by default). The proxy
-   kills the subprocess on cap exceeded.
-3. **Tests the PR's code, not the PR's tests.** The bench harness is overlaid
-   from `main` after the PR is checked out — PR edits to `archolith-bench/` are
-   discarded.
+2. **Reserves call budget before forwarding** (200 calls by default) and
+   stops the subprocess when the USD or wall-clock guard trips.
+3. **Tests a Menhir PR's code, not its tests.** The trusted bench harness stays
+   in the `archolith-bench` checkout; the target PR is checked out from the
+   sibling Menhir repository.
 4. **Compares to a pinned baseline.** The baseline file lives in `main` and is
    hash-pinned. PR edits to it are ignored.
 
@@ -29,14 +29,12 @@ docker run -d --name neo4j-bench -p 7687:7687 -e NEO4J_AUTH=neo4j/password neo4j
 # Per-PR: review the diff on github.com first, then:
 .\scripts\bench-pr.ps1 -PR 123
 
-# Dry run (no LLM, no menhir start):
+# Dry run (no API key, proxy, LLM, or Menhir start):
 .\scripts\bench-pr.ps1 -PR 123 -DryRun
 
 # If menhir is already running:
 .\scripts\bench-pr.ps1 -PR 123 -SkipMenhirStart
 
-# If the PR touches bench infra:
-.\scripts\bench-pr.ps1 -PR 123 -Confirm
 ```
 
 The script writes:
@@ -51,6 +49,14 @@ Post the card to the PR:
 gh pr comment 123 --body-file .bench/runs/123/card.md
 ```
 
+## Execution boundary
+
+The runner allowlists the Menhir child environment, replaces `OPENAI_API_KEY`
+with a proxy-only dummy value, and gives it a fake home directory. That limits
+accidental credential exposure; it is **not** an operating-system sandbox for
+arbitrary hostile code. Run unfamiliar or adversarial PRs in a disposable
+VM/container rather than relying on this local helper as a security boundary.
+
 ## Architecture
 
 ```
@@ -64,10 +70,9 @@ gh pr comment 123 --body-file .bench/runs/123/card.md
 │ LOCAL DEV MACHINE                                           │
 │                                                             │
 │  bench-pr.ps1                                               │
-│    1. git fetch origin pull/N/head                          │
-│    2. git worktree add .bench/worktrees/pr-N <sha>           │
-│    3. git checkout main -- archolith_bench/ci/  (overlay)   │
-│    4. python -m archolith_bench.ci                          │
+│    1. git -C ../menhir fetch origin pull/N/head             │
+│    2. git -C ../menhir worktree add menhir-pr-N <sha>        │
+│    3. python -m archolith_bench.ci --menhir-dir <worktree>  │
 │       │                                                     │
 │       ├─ BudgetProxy (port 8765)                           │
 │       │   holds real OPENAI_API_KEY                         │
@@ -90,12 +95,12 @@ gh pr comment 123 --body-file .bench/runs/123/card.md
 | Threat | Mitigation |
 |--------|-----------|
 | PR author steals API key | Key never leaves proxy process. PR code talks to `127.0.0.1:8765` with a dummy key. |
-| PR author burns budget | Three hard caps enforced by proxy: 200 calls / $5 / 15min. |
-| PR author changes bench script | Bench harness overlaid from `main` after PR checkout. PR edits discarded. |
+| PR author burns budget | Call slots are atomically reserved; the proxy stops the child immediately when USD/time guards trip. |
+| PR author changes bench script | The harness runs from the trusted `archolith-bench` checkout, outside the Menhir PR worktree. |
 | PR author changes baseline | Baseline loaded from `main`. PR edits ignored. |
 | PR author triggers repeatedly | Cooldown 10min + max 3 runs per PR. |
-| PR code escapes sandbox | Subprocess `HOME` set to fake dir. No GitHub token in env. |
-| Maintainer forgets to review | Script requires `-Confirm` if PR touches `archolith-bench/` or `bench-pr.ps1`. |
+| PR code inherits shell credentials | Child environment is allowlisted; `HOME` is fake and GitHub/OpenAI credentials are excluded. |
+| Maintainer forgets to review | The script is for Menhir PRs; review the PR diff before granting it local execution. |
 
 ## Gate rules
 

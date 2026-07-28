@@ -10,14 +10,14 @@ from archolith_bench.ci.stratified import StratifiedResult, TypeResult
 def _make_result(overall: float = 0.247) -> StratifiedResult:
     return StratifiedResult(
         overall=overall,
-        by_type={"single-session": 0.350, "multi-session": 0.250},
+        by_type={"temporal-reasoning": 0.350, "multi-session": 0.250},
         n_total=120,
         input_tokens=100000,
         output_tokens=50000,
         cost_usd=1.84,
         per_question={},
         type_results=[
-            TypeResult(type="single-session", score=0.350, n=20, input_tokens=50000,
+            TypeResult(type="temporal-reasoning", score=0.350, n=20, input_tokens=50000,
                        output_tokens=25000, cost_usd=0.92),
             TypeResult(type="multi-session", score=0.250, n=20, input_tokens=50000,
                        output_tokens=25000, cost_usd=0.92),
@@ -32,7 +32,7 @@ def _make_comparison(gate: GateResult = GateResult.PASS) -> Comparison:
         overall_delta=0.017,
         overall_pct_delta=7.4,
         type_deltas=[
-            TypeDelta(type="single-session", baseline=0.350, current=0.350, delta=0.0, status="─"),
+            TypeDelta(type="temporal-reasoning", baseline=0.350, current=0.350, delta=0.0, status="─"),
             TypeDelta(type="multi-session", baseline=0.180, current=0.250, delta=0.070, status="▲"),
         ],
         gate=gate,
@@ -121,5 +121,5 @@ def test_card_includes_per_type_table():
         usd_used=1.84,
     )
     assert "Per-type breakdown" in card
-    assert "single-session" in card
+    assert "temporal-reasoning" in card
     assert "multi-session" in card

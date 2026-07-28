@@ -48,6 +48,21 @@ def test_ingest_parser_accepts_fixture_and_namespace_prefix() -> None:
     assert args.limit == 1
 
 
+def test_ingest_parser_accepts_scalar_consolidation_controls() -> None:
+    args = ingest._parse_args(
+        [
+            "--consolidate-scalar",
+            "--consolidation-k",
+            "3",
+            "--consolidation-call-budget",
+            "40",
+        ]
+    )
+    assert args.consolidate_scalar is True
+    assert args.consolidation_k == 3
+    assert args.consolidation_call_budget == 40
+
+
 def test_fixture_path_is_forwarded_to_adapter() -> None:
     calls: list[dict] = []
 

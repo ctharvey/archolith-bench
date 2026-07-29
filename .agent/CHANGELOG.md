@@ -1,5 +1,55 @@
 # archolith-bench Changelog
 
+## 2026-07-29 - Scalar buildout correctness remediation
+
+Fixed four defects a review found in the knowledge-update buildout path. Each had the same
+shape: a build could finish and report numbers that did not describe the graph it produced.
+
+**The zero-FAILED gate is strict again.** `LME_KU_MAX_FAILURES_PER_NS` is gone. A FAILED episode
+means a turn never reached the graph, so every number downstream of it is computed over a
+namespace that does not match the transcript; the allowance turned that hard stop into a line of
+log output. Turns that legitimately yield no edges now take the evidence-only path instead, which
+creates no episode to fail.
+
+**CONTEXT_ONLY turns are recorded as evidence, not folded into a neighbour.** The previous fold
+concatenated a context turn onto the next extractable turn, which destroyed the per-turn
+`:TurnEvidence` boundaries and counts the scalar audit reads and -- across a role change -- filed
+assistant words under `declarant="user"`, with a hardcoded `role="user"` on the session-end flush.
+Each user turn now has one stable evidence identity carrying the original, unsplit text; every
+episode segment from that turn cites the same evidence UUID, and repeated identical source turns
+remain distinct. CONTEXT_ONLY assistant turns are likewise recorded with their own
+role/declarant and simply skip episode creation. The window scheduler steps over evidence-only
+turns rather than waiting for a lifecycle row that will never exist.
+
+**Durable facts stay extractable.** `is_purely_interrogative` short-circuited on all-question
+turns before checking for durable content, so "Since I moved to Portland, which neighborhoods
+should I check out?" was dropped; durable signals are now scanned across every sentence,
+questions included. A frozen-fixture audit then found 28 answer-bearing user turns still routed to
+CONTEXT_ONLY by the finite signal allowlist. The classifier now fails open: only provably phatic
+acknowledgments and fact-free question frames bypass extraction; unknown declaratives and
+first-person/possessive clauses embedded in questions are extracted. The deterministic signals
+still cover knowledge updates whose subject is not "I":
+possessive assertions ("my mom uses the same app"), frequencies ("three times a week"),
+quantities ("my rent is $2,400 now"), and state changes presupposed by a wh-question ("Why did I
+move to Seattle?"). Yes/no questions stay conservative, and fronted auxiliaries are no longer
+mistaken for proper-noun subjects.
+
+**The reset/stale-worker race is closed in the right order.** Menhir's stale-lease recovery can
+already be enriching a previous run's episodes when the ingest starts. The window now waits for
+those PENDING/ENRICHING rows to settle *before* any reset -- resetting first deletes the very rows
+that prove a worker is alive, so the wait would read zero against a worker still writing -- and
+then resets once. Unreadable state and timeouts raise instead of resetting anyway.
+
+**Provenance is append-only.** Both wrappers previously `cat >` their provenance file, so a resume
+replaced what happened with what that attempt intended: `run_provenance.json` lost the earlier
+attempt's start, commits and phases, and `graph-provenance-*.json` flipped the `graph_fresh` field
+`lme.sh ir-gate` reads. A new `scripts/longmemeval/lib/run_provenance.py` makes every write
+additive -- the top-level record is frozen after the first attempt, every attempt is kept whole in
+`attempts[]`, and each phase (`build-graph`, the checkpoint continuation, `recall-qa`,
+`ingest-graph`) records the manifest it inherited plus its own effective settings, including the
+ones the continuation flips. A resume whose run/arm/fixture/container/data identity disagrees with
+the record is refused, and phases a killed attempt left open are marked `interrupted`.
+
 ## 2026-07-28 - Hard review checkpoint for paid scalar reingest
 
 Added an optional `LME_KU_CHECKPOINT_ITEMS` gate to the guarded knowledge-update buildout. The first

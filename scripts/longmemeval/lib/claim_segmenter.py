@@ -98,6 +98,62 @@ _STATE_CHANGE_VERBS = re.compile(
     re.IGNORECASE,
 )
 
+# Thanks/gratitude, used to demote "again" from correction marker to pleasantry.
+_THANKS = re.compile(r"\bthank", re.IGNORECASE)
+
+# Possessive assertions — "my rent is 2400", "my mom uses the same app".
+# These carry knowledge updates that no first-person verb pattern catches: the subject is a
+# possessed noun, not "I". The verb list is closed on purpose -- matching any inflected word
+# after "my ..." would fire on "my question about ...".
+_POSSESSIVE_FACT = re.compile(
+    r"\bmy\s+(?:[A-Za-z][\w'-]*\s+){0,2}"
+    r"(?:is|are|was|were|has|have|had|became|becomes|will\s+be|"
+    r"uses|used|likes|liked|prefers|preferred|works|worked|lives|lived|"
+    r"goes|went|owns|owned|needs|needed|wants|wanted|takes|took|"
+    r"makes|made|says|said|keeps|kept|runs|ran|costs|cost|"
+    r"starts|started|stops|stopped|moves|moved|switched|switches)\b",
+    re.IGNORECASE,
+)
+
+# State-change verbs in their base form, for frames that carry tense elsewhere.
+_STATE_CHANGE_BASE = (
+    r"(?:move|change|start|stop|switch|leave|quit|join|buy|sell|marry|divorce|"
+    r"graduate|retire|transfer|adopt|resign|relocate|enroll|drop)"
+)
+
+# Presuppositional wh-questions — "Why did I move to Seattle?" is a question about a move that
+# the speaker is asserting happened. The fact is in the presupposition, so the turn is durable
+# even though every sentence ends in "?".
+#
+# Deliberately wh-only. A yes/no question ("Did I move to Seattle?") presupposes nothing -- it
+# may be genuinely asking -- so it stays conservative and is not treated as durable.
+_PRESUPPOSITIONAL_CHANGE = re.compile(
+    r"\b(?:why|when|where|how)\s+(?:did|do|does|has|have|had)\s+"
+    r"(?:i|we|he|she|they|my\s+[A-Za-z][\w'-]*)\s+"
+    r"(?:[A-Za-z][\w'-]*\s+){0,2}" + _STATE_CHANGE_BASE + r"\w*\b",
+    re.IGNORECASE,
+)
+
+# Habits and rates — "three times a week", "every other day", "daily". A frequency is a durable
+# personal fact and is often the entire content of a knowledge-update turn, with the count
+# spelled as a word so no digit pattern sees it.
+_FREQUENCY_FACT = re.compile(
+    r"\b(?:one|two|three|four|five|six|seven|eight|nine|ten|once|twice|a|an|\d+)\s+"
+    r"times?\s+(?:a|an|per|each|every)\s+"
+    r"(?:day|week|month|year|morning|evening|night|session|visit)\b"
+    r"|\b(?:every|each)\s+(?:other\s+)?(?:day|week|month|year|morning|evening|night)\b"
+    r"|\b(?:daily|weekly|monthly|yearly|nightly|hourly)\b",
+    re.IGNORECASE,
+)
+
+# Quantities — currency, percentages, and counted units. A knowledge update is
+# very often just a new number ("my rent is $2,400 now").
+_QUANTITY_FACT = re.compile(
+    r"(?:\$\s*\d|\b\d[\d,]*(?:\.\d+)?\s*(?:%|percent|dollars?|k\b|hours?|minutes?|"
+    r"days?|weeks?|months?|years?|miles?|km|kg|lbs?|pounds?)\b)",
+    re.IGNORECASE,
+)
+
 # Sentence boundary (same as the existing splitter).
 _SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
 
@@ -125,7 +181,12 @@ _COMMON_SENTENCE_STARTERS = frozenset({
     "Most", "Any", "Each", "Every", "Both", "All", "One", "Two",
     "Can", "Could", "Would", "Should", "Will", "May", "Might",
     "For", "And", "But", "Also", "Yes", "Yeah", "Sure", "Thanks",
-    "Great", "Good", "Nice", "Sounds", "Let",
+    "Great", "Good", "Got", "Nice", "Sounds", "Let",
+    # Fronted auxiliaries. A yes/no question opens with one of these, and reading it as a
+    # proper-noun subject made "Did I mention that already?" look like a durable named fact.
+    "Did", "Does", "Was", "Were", "Are", "Has", "Have", "Had", "Shall", "Must",
+    # Other common non-noun openers.
+    "Okay", "Well", "Just", "Please", "Actually", "Maybe", "Perhaps", "Right",
 })
 
 
@@ -183,42 +244,203 @@ def detect_claim_risk_signals(text: str) -> ClaimRiskSignals:
     return signals
 
 
-def _has_extractable_content(text: str) -> bool:
-    """Check whether a user turn contains signals suggesting extractable durable facts.
+def _has_correction_signal(text: str) -> bool:
+    """Correction/update marker that is not a social pleasantry.
 
-    Returns False for turns that are purely social, reactive, or phatic —
-    e.g. "Thanks again for your help!", "That sounds great!", "I see." —
-    turns where gpt-4o-mini would produce only ``{"name":"user"}`` with
-    zero edges, causing CombinedExtractionCollapsedError.
-
-    Conservative: only considers turns under 200 chars.  Any positive signal
-    (first-person durable statement, state-change verb, correction marker,
-    proper-noun subject) returns True immediately.  False-positive
-    CONTEXT_ONLY classification is low-risk because the fold logic in
-    ``_iter_item_turns`` preserves the content as context for the next
-    extractable turn.
+    ``again`` is a correction marker in "I moved again" but pure phatic filler in
+    "Thanks again for your help!", so it is ignored when the text also thanks.
     """
-    # Long messages might contain subtle durable facts — let them through
-    if len(text) > 200:
-        return True
-    # First-person durable statements ("I live", "I bought", etc.)
-    if _FIRST_PERSON_DURABLE.search(text):
-        return True
-    # State-change verbs ("moved", "started", "quit", etc.)
-    if _STATE_CHANGE_VERBS.search(text):
-        return True
-    # Correction markers ("actually", "used to", "no longer", etc.)
-    # "again" is excluded when preceded by "thank*" — social pleasantry,
-    # not a state-change correction.
-    for m in _CORRECTION_MARKERS.finditer(text):
-        if m.group().lower() == "again" and re.search(r"\bthank", text, re.IGNORECASE):
+    for match in _CORRECTION_MARKERS.finditer(text):
+        if match.group().lower() == "again" and _THANKS.search(text):
             continue
         return True
-    # Proper-noun subjects at sentence boundaries (potential named entities)
-    named = set(_SUBJECT_PATTERN.findall(text)) - _COMMON_SENTENCE_STARTERS
-    if named:
-        return True
     return False
+
+
+def has_durable_signals(text: str) -> bool:
+    """Whether ``text`` carries any signal of a durable, extractable fact.
+
+    This is the single durable-content detector shared by
+    :func:`_has_extractable_content` and :func:`is_purely_interrogative`, so a
+    turn can never be judged durable by one and phatic by the other.  It looks at
+    the whole string — a durable fact is just as durable inside a question
+    ("Since I moved to Portland, what should I see?") as inside a statement.
+
+    A miss here silently drops a knowledge update from graph extraction, so the
+    signal set deliberately covers the shapes LongMemEval knowledge-update items
+    use: first-person durable verbs, state-change verbs (inflected or presupposed
+    by a wh-question), correction markers, named sentence subjects, possessive
+    assertions ("my mom uses the same app"), frequencies ("three times a week"),
+    and quantities ("$2,400", "three years").
+    """
+    return bool(
+        _FIRST_PERSON_DURABLE.search(text)
+        or _STATE_CHANGE_VERBS.search(text)
+        or _PRESUPPOSITIONAL_CHANGE.search(text)
+        or _has_correction_signal(text)
+        or _POSSESSIVE_FACT.search(text)
+        or _FREQUENCY_FACT.search(text)
+        or _QUANTITY_FACT.search(text)
+        or (set(_SUBJECT_PATTERN.findall(text)) - _COMMON_SENTENCE_STARTERS)
+    )
+
+
+# Vocabulary of fact-free/phatic language. A declarative sentence built ONLY from these words asserts
+# nothing durable. Kept deliberately small: this list is a denylist, and anything it does not
+# recognise is treated as content.
+_PHATIC_TOKENS = frozenset({
+    "a", "about", "absolutely", "again", "agreed", "alright", "all", "also", "am", "amazing",
+    "and", "any", "anyway", "appreciate", "are", "as", "awesome", "be", "been", "brilliant",
+    "but", "cheers", "cool", "definitely", "do", "does", "enough", "exactly", "excellent",
+    "fair", "fantastic", "fine", "for", "get", "glad", "good", "got", "great", "haha", "have",
+    "hear", "hello", "help", "helpful", "hey", "hi", "hmm", "how", "i", "idea", "if", "in",
+    "indeed", "interesting", "is", "it", "just", "know", "let", "like", "lol", "lot", "love",
+    "makes", "many", "me", "much", "my", "neat", "nice", "no", "noted", "of", "ofcourse", "oh",
+    "ok", "okay", "one", "perfect", "please", "point", "really", "right", "same", "see",
+    "sense", "so", "sorry", "sound", "sounds", "sure", "team", "thank", "thanks", "that",
+    "the", "then", "there", "these", "think", "this", "those", "thx", "to", "too", "true",
+    "try", "understood", "very", "well", "what", "when", "will", "wonderful", "work", "works",
+    "wow", "yeah", "yep", "yes", "you", "your", "yup", "that's",
+})
+
+_WORD = re.compile(r"[A-Za-z][A-Za-z'-]*")
+_ANY_DIGIT = re.compile(r"\d")
+
+# The longest a sentence can be and still be *provably* reactive commentary. Past this, the
+# claim "there is nothing durable in here" stops being something a heuristic can support.
+_MAX_PHATIC_WORDS = 8
+
+
+def is_phatic_sentence(sentence: str) -> bool:
+    """Whether a declarative sentence is *provably* fact-free/phatic.
+
+    This is a denylist, and that direction is the whole design. The previous version asked the
+    opposite question -- "can I recognise a durable fact in here?" -- which requires an
+    exhaustive allowlist of every shape a fact can take. It cannot exist: an audit of the frozen
+    78-item fixture found 28 user turns carrying answers that no pattern matched, so they were
+    routed to CONTEXT_ONLY and silently never extracted. A missing fact looks exactly like a
+    model that had nothing to say, and nothing in the pipeline reports it.
+
+    So an unrecognised statement fails OPEN, to extraction. If extraction then collapses to zero
+    edges the episode FAILS and the strict gate stops the build -- loud, attributable, and
+    fixable. Silent omission is the worse of the two failures.
+    """
+    stripped = sentence.strip()
+    if not stripped:
+        return True
+    # A durable signal settles it: never phatic.
+    if has_durable_signals(stripped):
+        return False
+    words = _WORD.findall(stripped)
+    if not words:
+        return True
+    # A number is a value, and a value is not fact-free ("I've completed 30 videos").
+    if _ANY_DIGIT.search(stripped):
+        return False
+    # A named thing anywhere but the sentence opener is content, whatever surrounds it
+    # ("my Canon EOS 80D on five trips"). "I" is not a name.
+    if any(word[0].isupper() and word != "I" for word in words[1:]):
+        return False
+    lowered = [word.lower() for word in words]
+    if all(word in _PHATIC_TOKENS for word in lowered):
+        return True
+    # Reactive commentary about the topic ("I think that sounds great"), capped short so a fact
+    # cannot ride along inside it.
+    return bool(_FIRST_PERSON_REACTIVE.search(stripped)) and len(words) <= _MAX_PHATIC_WORDS
+
+
+# Clause boundaries. A sentence that ends in "?" routinely opens with a declarative clause --
+# "I'm planning to go to the mall this weekend, can you remind me what's near H&M?" -- and the
+# statement half is the knowledge update. Sentence-level analysis cannot see it.
+_CLAUSE_BOUNDARY = re.compile(r"\s*(?:[,;:]|--|—)\s*|\s+(?:and|but|so|then|though|although)\s+")
+
+# A clause that is asking, not telling. Wh-word or inverted auxiliary at the clause opening.
+_QUESTION_CLAUSE = re.compile(
+    r"^(?:and|but|so|or|also)?\s*"
+    r"(?:what|when|where|why|how|which|who|whom|whose|"
+    r"can|could|would|should|will|shall|may|might|must|"
+    r"do|does|did|is|are|was|were|have|has|had|any|anyone|anybody)\b",
+    re.IGNORECASE,
+)
+
+# First-person or possessive subject. Deliberately broad -- "did the user talk about themselves"
+# is a question a short closed list can answer, unlike "is this a durable fact".
+_FIRST_PERSON_SUBJECT = re.compile(
+    r"\b(?:I|I'm|I've|I'll|I'd|we|we're|we've|we'll|we'd|my|mine|our|ours)\b",
+    re.IGNORECASE,
+)
+
+# The narrow exception: first-person framing that reacts to the conversation instead of
+# reporting anything about the speaker's life. Anchored at the clause opening, so "I think that
+# sounds great" is reactive while "I'm thinking of switching plans" is a plan.
+_REACTIVE_CLAUSE = re.compile(
+    r"^(?:and|but|so|also|well|ok|okay|yeah|yes|sure)?\s*"
+    r"(?:I\s+(?:agree|see|understand|appreciate)\b(?:\s+(?:that|this|it))?\s*[.!]?$"
+    r"|I\s+(?:think|thought|suppose|guess|bet|mean|imagine|assume|figured|believe)\s+"
+    r"(?:that|this|it|so|the\s+(?:idea|plan|approach)|.*\bsounds?\b)"
+    r"|I\s+was\s+wondering\b"
+    r"|I'?m\s+(?:curious|wondering|not\s+sure|glad|sorry|excited\s+to\s+hear)\b"
+    r"|I'?d\s+(?:love|like)\s+to\s+(?:know|hear)\b"
+    r"|I\s+see\b)",
+    re.IGNORECASE,
+)
+
+
+def _clauses(sentence: str) -> list[str]:
+    return [clause.strip() for clause in _CLAUSE_BOUNDARY.split(sentence) if clause.strip()]
+
+
+def has_first_person_declarative(text: str) -> bool:
+    """Whether any clause is the speaker telling us something about themselves.
+
+    This is the load-bearing fail-open rule. A first-person or possessive declarative clause --
+    "I'm planning a trip", "I've been experimenting with noodles", "I'm feeling overwhelmed",
+    "I've been using my Starbucks Rewards app" -- is a statement about the user's own life. None
+    of those match any fact template, and under a template-based rule all of them were discarded.
+    Whether such a clause is *durable* is a judgement no regex should be making, so it is handed
+    to extraction, which is the component that actually reads.
+
+    Only two things are excluded: clauses that ask rather than tell, and the narrow set of
+    first-person framings that react to the conversation ("I think that sounds great").
+    """
+    for sentence in _SENTENCE_BOUNDARY.split(text):
+        for clause in _clauses(sentence):
+            if clause.rstrip().endswith("?") or _QUESTION_CLAUSE.match(clause):
+                continue
+            if not _FIRST_PERSON_SUBJECT.search(clause):
+                continue
+            if _REACTIVE_CLAUSE.match(clause) and is_phatic_sentence(clause):
+                continue
+            return True
+    return False
+
+
+def is_context_only_user_turn(text: str) -> bool:
+    """Whether a user turn can be proven to be fact-free.
+
+    Three ways to fail that proof, in order of how much they catch:
+
+    1. a durable signal anywhere (a presupposition can span the sentence split);
+    2. any first-person/possessive declarative clause -- the speaker talking about themselves;
+    3. any declarative sentence that is not provably phatic.
+
+    Only a turn that survives all three is evidence-only. In practice what remains is fact-free
+    question frames ("What are some good resources for X?") and acknowledgments ("Thanks
+    again!"), which is exactly the population that extracts to ``{"name":"user"}`` with zero
+    edges.
+    """
+    sentences = [s.strip() for s in _SENTENCE_BOUNDARY.split(text) if s.strip()]
+    if not sentences:
+        return True
+    if has_durable_signals(text):
+        return False
+    if has_first_person_declarative(text):
+        return False
+    declaratives = [s for s in sentences if not s.rstrip().endswith("?")]
+    if not declaratives:
+        # Nothing but questions, and nothing durable presupposed by them.
+        return is_purely_interrogative(text)
+    return all(is_phatic_sentence(sentence) for sentence in declaratives)
 
 
 def is_short_and_coherent(text: str, max_chars: int = 300, max_sentences: int = 3) -> bool:
@@ -256,35 +478,24 @@ def is_purely_interrogative(text: str) -> bool:
     Returns True for turns like "What do you think about X?" or "I think that sounds
     great. What kind of elements were you thinking of?" — turns where the user is
     engaging with the topic but not stating any durable personal fact.
+
+    Durable signals are scanned across *every* sentence, questions included. A
+    question is a perfectly ordinary carrier for a knowledge update — "Since I
+    moved to Portland, which neighborhoods should I check out?" states the move —
+    so an all-questions turn is only interrogative when nothing in it is durable.
     """
     sentences = _SENTENCE_BOUNDARY.split(text)
     real = [s.strip() for s in sentences if s.strip()]
     if not real:
         return True
 
-    questions = sum(1 for s in real if s.rstrip().endswith("?"))
-
     # Must have at least one question
-    if questions == 0:
+    if not any(s.rstrip().endswith("?") for s in real):
         return False
 
-    # If ALL sentences are questions, definitely interrogative
-    if questions == len(real):
-        return True
-
-    # Mixed: non-question sentences exist. Check if they contain durable facts.
-    for s in real:
-        if s.rstrip().endswith("?"):
-            continue
-        # State-change verbs or correction markers → durable content
-        if _STATE_CHANGE_VERBS.search(s) or _CORRECTION_MARKERS.search(s):
-            return False
-        # First-person durable statements → personal fact
-        if _FIRST_PERSON_DURABLE.search(s):
-            return False
-
-    # Non-question sentences are purely reactive ("I think that sounds great")
-    return True
+    # Any durable fact anywhere — including inside a question — makes this turn
+    # worth extracting on its own rather than being recorded as context-only evidence.
+    return not has_durable_signals(text)
 
 
 # ---------------------------------------------------------------------------
@@ -337,18 +548,11 @@ def segmentation_mode(
             return SegmentationMode.EXTRACT_WHOLE
         return SegmentationMode.CONTEXT_ONLY
 
-    # User messages: check for purely interrogative turns before committing to
-    # extraction. A turn like "I think that sounds great. What kind of X were you
-    # thinking of?" has no durable personal fact — extracting it produces only
-    # {"name":"user"} with zero edges and fails the pipeline.  Returning
-    # CONTEXT_ONLY lets the ingest fold it into the adjacent extractable turn.
-    if is_purely_interrogative(content):
-        return SegmentationMode.CONTEXT_ONLY
-
-    # Short turns with no durable-content signals — social pleasantries,
-    # acknowledgments, reactive commentary.  Folded into the next extractable
-    # turn so content is preserved as context.
-    if not _has_extractable_content(content):
+    # User messages: route to CONTEXT_ONLY only when the turn can be proven fact-free/phatic.
+    # Such a turn extracts to just {"name":"user"} with zero edges, which fails the episode; it
+    # is instead recorded as evidence and never sent to extraction. Anything not provably phatic
+    # is extracted, because a fact dropped here is dropped silently.
+    if is_context_only_user_turn(content):
         return SegmentationMode.CONTEXT_ONLY
 
     if is_short_and_coherent(content, max_short_chars, max_short_sentences):

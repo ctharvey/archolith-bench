@@ -99,6 +99,17 @@ class IngestTurn:
     content: str
     occurred_at: str | None
     session_id: str
+    # False for CONTEXT_ONLY turns: capture the turn as evidence, create no episode.
+    # Never merge such a turn into a neighbour -- see _iter_item_turns.
+    extract: bool = True
+    # The ORIGINAL source turn's full text. ``content`` may be one segment of it (sentence
+    # splitting, SEGMENT_CLAIMS); evidence always records the whole turn, once.
+    evidence_text: str = ""
+    # Stable identity of the source turn this came from: namespace + session + turn index.
+    # Every segment of one source turn carries the same key, and it is what menhir's
+    # :TurnEvidence MERGE keys on. Without it menhir falls back to hashing the TEXT, which
+    # collapses two genuinely repeated identical turns onto one evidence node.
+    turn_key: str = ""
 
 
 @dataclass
@@ -145,6 +156,10 @@ def _ingest_turn(
     tries: int = 4,
     occurred_at: str | None = None,
     session_id: str | None = None,
+    extract: bool = True,
+    evidence_text: str | None = None,
+    turn_key: str | None = None,
+    evidence_cache: dict[str, str] | None = None,
 ) -> str:
     """Ingest one turn with bounded exponential backoff on transient errors.
 
@@ -153,25 +168,62 @@ def _ingest_turn(
     gate downgrades the claim to ``agent_inference`` and writes a noisy
     admission-denial entity.
 
+    EXACTLY ONE :TurnEvidence PER SOURCE TURN. Two things would otherwise break that:
+
+    * ``turn_key`` is the identity menhir MERGEs evidence on. Supplied with none, it
+      derives one by hashing the TEXT, so a user who says the same thing twice in a
+      session ("I have 20 coins") collapses onto a single evidence node and the second
+      observation disappears. The caller therefore supplies a key built from the
+      namespace, session and source-turn index, which is distinct per genuine turn and
+      stable across retries of the same turn.
+    * ``content`` may be one segment of a turn (sentence splitting, SEGMENT_CLAIMS).
+      Evidence records ``evidence_text`` -- the whole original turn -- and
+      ``evidence_cache`` makes the first segment record it while every later segment of
+      the same turn reuses that UUID. So N episodes from one turn all cite ONE evidence
+      node holding the user's actual words, rather than N evidence nodes holding
+      fragments of them.
+
+    ``extract=False`` is the evidence-only path for CONTEXT_ONLY turns: the turn is still
+    captured as exactly one :TurnEvidence record carrying its own text and its own
+    ``role``/``declarant``, but no :Episodic node is created, so nothing is sent to
+    extraction and the returned episode uuid is empty. Turns are never combined --
+    evidence boundaries and per-turn counts stay identical to the source transcript, and
+    an assistant turn can never be captured under ``declarant="user"`` (menhir's evidence
+    projection is fail-closed on ``role='user' AND declarant='user'``, so assistant
+    evidence stays inert rather than founding a user-declared claim).
+
     Uses wait=False: the namespace-window scheduler is the completeness
     guarantee, so we do not block on an HTTP request per turn. It still keeps
     at most one episode active per namespace while allowing different
     namespaces to use multiple enrichment workers.
     """
-    is_user = role.strip().lower() == "user"
+    normalized_role = role.strip().lower() or "user"
+    is_user = normalized_role == "user"
     turn_evidence_uuid: str | None = None
+    # The evidence body is the ORIGINAL turn, never the segment being ingested.
+    evidence_body = content if evidence_text is None else evidence_text
 
-    # Ground the user-tier claim by recording turn evidence first.
-    if is_user:
+    # A sibling segment of the same source turn already recorded the evidence.
+    if evidence_cache is not None and turn_key:
+        turn_evidence_uuid = evidence_cache.get(turn_key)
+
+    # Ground the user-tier claim by recording turn evidence first. Evidence-only
+    # turns are captured for every role, since they have no episode to ground and
+    # the record is the only trace the source turn leaves.
+    if turn_evidence_uuid is None and (is_user or not extract):
         for attempt in range(tries):
             try:
                 ev = client.record_turn_evidence(
                     ns,
-                    content,
-                    role="user",
+                    evidence_body,
+                    role=normalized_role,
+                    declarant=normalized_role,
                     session_id=session_id,
+                    turn_key=turn_key,
                 )
                 turn_evidence_uuid = ev.get("turn_id")
+                if turn_evidence_uuid and evidence_cache is not None and turn_key:
+                    evidence_cache[turn_key] = turn_evidence_uuid
                 break
             except (httpx.HTTPError,) as exc:
                 if attempt == tries - 1:
@@ -185,6 +237,16 @@ def _ingest_turn(
                 wait = 2 ** (attempt + 1)
                 print(f"    turn-evidence retry {attempt+1}/{tries} after {exc.__class__.__name__} -> sleep {wait}s", flush=True)
                 time.sleep(wait)
+
+    if REQUIRE_TURN_EVIDENCE and (is_user or not extract) and not turn_evidence_uuid:
+        raise RuntimeError(
+            "turn-evidence capture returned no turn_id; refusing to continue without "
+            f"grounding for namespace {ns}"
+        )
+
+    # Evidence-only: the turn is recorded, but there is no episode to enrich.
+    if not extract:
+        return ""
 
     for attempt in range(tries):
         try:
@@ -374,40 +436,63 @@ def _reset_namespace(admin: httpx.Client, menhir_url: str, namespace: str) -> No
     response.raise_for_status()
 
 
-def _clear_stale_episodes(namespaces: list[str], *, poll_s: float = 2.0, timeout_s: float = 60.0) -> int:
-    """Wait for in-flight stale episodes to settle, then delete any FAILED leftovers.
+def _await_stale_episode_settlement(
+    namespaces: list[str],
+    *,
+    poll_s: float = 2.0,
+    timeout_s: float = 60.0,
+) -> None:
+    """Block until no stale episode is PENDING or ENRICHING in *namespaces*. Fail closed.
 
     When Menhir starts with ``ALLOW_RESUME`` it auto-recovers stale enrichment leases from a
-    previous killed run.  Those episodes begin enriching *before* the ingest script resets
-    namespaces, so they fail when their graph partition disappears.  This function lets that
-    race resolve and then purges the FAILED debris so ``_require_no_failed_episodes`` does not
-    trip on ghosts from an earlier run.
+    previous killed run. Those workers are already running when this script starts, and they
+    write entities, edges, TurnEvidence and lifecycle rows into namespaces this window is about
+    to own.
+
+    ORDER IS THE WHOLE POINT: this must run BEFORE any reset. A reset deletes the very
+    PENDING/ENRICHING rows that show a worker is alive, so settlement checked afterwards reads
+    zero instantly while the worker is still mid-flight in memory -- and its next write lands in
+    the namespace the reset just cleaned. Wait first on the rows that exist, then reset once.
+
+    An unreadable count (-1, cypher unreachable) is never settlement: it is indistinguishable
+    from a busy worker, so it keeps polling and, if it persists, times out. Timing out RAISES
+    rather than resetting anyway -- resetting on an unconfirmed worker is the same race this
+    function exists to close, and continuing would ingest into a partition a straggler is still
+    writing to. Stopping costs a re-run; proceeding costs a silently corrupted namespace whose
+    numbers still look plausible.
     """
-    t0 = time.time()
-    # Wait until no PENDING/ENRICHING episodes remain in the target namespaces.
-    while time.time() - t0 < timeout_s:
-        still_in_flight = False
-        for ns in namespaces:
-            counts = _ns_state_counts(ns)
-            if counts.get("pending", 0) > 0 or counts.get("enriching", 0) > 0:
-                still_in_flight = True
-                break
-        if not still_in_flight:
-            break
+    deadline = time.time() + timeout_s
+    last: dict[str, dict[str, int]] = {}
+    while True:
+        last = {namespace: _ns_state_counts(namespace) for namespace in namespaces}
+        unsettled = {
+            namespace: state
+            for namespace, state in last.items()
+            if state.get("pending", -1) != 0 or state.get("enriching", -1) != 0
+        }
+        if not unsettled:
+            return
+        if time.time() >= deadline:
+            details = ", ".join(
+                f"{namespace}=pending:{state.get('pending')}/enriching:{state.get('enriching')}"
+                for namespace, state in unsettled.items()
+            )
+            raise RuntimeError(
+                "stale enrichment did not settle within "
+                f"{timeout_s:.0f}s; refusing to reset a namespace a worker may still be "
+                "writing to (a -1 count means the state could not be read): " + details
+            )
         time.sleep(poll_s)
 
-    # Delete any FAILED Episodic nodes left by stale enrichment.
-    total_cleared = 0
-    for ns in namespaces:
-        cleared = _cypher_count(
-            f"MATCH (e:Episodic {{namespace:'{ns}'}}) "
-            "WHERE e.processing_state = 'FAILED' "
-            "DETACH DELETE e RETURN count(e);"
-        )
-        if cleared > 0:
-            print(f"    cleared {cleared} stale FAILED episode(s) in {ns}", flush=True)
-            total_cleared += cleared
-    return total_cleared
+
+def _reset_window_namespaces(
+    admin: httpx.Client,
+    menhir_url: str,
+    namespaces: list[str],
+) -> None:
+    """Force-reset every namespace in a window (graph partition + phase-3 evidence)."""
+    for namespace in namespaces:
+        _reset_namespace(admin, menhir_url, namespace)
 
 
 def _drain_many(
@@ -524,24 +609,41 @@ def _ingest_window(
     active: dict[int, tuple[str, bool]] = {}
     requeued = {state.namespace: 0 for state in window}
     started_at = time.time()
+    # turn_key -> :TurnEvidence uuid. Every segment cut from one source turn reuses the first
+    # segment's record, so one source turn is one evidence node no matter how it was split.
+    # Keys are namespace-qualified, so sharing one map across the window is safe.
+    evidence_by_turn: dict[str, str] = {}
 
     def submit_next(index: int) -> bool:
-        try:
-            turn = next(turn_iterators[index])
-        except StopIteration:
-            return False
+        """Advance one namespace to its next *extractable* turn.
+
+        Evidence-only turns create no episode, so there is no lifecycle row to
+        wait on. They are recorded in order and skipped over here rather than
+        occupying the namespace's single active slot -- which would deadlock the
+        drain, since a missing episode never reaches READY.
+        """
         state = window[index]
-        episode_uuid = _ingest_turn(
-            client,
-            state.namespace,
-            turn.role,
-            turn.content,
-            occurred_at=turn.occurred_at,
-            session_id=turn.session_id,
-        )
-        state.turns += 1
-        active[index] = (episode_uuid, False)
-        return True
+        while True:
+            try:
+                turn = next(turn_iterators[index])
+            except StopIteration:
+                return False
+            episode_uuid = _ingest_turn(
+                client,
+                state.namespace,
+                turn.role,
+                turn.content,
+                occurred_at=turn.occurred_at,
+                session_id=turn.session_id,
+                extract=turn.extract,
+                evidence_text=turn.evidence_text or turn.content,
+                turn_key=turn.turn_key or None,
+                evidence_cache=evidence_by_turn,
+            )
+            state.turns += 1
+            if episode_uuid:
+                active[index] = (episode_uuid, False)
+                return True
 
     for index in range(len(window)):
         submit_next(index)
@@ -704,15 +806,19 @@ def _iter_item_turns(
             if raw_session_id
             else f"{namespace}-s{session_index}"
         )
-        # Buffer for CONTEXT_ONLY turns that should be folded into the next
-        # extractable turn rather than emitted as standalone episodes.
-        context_prefix: str = ""
-        for turn in session:
+        for turn_index, turn in enumerate(session):
             content = turn.get("content", "")
             if not content:
                 continue
             role = turn.get("role", "user")
             contents: list[str]
+            # CONTEXT_ONLY turns take the evidence-only path below instead of
+            # being merged into a neighbour. Merging would concatenate two source
+            # turns into one record, destroying the per-turn TurnEvidence
+            # boundaries and counts the scalar audit reads, and -- when the two
+            # turns had different roles -- would file assistant words under
+            # declarant="user".
+            extract = True
             if segmentation == "none":
                 contents = [content]
             elif segmentation == "sentence":
@@ -728,12 +834,12 @@ def _iter_item_turns(
                 if mode == SegmentationMode.SKIP:
                     contents = []
                 elif mode == SegmentationMode.CONTEXT_ONLY:
-                    # Fold into the next extractable turn so the combined
-                    # segment has enough context for meaningful extraction.
-                    # Without this, purely interrogative user turns produce
-                    # only {"name":"user"} with zero edges and fail.
-                    context_prefix += ("\n\n" if context_prefix else "") + content
-                    contents = []
+                    # Captured as evidence, never extracted. Purely interrogative
+                    # or phatic turns produce only {"name":"user"} with zero edges,
+                    # so sending them to extraction fails the episode; skipping
+                    # extraction keeps the turn's own evidence record intact.
+                    contents = [content]
+                    extract = False
                 elif mode == SegmentationMode.SEGMENT_CLAIMS:
                     contents = [
                         content,
@@ -743,27 +849,22 @@ def _iter_item_turns(
                     contents = [content]
             else:
                 contents = [content]
-            # Prepend any buffered context-only content to the first segment.
-            if contents and context_prefix:
-                contents[0] = context_prefix + "\n\n" + contents[0]
-                context_prefix = ""
+            # One identity per SOURCE turn, shared by every segment cut from it. The index is
+            # over the raw session, so it does not shift when a turn is skipped, and it keeps
+            # two identical repeated turns distinct -- menhir's fallback key hashes the text
+            # and would merge them onto one evidence node.
+            turn_key = f"{namespace}|{session_id}|t{turn_index}"
             for segmented_content in contents:
                 yield IngestTurn(
                     role=role,
                     content=segmented_content,
                     occurred_at=occurred_at,
                     session_id=session_id,
+                    extract=extract,
+                    # Evidence is the whole turn, even when the episode is one segment of it.
+                    evidence_text=content,
+                    turn_key=turn_key,
                 )
-        # If context_prefix remains at session end, emit it as a standalone
-        # turn so the content is not silently lost.
-        if context_prefix:
-            yield IngestTurn(
-                role="user",
-                content=context_prefix,
-                occurred_at=occurred_at,
-                session_id=session_id,
-            )
-            context_prefix = ""
 
 
 def _write_manifest(path: Path, manifest: list[dict]) -> None:
@@ -775,45 +876,30 @@ def _write_manifest(path: Path, manifest: list[dict]) -> None:
 
 def _require_no_failed_episodes(
     drained_by_namespace: dict[str, dict[str, int | bool]],
-    *,
-    max_failures_per_namespace: int = 0,
 ) -> None:
     """Stop a scalar build before more paid work when a completed window is incomplete.
 
-    ``max_failures_per_namespace`` (default 0, override via ``LME_KU_MAX_FAILURES_PER_NS``)
-    allows a small number of FAILED episodes per namespace without stopping the build.
-    Evidence projections of phatic/negated content sometimes produce entities but zero
-    edges even after the bounded repair — these are logged but acceptable for benchmark
-    scoring.  Setting this to 0 preserves the strict original behaviour.
+    The gate is strict and has no tolerance knob. A FAILED episode means some turn of
+    that item never made it into the graph, so every downstream number -- scalar views,
+    user-founded views, recall accuracy -- is computed over a namespace that does not
+    match the transcript. Scoring a partial graph is worse than stopping: it produces a
+    plausible number nobody can trust. A per-namespace failure allowance was tried and
+    reverted because it converted that hard stop into a line of log output, letting a
+    build ship silently-lossy namespaces. Turns that legitimately yield no edges belong
+    on the evidence-only path in ``_iter_item_turns``, which creates no episode to fail.
     """
-    threshold = int(os.getenv("LME_KU_MAX_FAILURES_PER_NS", str(max_failures_per_namespace)))
     residual_failures = {
         namespace: int(drained.get("failed", 0))
         for namespace, drained in drained_by_namespace.items()
-        if int(drained.get("failed", 0)) > threshold
+        if int(drained.get("failed", 0)) > 0
     }
-    # Always log failures even when under threshold
-    minor_failures = {
-        namespace: int(drained.get("failed", 0))
-        for namespace, drained in drained_by_namespace.items()
-        if 0 < int(drained.get("failed", 0)) <= threshold
-    }
-    if minor_failures:
-        details = ", ".join(
-            f"{namespace}={failed}" for namespace, failed in minor_failures.items()
-        )
-        print(
-            f"    tolerated {sum(minor_failures.values())} FAILED episode(s) under "
-            f"threshold {threshold}: {details}",
-            flush=True,
-        )
     if residual_failures:
         details = ", ".join(
             f"{namespace}={failed}" for namespace, failed in residual_failures.items()
         )
         raise RuntimeError(
             "scalar namespace window has residual FAILED episodes after immediate retry; "
-            f"refusing further paid work (threshold={threshold}): " + details
+            "refusing further paid work: " + details
         )
 
 
@@ -875,16 +961,20 @@ def main(argv: list[str] | None = None) -> int:
         ]
         window_started = time.time()
 
-        # An interrupted window has no manifest rows, so fully reset every namespace before
-        # resubmitting. This must include TurnEvidence, which is not group_id-keyed.
-        for state in window:
-            _reset_namespace(admin, args.menhir_url, state.namespace)
+        window_namespaces = [state.namespace for state in window]
 
-        # Menhir's stale-lease recovery may have already started enriching old episodes into
-        # these namespaces before the reset above could run.  Let those in-flight episodes
-        # settle (they will fail because the namespace was just wiped) and then delete the
-        # FAILED debris so _require_no_failed_episodes does not trip on ghosts.
-        _clear_stale_episodes([state.namespace for state in window])
+        # Menhir's stale-lease recovery may already be enriching a previous run's episodes into
+        # these namespaces. Wait for that to finish FIRST -- while the PENDING/ENRICHING rows
+        # that prove a worker is alive still exist. Resetting first would delete those rows and
+        # make settlement read zero against a worker that is still running, which is the race
+        # itself. This raises rather than proceeding if settlement cannot be confirmed.
+        _await_stale_episode_settlement(window_namespaces)
+
+        # Only now, with no writer left, reset. An interrupted window has no manifest rows, so
+        # every namespace is fully cleared before resubmitting -- including TurnEvidence, which
+        # is not group_id-keyed. One reset after confirmed settlement is enough; a second pass
+        # would only re-open the gap it is meant to close.
+        _reset_window_namespaces(admin, args.menhir_url, window_namespaces)
 
         turn_iterators = [
             _iter_item_turns(adapter, state.item, state.namespace, args.segmentation)
@@ -899,9 +989,8 @@ def main(argv: list[str] | None = None) -> int:
             timeout_s=args.drain_timeout,
         )
 
-        namespaces = [state.namespace for state in window]
         drained_by_namespace = _drain_many(
-            namespaces,
+            window_namespaces,
             admin,
             args.menhir_url,
             timeout_s=args.drain_timeout,

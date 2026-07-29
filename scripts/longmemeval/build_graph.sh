@@ -68,7 +68,15 @@ curl -sf "http://localhost:${LME_HTTP}" >/dev/null 2>&1 || die "Neo4j not ready"
 # LME_GRAPH_FRESH env var -- it reads this file for the container currently configured.
 mkdir -p "${LME_RESULTS_DIR}"
 GRAPH_PROVENANCE_PATH="${LME_RESULTS_DIR}/graph-provenance-${LME_NEO4J_NAME}.json"
-cat > "${GRAPH_PROVENANCE_PATH}" <<EOF
+GRAPH_PROVENANCE_TOOL="$(dirname "${BASH_SOURCE[0]}")/lib/run_provenance.py"
+[ -f "${GRAPH_PROVENANCE_TOOL}" ] || die "provenance helper missing: ${GRAPH_PROVENANCE_TOOL}"
+GRAPH_ATTEMPT_RECORD="${LME_RESULTS_DIR}/.graph-attempt-${LME_NEO4J_NAME}.json"
+
+# Each build attempt APPENDS. A resume re-runs this script against a graph an earlier attempt
+# already partly ingested; overwriting the record here would restate that graph's freshness,
+# dataset and settings as whatever this attempt happens to be configured with -- and
+# `lme.sh ir-gate` reads exactly this file to decide whether the data is fresh.
+cat > "${GRAPH_ATTEMPT_RECORD}" <<EOF
 {
   "container": "${LME_NEO4J_NAME}",
   "volume": "${LME_NEO4J_VOL}",
@@ -77,6 +85,8 @@ cat > "${GRAPH_PROVENANCE_PATH}" <<EOF
   "require_fresh": ${LME_REQUIRE_FRESH},
   "dataset": "${LME_DATASET}",
   "variant": "${LONGMEMEVAL_VARIANT}",
+  "fixture_sha256": "${LME_FIXTURE_SHA256:-}",
+  "fixture_count": ${LME_FIXTURE_COUNT:-0},
   "fixture": "${LME_FIXTURE_PATH:-}",
   "requested_items": ${LIMIT},
   "ingest_target_items": ${INGEST_TARGET},
@@ -92,9 +102,52 @@ cat > "${GRAPH_PROVENANCE_PATH}" <<EOF
   "scalar_canonical_self": ${LME_SCALAR_CANONICAL_SELF},
   "scalar_output_required": ${LME_REQUIRE_SCALAR_OUTPUT},
   "turn_evidence_required": ${LME_REQUIRE_TURN_EVIDENCE},
+  "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "build_started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 EOF
+"${BENCH_PY}" "${GRAPH_PROVENANCE_TOOL}" begin "${GRAPH_PROVENANCE_PATH}" "${GRAPH_ATTEMPT_RECORD}" ||
+  die "graph provenance refused this attempt (container/volume identity mismatch); see above"
+rm -f "${GRAPH_ATTEMPT_RECORD}"
+# A phase is only reproducible if it names the code that ran it and the data it ran on.
+# build_graph.sh can be invoked directly, so the fixture hash/count are recorded when the
+# caller exported them and omitted otherwise rather than guessed.
+GRAPH_FIXTURE_SETTINGS=()
+if [ -n "${LME_FIXTURE_PATH:-}" ]; then
+  GRAPH_FIXTURE_SETTINGS+=(--setting "fixture=${LME_FIXTURE_PATH}")
+fi
+if [ -n "${LME_FIXTURE_SHA256:-}" ]; then
+  GRAPH_FIXTURE_SETTINGS+=(--setting "fixture_sha256=${LME_FIXTURE_SHA256}")
+fi
+if [ -n "${LME_FIXTURE_COUNT:-}" ]; then
+  GRAPH_FIXTURE_SETTINGS+=(--setting "fixture_count=${LME_FIXTURE_COUNT}")
+fi
+
+"${BENCH_PY}" "${GRAPH_PROVENANCE_TOOL}" phase-start "${GRAPH_PROVENANCE_PATH}" \
+  --phase ingest-graph --manifest "${LME_MANIFEST_PATH}" \
+  "${GRAPH_FIXTURE_SETTINGS[@]}" \
+  --setting "menhir_commit=$(git -C "${MENHIR_MAIN}" rev-parse HEAD 2>/dev/null || echo unknown)" \
+  --setting "bench_commit=$(git -C "${BENCH_DIR}" rev-parse HEAD 2>/dev/null || echo unknown)" \
+  --setting "menhir_dirty=$([ -n "$(git -C "${MENHIR_MAIN}" status --porcelain --untracked-files=no 2>/dev/null)" ] && echo true || echo false)" \
+  --setting "bench_dirty=$([ -n "$(git -C "${BENCH_DIR}" status --porcelain --untracked-files=no 2>/dev/null)" ] && echo true || echo false)" \
+  --setting "dataset=${LME_DATASET}" \
+  --setting "variant=${LONGMEMEVAL_VARIANT}" \
+  --setting "namespace_prefix=${LME_NS_PREFIX}" \
+  --setting "graph_fresh=${GRAPH_FRESH}" \
+  --setting "volume_pre_existed=${VOLUME_PRE_EXISTED}" \
+  --setting "require_fresh=${LME_REQUIRE_FRESH}" \
+  --setting "segmentation=${LME_SEGMENTATION}" \
+  --setting "strict_failure_policy=zero-failed-episodes-per-namespace" \
+  --setting "ingest_target_items=${INGEST_TARGET}" \
+  --setting "ingest_concurrency=${LME_INGEST_CONCURRENCY}" \
+  --setting "scalar_state_enabled=${LME_SCALAR_STATE_ENABLED}" \
+  --setting "scalar_consolidation_k=${LME_SCALAR_CONSOLIDATION_K}" \
+  --setting "scalar_consolidation_call_budget=${LME_SCALAR_CALL_BUDGET}" \
+  --setting "scalar_threshold=${LME_SCALAR_THRESHOLD}" \
+  --setting "scalar_reconcile_attribute=${LME_SCALAR_RECONCILE_ATTRIBUTE}" \
+  --setting "scalar_reconcile_scope=${LME_SCALAR_RECONCILE_SCOPE}" \
+  --setting "scalar_reconcile_subject=${LME_SCALAR_RECONCILE_SUBJECT}" \
+  --setting "turn_evidence_required=${LME_REQUIRE_TURN_EVIDENCE}"
 log "graph provenance recorded: ${GRAPH_PROVENANCE_PATH} (graph_fresh=${GRAPH_FRESH})"
 
 # ---- temp menhir for ingestion (stopped on exit; Neo4j persists) ----
@@ -216,5 +269,12 @@ else
   log "backfill-dates SKIPPED (LME_BACKFILL_DATES=0): valid_at comes from the ingest."
   log "  verify with menhir scripts/_verify_valid_at_repair.py before trusting this graph."
 fi
+
+# Close the phase only here, on the success path. `set -e` means any earlier failure exits
+# without this line, leaving the phase recorded as `started` -- which the next attempt's
+# `begin` marks `interrupted`. An interrupted build is exactly what a reader needs to see.
+"${BENCH_PY}" "${GRAPH_PROVENANCE_TOOL}" phase-end "${GRAPH_PROVENANCE_PATH}" \
+  --phase ingest-graph --status completed \
+  --setting "backfill_dates=${LME_BACKFILL_DATES}"
 
 log "build complete. Neo4j ${LME_NEO4J_NAME} (bolt ${LME_BOLT}) holds the data; manifest at ${LME_MANIFEST_PATH}."

@@ -1,0 +1,200 @@
+"""Tests for adaptive claim segmentation's durable-content routing.
+
+The failure these guard against is silent: a turn misrouted to CONTEXT_ONLY is
+never extracted, so its knowledge update is missing from the graph and only shows
+up later as an unexplained recall miss.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import sys
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def _load_script(name: str, relative_path: str):
+    path = ROOT / relative_path
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+segmenter = _load_script(
+    "lme_claim_segmenter_test", "scripts/longmemeval/lib/claim_segmenter.py"
+)
+MODE = segmenter.SegmentationMode
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # A question is an ordinary carrier for a knowledge update. Every sentence
+        # here ends in "?", but the move is still a durable fact.
+        "Since I moved to Portland, which neighborhoods should I check out?",
+        "I switched to the night shift last month, any tips for sleeping?",
+        # Mixed statement + question, durable half first.
+        "I quit my job at Acme. What should I put on my resume?",
+    ],
+)
+def test_questions_carrying_durable_facts_are_not_interrogative(text: str) -> None:
+    assert segmenter.is_purely_interrogative(text) is False
+    assert segmenter.segmentation_mode("user", text) == MODE.EXTRACT_WHOLE
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Possessive assertions: no first-person verb, no capitalized subject, but
+        # this is exactly the shape a knowledge-update item takes.
+        "yes, my rent is $2,400 now",
+        "my sister's address is 44 Oak Lane",
+        "my commute is 45 minutes each way",
+    ],
+)
+def test_possessive_and_quantity_updates_stay_extractable(text: str) -> None:
+    assert segmenter.has_durable_signals(text) is True
+    assert segmenter.segmentation_mode("user", text) == MODE.EXTRACT_WHOLE
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # A wh-question about a past change asserts the change happened -- the fact lives in
+        # the presupposition, not the surface form.
+        "Why did I move to Seattle?",
+        "When did I switch to the new plan?",
+        # Frequencies are durable personal facts, and the count is spelled as a word so no
+        # digit pattern sees it.
+        "I go three times a week.",
+        "three times a week.",
+        # Possessed subject rather than "I": no first-person verb pattern catches this.
+        "my mom uses the same app.",
+    ],
+)
+def test_reviewed_detector_misses_are_extractable(text: str) -> None:
+    """Exact turns a review found routed to CONTEXT_ONLY despite carrying durable facts."""
+    assert segmenter.has_durable_signals(text) is True
+    assert segmenter.segmentation_mode("user", text) == MODE.EXTRACT_WHOLE
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Yes/no questions presuppose nothing -- they may be genuinely asking -- so the
+        # presuppositional rule stays wh-only and these remain conservative.
+        "Did I mention that already?",
+        "Do you have any tips?",
+        "Have you tried it?",
+    ],
+)
+def test_yes_no_questions_stay_conservative(text: str) -> None:
+    assert segmenter.segmentation_mode("user", text) == MODE.CONTEXT_ONLY
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Thanks again for your help!",
+        "That sounds great!",
+        "Sure, sounds good.",
+        "I think that sounds great. What kind of elements were you thinking of?",
+    ],
+)
+def test_phatic_and_reactive_turns_remain_context_only(text: str) -> None:
+    """Regression guard: broadening durable detection must not start extracting filler.
+
+    These produce only ``{"name":"user"}`` with zero edges, which fails the episode
+    and -- with the strict FAILED gate -- stops the whole build.
+    """
+    assert segmenter.segmentation_mode("user", text) == MODE.CONTEXT_ONLY
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Representative shapes from a fixture-wide audit: user turns that carry the answer but
+        # match no durable pattern. Under an allowlist all of these vanished silently.
+        "I've completed 30 videos of the course so far.",
+        "I used my Canon EOS 80D on five trips.",
+        "I caught 7 largemouth bass at the lake.",
+        # Mixed question + unrecognised declarative: the statement half is the knowledge update.
+        "I picked up a new hobby recently. Any suggestions?",
+        "The trail was muddy. What boots do you recommend?",
+        # Plain declaratives no pattern anticipates. Unknown means extract, not discard.
+        "The plumber replaced the whole fixture.",
+        "We ended up going with the blue one.",
+    ],
+)
+def test_unrecognized_statements_fail_open_to_extraction(text: str) -> None:
+    """CONTEXT_ONLY is a narrow denylist, not the complement of an allowlist.
+
+    A fact dropped here is dropped silently and looks identical to a model with nothing to say.
+    A fact wrongly extracted, if it collapses, trips the strict FAILED gate -- loud and fixable.
+    """
+    assert segmenter.is_context_only_user_turn(text) is False
+    assert segmenter.segmentation_mode("user", text) != MODE.CONTEXT_ONLY
+
+
+def test_one_unrecognized_declarative_carries_the_whole_turn() -> None:
+    """Every declarative must be provably phatic; one that is not sends the turn to extraction."""
+    mixed = "Thanks, that's really helpful! I switched my plan to the annual one. Anything else?"
+
+    assert segmenter.is_phatic_sentence("Thanks, that's really helpful!") is True
+    assert segmenter.is_phatic_sentence("I switched my plan to the annual one.") is False
+    assert segmenter.is_context_only_user_turn(mixed) is False
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "I'm planning a trip to Europe, can you recommend a hotel?",
+        "I've been experimenting with noodles, what should I try next?",
+        "I'm feeling overwhelmed with work and was wondering if you could help?",
+        "I've been using my Starbucks Rewards app, do you have any tips?",
+        "I hope to exercise tomorrow, what routine would you suggest?",
+        "I know Alice from work, should I invite her?",
+    ],
+)
+def test_personal_declarative_clause_inside_question_is_extracted(text: str) -> None:
+    assert segmenter.has_first_person_declarative(text) is True
+    assert segmenter.segmentation_mode("user", text) != MODE.CONTEXT_ONLY
+
+
+@pytest.mark.parametrize(
+    "sentence, phatic",
+    [
+        ("Thanks again for your help!", True),
+        ("That sounds great!", True),
+        ("I think that sounds great.", True),
+        ("Got it, thanks.", True),
+        # A number is a value; a value is not small talk.
+        ("Sounds good, 30 of them.", False),
+        # A named thing away from the sentence opener is content.
+        ("Sounds good, I'll check Amazon.", False),
+        # Too long to prove anything about.
+        ("I think the whole approach to the migration was reasonable given the constraints.", False),
+    ],
+)
+def test_phatic_sentence_boundaries(sentence: str, phatic: bool) -> None:
+    assert segmenter.is_phatic_sentence(sentence) is phatic
+
+
+def test_thanks_again_is_not_read_as_a_correction_marker() -> None:
+    """"again" corrects a fact in "I moved again" and is pure pleasantry in "thanks again"."""
+    assert segmenter._has_correction_signal("Thanks again for your help!") is False
+    assert segmenter._has_correction_signal("I moved again last spring") is True
+
+
+def test_assistant_turns_are_unaffected_by_user_durable_routing() -> None:
+    assert segmenter.segmentation_mode("assistant", "That's a great question!") == MODE.CONTEXT_ONLY
+    assert (
+        segmenter.segmentation_mode("assistant", "I've scheduled your appointment.")
+        == MODE.EXTRACT_WHOLE
+    )

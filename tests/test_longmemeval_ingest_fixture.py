@@ -116,6 +116,51 @@ def test_build_graph_wires_same_namespace_window_into_menhir_workers() -> None:
     assert '"ingest_concurrency": ${LME_INGEST_CONCURRENCY}' in script
 
 
+def test_buildout_wrapper_records_every_phase_with_effective_settings() -> None:
+    """Provenance must describe the phases that ran, not the intent captured at preflight."""
+    script = (
+        ROOT / "scripts" / "longmemeval" / "run_knowledge_update_buildout.sh"
+    ).read_text(encoding="utf-8")
+
+    for phase in ("build-graph", "build-graph-checkpoint-continuation", "recall-qa"):
+        assert f"record_phase_start {phase}" in script
+        assert f"record_phase_end {phase}" in script
+
+    # The continuation flips both of these, so a single preflight snapshot describes neither
+    # build phase. They are read again per phase.
+    assert "require_fresh=%s" in script
+    assert "ingest_stop_after_items=%s" in script
+    # An arm is not defined by its threshold alone.
+    for setting in (
+        "segmentation=%s",
+        "strict_failure_policy=%s",
+        "scalar_consolidation_k=%s",
+        "scalar_consolidation_call_budget=%s",
+        "scalar_reconcile_attribute=%s",
+        "consolidation_audit_enabled=%s",
+        "turn_evidence_required=%s",
+    ):
+        assert setting in script
+    # Each phase records the manifest it inherited.
+    assert '--manifest "${LME_MANIFEST_PATH}"' in script
+
+
+def test_provenance_is_appended_never_overwritten() -> None:
+    """Neither wrapper may `cat >` its provenance file: a resume would erase the real history."""
+    buildout = (
+        ROOT / "scripts" / "longmemeval" / "run_knowledge_update_buildout.sh"
+    ).read_text(encoding="utf-8")
+    build_graph = (ROOT / "scripts" / "longmemeval" / "build_graph.sh").read_text(encoding="utf-8")
+
+    assert 'cat > "${LME_RESULTS_DIR}/run_provenance.json"' not in buildout
+    assert 'cat > "${GRAPH_PROVENANCE_PATH}"' not in build_graph
+    for script in (buildout, build_graph):
+        assert "run_provenance.py" in script
+        assert "begin" in script
+    assert 'phase-start "${GRAPH_PROVENANCE_PATH}"' in build_graph
+    assert 'phase-end "${GRAPH_PROVENANCE_PATH}"' in build_graph
+
+
 def test_fixture_path_is_forwarded_to_adapter() -> None:
     calls: list[dict] = []
 
@@ -381,6 +426,331 @@ def test_scalar_window_refuses_residual_failed_episodes() -> None:
         ingest._require_no_failed_episodes(drained)
 
 
+def test_failed_gate_has_no_tolerance_knob(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A FAILED episode means the namespace does not match the transcript. No env var buys past it."""
+    monkeypatch.setenv("LME_KU_MAX_FAILURES_PER_NS", "5")
+
+    with pytest.raises(RuntimeError, match="ns-b=1"):
+        ingest._require_no_failed_episodes({"ns-a": {"failed": 0}, "ns-b": {"failed": 1}})
+
+
+# ---------------------------------------------------------------------------
+# Evidence-only routing for CONTEXT_ONLY turns
+# ---------------------------------------------------------------------------
+
+class _FakeSessionAdapter:
+    def sessions(self, item):
+        return item["sessions"]
+
+
+def test_context_only_turns_keep_their_own_boundaries_and_role() -> None:
+    """CONTEXT_ONLY turns are never merged into a neighbour.
+
+    Merging concatenated two source turns into one record, which destroys the per-turn
+    TurnEvidence boundaries the scalar audit counts and -- across a role change -- filed
+    assistant words under the user's evidence.
+    """
+    item = {
+        "sessions": [[
+            {"role": "assistant", "content": "That's a great question!"},
+            {"role": "user", "content": "Thanks! What do you think?"},
+            {"role": "user", "content": "I moved to Portland last month."},
+        ]],
+    }
+
+    turns = list(
+        ingest._iter_item_turns(_FakeSessionAdapter(), item, "ns-a", "adaptive")
+    )
+
+    # One emitted turn per source turn, content byte-identical, role preserved.
+    assert [(turn.role, turn.content, turn.extract) for turn in turns] == [
+        ("assistant", "That's a great question!", False),
+        ("user", "Thanks! What do you think?", False),
+        ("user", "I moved to Portland last month.", True),
+    ]
+    # No assistant text anywhere in a user turn.
+    user_text = " ".join(turn.content for turn in turns if turn.role == "user")
+    assert "That's a great question!" not in user_text
+
+
+def test_evidence_only_turn_records_one_record_and_creates_no_episode() -> None:
+    evidence: list[dict] = []
+    episodes: list[dict] = []
+
+    class FakeClient:
+        def record_turn_evidence(self, namespace, text, **kwargs):
+            evidence.append({"namespace": namespace, "text": text, **kwargs})
+            return {"turn_id": f"turn-{len(evidence)}"}
+
+        def ingest(self, *args, **kwargs):
+            episodes.append({"args": args, "kwargs": kwargs})
+            return {"episode_id": "episode-1"}
+
+    episode_uuid = ingest._ingest_turn(
+        FakeClient(),
+        "ns-a",
+        "assistant",
+        "That's a great question!",
+        session_id="ns-a-s0",
+        extract=False,
+    )
+
+    assert episode_uuid == ""
+    assert episodes == []
+    assert len(evidence) == 1
+    # An assistant turn is never captured as user evidence: menhir's evidence projection is
+    # fail-closed on role='user' AND declarant='user', so this record stays inert.
+    assert evidence[0]["role"] == "assistant"
+    assert evidence[0]["declarant"] == "assistant"
+    assert evidence[0]["text"] == "That's a great question!"
+
+
+def test_required_evidence_without_turn_id_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Client:
+        def record_turn_evidence(self, namespace, text, **kwargs):
+            return {}
+
+        def ingest(self, *args, **kwargs):
+            raise AssertionError("an ungrounded turn must never be ingested")
+
+    monkeypatch.setattr(ingest, "REQUIRE_TURN_EVIDENCE", True)
+
+    with pytest.raises(RuntimeError, match="returned no turn_id"):
+        ingest._ingest_turn(
+            Client(),
+            "ns",
+            "user",
+            "I moved to Seattle.",
+            extract=False,
+            turn_key="ns|session|t0",
+        )
+
+
+def test_extracting_user_turn_still_grounds_on_user_evidence() -> None:
+    evidence: list[dict] = []
+
+    class FakeClient:
+        def record_turn_evidence(self, namespace, text, **kwargs):
+            evidence.append(kwargs)
+            return {"turn_id": "turn-1"}
+
+        def ingest(self, *args, **kwargs):
+            assert kwargs["turn_evidence_uuid"] == "turn-1"
+            assert kwargs["source"] == "user"
+            return {"episode_id": "episode-1"}
+
+    assert ingest._ingest_turn(
+        FakeClient(), "ns-a", "user", "I moved to Portland.", session_id="ns-a-s0"
+    ) == "episode-1"
+    assert evidence[0]["declarant"] == "user"
+
+
+class _RecordingClient:
+    """Captures the evidence and episode calls a window makes."""
+
+    def __init__(self) -> None:
+        self.evidence: list[dict] = []
+        self.episodes: list[dict] = []
+
+    def record_turn_evidence(self, namespace, text, **kwargs):
+        # Mirror menhir: MERGE on turn_key, so one key is one node.
+        key = kwargs.get("turn_key")
+        for existing in self.evidence:
+            if key is not None and existing["turn_key"] == key:
+                return {"turn_id": existing["turn_id"]}
+        record = {
+            "turn_id": f"evidence-{len(self.evidence) + 1}",
+            "namespace": namespace,
+            "text": text,
+            **kwargs,
+        }
+        self.evidence.append(record)
+        return {"turn_id": record["turn_id"]}
+
+    def ingest(self, namespace, role, content, **kwargs):
+        self.episodes.append({"content": content, **kwargs})
+        return {"episode_id": f"episode-{len(self.episodes)}"}
+
+
+def _run_window(client, turns: list) -> None:
+    ingest._ingest_window(
+        [ingest.WindowItem(item={}, question_id="a", namespace="ns-a")],
+        [iter(turns)],
+        client,
+        object(),
+        "http://menhir",
+        timeout_s=1,
+        poll_s=0,
+    )
+
+
+def test_repeated_identical_turns_stay_distinct_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Menhir's fallback turn_key hashes the TEXT, merging two genuine repeats onto one node.
+
+    A user who states the same fact twice made two observations; collapsing them loses one.
+    """
+    monkeypatch.setattr(
+        ingest, "_episode_processing", lambda admin, url, uuid: {"processing_state": "READY"}
+    )
+    client = _RecordingClient()
+    item = {"sessions": [[
+        {"role": "user", "content": "I have 20 coins."},
+        {"role": "user", "content": "I have 20 coins."},
+    ]]}
+    turns = list(ingest._iter_item_turns(_FakeSessionAdapter(), item, "ns-a", "none"))
+
+    assert turns[0].turn_key != turns[1].turn_key
+    _run_window(client, turns)
+
+    assert len(client.evidence) == 2
+    assert len({record["turn_id"] for record in client.evidence}) == 2
+
+
+def test_one_evidence_record_per_source_turn_across_segments(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A split turn is still ONE source turn: N episodes, one evidence node, whole-turn text."""
+    monkeypatch.setattr(
+        ingest, "_episode_processing", lambda admin, url, uuid: {"processing_state": "READY"}
+    )
+    client = _RecordingClient()
+    original = (
+        "I moved to Portland in March. My rent is now $2,400. "
+        "I switched to the night shift at the hospital downtown."
+    )
+    item = {"sessions": [[{"role": "user", "content": original}]]}
+    turns = list(ingest._iter_item_turns(_FakeSessionAdapter(), item, "ns-a", "sentence"))
+
+    assert len(turns) > 1, "this turn must actually split for the test to mean anything"
+    assert len({turn.turn_key for turn in turns}) == 1
+    _run_window(client, turns)
+
+    # One evidence node, holding the user's ACTUAL words -- not a fragment.
+    assert len(client.evidence) == 1
+    assert client.evidence[0]["text"] == original
+    # Every episode cites that same evidence node.
+    assert len(client.episodes) == len(turns)
+    assert {episode["turn_evidence_uuid"] for episode in client.episodes} == {"evidence-1"}
+
+
+def test_context_only_turn_is_one_evidence_and_no_episode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        ingest, "_episode_processing", lambda admin, url, uuid: {"processing_state": "READY"}
+    )
+    client = _RecordingClient()
+    item = {"sessions": [[{"role": "assistant", "content": "That's a great question!"}]]}
+    turns = list(ingest._iter_item_turns(_FakeSessionAdapter(), item, "ns-a", "adaptive"))
+
+    _run_window(client, turns)
+
+    assert len(client.evidence) == 1
+    assert client.evidence[0]["declarant"] == "assistant"
+    assert client.episodes == []
+
+
+def test_turn_key_is_stable_and_namespace_qualified() -> None:
+    item = {"sessions": [[
+        {"role": "user", "content": "first"},
+        {"role": "user", "content": "second"},
+    ]]}
+    first = list(ingest._iter_item_turns(_FakeSessionAdapter(), item, "ns-a", "none"))
+    again = list(ingest._iter_item_turns(_FakeSessionAdapter(), item, "ns-a", "none"))
+    other = list(ingest._iter_item_turns(_FakeSessionAdapter(), item, "ns-b", "none"))
+
+    # Stable across re-iteration (a resume must reuse, not duplicate, the same turn's evidence).
+    assert [turn.turn_key for turn in first] == [turn.turn_key for turn in again]
+    # Distinct per turn, and never shared between namespaces.
+    assert len({turn.turn_key for turn in first}) == 2
+    assert not {turn.turn_key for turn in first} & {turn.turn_key for turn in other}
+
+
+def test_window_scheduler_does_not_wait_on_evidence_only_turns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An evidence-only turn has no episode, so it must not occupy the active slot.
+
+    If it did, the scheduler would poll forever for a lifecycle row that does not exist.
+    """
+    window = [ingest.WindowItem(item={}, question_id="a", namespace="ns-a")]
+    turns = [iter([
+        ingest.IngestTurn("user", "a1", None, "ns-a-s0", extract=False),
+        ingest.IngestTurn("assistant", "a2", None, "ns-a-s0", extract=False),
+        ingest.IngestTurn("user", "a3", None, "ns-a-s0", extract=True),
+    ])]
+    submitted: list[tuple[str, bool]] = []
+
+    def fake_ingest_turn(client, namespace, role, content, **kwargs):
+        extract = kwargs.get("extract", True)
+        submitted.append((content, extract))
+        return f"episode-{len(submitted)}" if extract else ""
+
+    monkeypatch.setattr(ingest, "_ingest_turn", fake_ingest_turn)
+    monkeypatch.setattr(
+        ingest, "_episode_processing", lambda admin, url, uuid: {"processing_state": "READY"}
+    )
+
+    requeued = ingest._ingest_window(
+        window, turns, object(), object(), "http://menhir", timeout_s=1, poll_s=0
+    )
+
+    assert submitted == [("a1", False), ("a2", False), ("a3", True)]
+    assert requeued == {"ns-a": 0}
+    # Every source turn is counted, extracted or not.
+    assert window[0].turns == 3
+
+
+# ---------------------------------------------------------------------------
+# Stale-worker / reset ordering
+# ---------------------------------------------------------------------------
+
+def test_settlement_waits_for_stale_lifecycle_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    states = iter([
+        {"pending": 0, "enriching": 1},
+        {"pending": 1, "enriching": 0},
+        {"pending": 0, "enriching": 0},
+    ])
+    monkeypatch.setattr(ingest, "_ns_state_counts", lambda namespace: next(states))
+    monkeypatch.setattr(ingest.time, "sleep", lambda seconds: None)
+
+    ingest._await_stale_episode_settlement(["ns-a"], poll_s=0, timeout_s=30)
+
+    assert next(states, "exhausted") == "exhausted"
+
+
+def test_settlement_fails_closed_when_work_never_settles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Timing out must raise, not reset anyway -- resetting under a live worker is the race."""
+    monkeypatch.setattr(
+        ingest, "_ns_state_counts", lambda namespace: {"pending": 0, "enriching": 2}
+    )
+    monkeypatch.setattr(ingest.time, "sleep", lambda seconds: None)
+
+    with pytest.raises(RuntimeError, match="did not settle"):
+        ingest._await_stale_episode_settlement(["ns-a"], poll_s=0, timeout_s=0)
+
+
+def test_settlement_fails_closed_when_state_is_unreadable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """-1 means cypher could not answer. Unreadable is not settled."""
+    monkeypatch.setattr(
+        ingest, "_ns_state_counts", lambda namespace: {"pending": -1, "enriching": -1}
+    )
+    monkeypatch.setattr(ingest.time, "sleep", lambda seconds: None)
+
+    with pytest.raises(RuntimeError, match="could not be read"):
+        ingest._await_stale_episode_settlement(["ns-a"], poll_s=0, timeout_s=0)
+
+
 def test_main_submits_a_namespace_window_round_robin_and_manifests_after_drain(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -420,6 +790,7 @@ def test_main_submits_a_namespace_window_round_robin_and_manifests_after_drain(
     submitted: list[tuple[str, str]] = []
     reset: list[str] = []
     drain_calls: list[list[str]] = []
+    ordering: list[str] = []
 
     class FakeAdapter:
         def load_items(self, **kwargs):
@@ -464,11 +835,15 @@ def test_main_submits_a_namespace_window_round_robin_and_manifests_after_drain(
     monkeypatch.setattr(ingest, "_ingest_turn", fake_ingest_turn)
     monkeypatch.setattr(ingest, "_backend", fake_backend)
     monkeypatch.setattr(ingest, "_drain_many", fake_drain_many)
-    monkeypatch.setattr(
-        ingest,
-        "_reset_namespace",
-        lambda admin, url, namespace: reset.append(namespace),
-    )
+    def fake_reset(admin, url, namespace):
+        ordering.append(f"reset:{namespace}")
+        reset.append(namespace)
+
+    def fake_settle(namespaces, **kwargs):
+        ordering.append(f"settle:{','.join(namespaces)}")
+
+    monkeypatch.setattr(ingest, "_reset_namespace", fake_reset)
+    monkeypatch.setattr(ingest, "_await_stale_episode_settlement", fake_settle)
 
     manifest_path = tmp_path / "manifest.json"
     result = ingest.main(
@@ -488,6 +863,10 @@ def test_main_submits_a_namespace_window_round_robin_and_manifests_after_drain(
 
     assert result == 0
     assert reset == ["lme-a", "lme-b"]
+    # Settlement is confirmed BEFORE the reset. Resetting first would delete the
+    # PENDING/ENRICHING rows that prove a stale worker is alive, so the wait would read zero
+    # against a worker still writing into the namespace.
+    assert ordering == ["settle:lme-a,lme-b", "reset:lme-a", "reset:lme-b"]
     assert submitted == [
         ("lme-a", "a1"),
         ("lme-b", "b1"),

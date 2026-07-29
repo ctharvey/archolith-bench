@@ -147,6 +147,10 @@ PY
 # Windows Python writes CRLF even under Git Bash; `read` removes LF but leaves CR in the final
 # field. Strip it before interpolating the digest into JSON provenance.
 FIXTURE_SHA256="${FIXTURE_SHA256//$'\r'/}"
+# Pass the fixture identity down so build_graph.sh can stamp its own phase record with the
+# data it ingested, not just the settings it ingested under.
+export LME_FIXTURE_SHA256="${FIXTURE_SHA256}"
+export LME_FIXTURE_COUNT="${KU_COUNT}"
 [ "${KU_COUNT}" = "78" ] || die "expected the frozen 78-item fixture, found ${KU_COUNT}"
 [ "${LME_KU_CHECKPOINT_ITEMS}" -lt "${KU_COUNT}" ] ||
   die "LME_KU_CHECKPOINT_ITEMS must be smaller than the full fixture"
@@ -198,12 +202,77 @@ fi
 
 mkdir -p "${LME_RESULTS_DIR}"
 
+PROVENANCE_PATH="${LME_RESULTS_DIR}/run_provenance.json"
+ATTEMPT_RECORD="${LME_RESULTS_DIR}/.attempt-record.json"
+
+PROVENANCE_TOOL="${SCRIPT_DIR}/lib/run_provenance.py"
+[ -f "${PROVENANCE_TOOL}" ] || die "provenance helper missing: ${PROVENANCE_TOOL}"
+
+# The effective settings of a phase at the moment it starts -- not the values captured during
+# preflight. The checkpoint continuation deliberately flips LME_REQUIRE_FRESH and
+# LME_INGEST_STOP_AFTER_ITEMS, so a single preflight snapshot describes neither build phase
+# correctly. Commits are re-read for the same reason: a resume can run against a different
+# checkout than the attempt that ingested the earlier items. Everything a reader would need to
+# reproduce the phase goes in, including the segmentation mode, the failure policy and the
+# consolidation budget -- an arm is not defined by its threshold alone.
+phase_settings(){
+  printf -- '--setting\nmenhir_commit=%s\n--setting\nbench_commit=%s\n' \
+    "$(git -C "${MENHIR_MAIN}" rev-parse HEAD 2>/dev/null || echo unknown)" \
+    "$(git -C "${BENCH_DIR}" rev-parse HEAD 2>/dev/null || echo unknown)"
+  printf -- '--setting\nmenhir_dirty=%s\n--setting\nbench_dirty=%s\n' \
+    "$([ -n "$(git -C "${MENHIR_MAIN}" status --porcelain --untracked-files=no)" ] && echo true || echo false)" \
+    "$([ -n "$(git -C "${BENCH_DIR}" status --porcelain --untracked-files=no)" ] && echo true || echo false)"
+  printf -- '--setting\nrequire_fresh=%s\n--setting\ningest_stop_after_items=%s\n' \
+    "${LME_REQUIRE_FRESH}" "${LME_INGEST_STOP_AFTER_ITEMS}"
+  printf -- '--setting\ningest_concurrency=%s\n--setting\nsegmentation=%s\n' \
+    "${LME_INGEST_CONCURRENCY}" "${LME_SEGMENTATION}"
+  printf -- '--setting\nstrict_failure_policy=%s\n--setting\nallow_resume=%s\n' \
+    "zero-failed-episodes-per-namespace" "${LME_KU_ALLOW_RESUME}"
+  printf -- '--setting\nscalar_threshold=%s\n--setting\nscalar_consolidation_k=%s\n' \
+    "${LME_SCALAR_THRESHOLD}" "${LME_SCALAR_CONSOLIDATION_K}"
+  printf -- '--setting\nscalar_consolidation_call_budget=%s\n--setting\nextract_model=%s\n' \
+    "${LME_SCALAR_CALL_BUDGET}" "${LME_EXTRACT_MODEL}"
+  printf -- '--setting\nscalar_reconcile_attribute=%s\n--setting\nscalar_reconcile_scope=%s\n' \
+    "${LME_SCALAR_RECONCILE_ATTRIBUTE}" "${LME_SCALAR_RECONCILE_SCOPE}"
+  printf -- '--setting\nscalar_reconcile_subject=%s\n--setting\nscalar_view_authority_enabled=%s\n' \
+    "${LME_SCALAR_RECONCILE_SUBJECT}" "${LME_SCALAR_VIEW_AUTHORITY_ENABLED}"
+  printf -- '--setting\nconsolidation_audit_enabled=%s\n--setting\nrecall_audit_enabled=%s\n' \
+    "${LME_CONSOLIDATION_AUDIT_ENABLED}" "${LME_RECALL_AUDIT_ENABLED}"
+  printf -- '--setting\nturn_evidence_required=%s\n--setting\nbackfill_dates=%s\n' \
+    "${LME_REQUIRE_TURN_EVIDENCE}" "${LME_BACKFILL_DATES}"
+}
+
+# record_phase_start <phase-name>: appends a phase with the manifest state it inherits, so a
+# resumed phase is distinguishable from a fresh one, plus its full effective settings.
+record_phase_start(){
+  local phase="$1"
+  # One argument per line, read into an array: a settings value may contain spaces, so
+  # unquoted word splitting would corrupt it.
+  local settings=()
+  local line
+  while IFS= read -r line; do settings+=("${line}"); done < <(phase_settings)
+  "${BENCH_PY}" "${PROVENANCE_TOOL}" phase-start "${PROVENANCE_PATH}" \
+    --phase "${phase}" --manifest "${LME_MANIFEST_PATH}" "${settings[@]}"
+}
+
+# record_phase_end <phase-name> <completed|failed> [extra key=value ...]
+record_phase_end(){
+  local phase="$1" status="$2"
+  shift 2
+  local extra=()
+  local pair
+  for pair in "$@"; do extra+=(--setting "${pair}"); done
+  "${BENCH_PY}" "${PROVENANCE_TOOL}" phase-end "${PROVENANCE_PATH}" \
+    --phase "${phase}" --status "${status}" "${extra[@]}"
+}
+
 # ---- record run provenance ----
-cat > "${LME_RESULTS_DIR}/run_provenance.json" <<EOF
+cat > "${ATTEMPT_RECORD}" <<EOF
 {
   "run_id": "${RUN_ID}",
   "arm": "${ARM}",
   "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "resumed": $([ "${LME_KU_ALLOW_RESUME}" = "1" ] && echo true || echo false),
   "menhir_commit": "${MENHIR_COMMIT}",
   "menhir_dirty": ${MENHIR_DIRTY},
   "bench_commit": "${BENCH_COMMIT}",
@@ -212,6 +281,9 @@ cat > "${LME_RESULTS_DIR}/run_provenance.json" <<EOF
   "fixture": "${FIXTURE_PATH}",
   "fixture_count": ${KU_COUNT},
   "fixture_sha256": "${FIXTURE_SHA256}",
+  "dataset": "${LME_DATASET}",
+  "variant": "${LONGMEMEVAL_VARIANT}",
+  "namespace_prefix": "${LME_NS_PREFIX}",
   "container": "${LME_NEO4J_NAME}",
   "volume": "${LME_NEO4J_VOL}",
   "bolt_port": ${LME_BOLT},
@@ -234,7 +306,16 @@ cat > "${LME_RESULTS_DIR}/run_provenance.json" <<EOF
   "purpose": "fresh current-code scalar knowledge-update ${ARM} arm"
 }
 EOF
-log "provenance recorded: ${LME_RESULTS_DIR}/run_provenance.json"
+
+# Merge this attempt into any provenance a previous attempt left behind. A resume must not
+# `cat >` over that file: the earlier attempt ingested real items under its own commit and
+# clock, and overwriting the record replaces what happened with what this attempt intends.
+# `begin` also refuses a resume whose run_id/arm/fixture/container identity disagrees with
+# the record, and marks phases the killed attempt left open as interrupted.
+"${BENCH_PY}" "${PROVENANCE_TOOL}" begin "${PROVENANCE_PATH}" "${ATTEMPT_RECORD}" ||
+  die "provenance refused this attempt; see the error above"
+rm -f "${ATTEMPT_RECORD}"
+log "provenance recorded: ${PROVENANCE_PATH}"
 
 MENHIR_PID=""
 cleanup_all(){
@@ -249,7 +330,9 @@ trap cleanup_all EXIT
 
 # ---- Phase 1: build graph ----
 log "======== PHASE 1: BUILD GRAPH (${KU_COUNT} items) ========"
+record_phase_start build-graph
 "${SCRIPT_DIR}/build_graph.sh" "${KU_COUNT}"
+record_phase_end build-graph completed
 if [ "${LME_KU_CHECKPOINT_ITEMS}" -gt 0 ]; then
   CHECKPOINT_READY="${LME_RESULTS_DIR}/checkpoint-${LME_KU_CHECKPOINT_ITEMS}-ready.json"
   CHECKPOINT_CONTINUE="${LME_RESULTS_DIR}/continue-after-checkpoint-${LME_KU_CHECKPOINT_ITEMS}"
@@ -289,12 +372,17 @@ PY
   log "checkpoint review marker found; resuming remaining $((KU_COUNT-LME_KU_CHECKPOINT_ITEMS)) items"
   export LME_INGEST_STOP_AFTER_ITEMS=0
   export LME_REQUIRE_FRESH=0
+  # A distinct phase with its own effective settings: this build runs with the freshness
+  # requirement and the item cap both lifted, which the phase-1 record does not describe.
+  record_phase_start build-graph-checkpoint-continuation
   "${SCRIPT_DIR}/build_graph.sh" "${KU_COUNT}"
+  record_phase_end build-graph-checkpoint-continuation completed
 fi
 log "build complete"
 
 # ---- Phase 2: recall+QA scoring ----
 log "======== PHASE 2: RECALL+QA SCORING ========"
+record_phase_start recall-qa
 
 # Start a fresh menhir for recall (the build menhir exited after build_graph.sh)
 RECALL_PORT="${LME_KU_RECALL_PORT:-8125}"
@@ -352,12 +440,9 @@ if [ -f "${RECALL_OUT}/results.md" ]; then
 fi
 
 # Record completion
-"${BENCH_PY}" -c "
-import json, sys
-p = '${LME_RESULTS_DIR}/run_provenance.json'
-d = json.load(open(p)); d['completed_at'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'; d['harness_exit'] = ${HARNESS_EXIT}
-json.dump(d, open(p,'w'), indent=2)
-"
+record_phase_end recall-qa "$([ "${HARNESS_EXIT}" = "0" ] && echo completed || echo failed)" \
+  "harness_exit=${HARNESS_EXIT}"
+"${BENCH_PY}" "${PROVENANCE_TOOL}" complete "${PROVENANCE_PATH}" --harness-exit "${HARNESS_EXIT}"
 
 kill "${MENHIR_PID}" 2>/dev/null || true
 MENHIR_PID=""

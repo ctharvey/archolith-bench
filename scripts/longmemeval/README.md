@@ -154,6 +154,35 @@ Every `recall-ab` run writes `results/lme-recall-<variant>/run_manifest.json` �
 
 Reproduce a run from the manifest alone (modulo API randomness).
 
+## run_provenance.json Contract (append-only)
+
+A buildout is resumable, so its provenance file outlives the process that created it. Every write
+is therefore **additive** — `lib/run_provenance.py` owns the file, and neither wrapper may `cat >`
+it. This applies to `run_provenance.json` and to `graph-provenance-<container>.json`.
+
+| Field | Meaning |
+|---|---|
+| *(top level)* | Frozen after the first attempt. Describes the graph on disk — `graph_fresh`, `volume_pre_existed`, dataset, and the settings the data was actually ingested under. `lme.sh ir-gate` reads `graph_fresh` from here. |
+| `identity` | `run_id`, `arm`, fixture hash/count, container/volume, dataset, variant, and namespace prefix (when supplied by that wrapper). A resume that disagrees on any recorded identity field is **refused**. |
+| `attempts[]` | Every attempt in full, first included, numbered, with `phases_interrupted`. |
+| `latest_attempt` | Mirror of the most recent attempt, for readers that want current values. |
+| `phases[]` | One entry per phase actually run. |
+| `first_started_at` / `last_started_at` / `attempt_count` | Span of the whole run. |
+
+Each phase entry records the state it inherited and the settings it truly ran under:
+
+- `phase` — `build-graph`, `build-graph-checkpoint-continuation`, `recall-qa`, or `ingest-graph`
+- `status` — `started`, `completed`, `failed`, or `interrupted`
+- `manifest_items_at_start` / `manifest_question_ids_at_start` — what the phase inherited, which is
+  what distinguishes a resumed phase from a fresh one
+- `effective_settings` — read at phase start, not at preflight. The checkpoint continuation flips
+  `require_fresh` and `ingest_stop_after_items`, so one preflight snapshot describes neither build
+  phase. Includes commits/dirty state, `segmentation`, `strict_failure_policy`, the scalar
+  threshold/`k`/call budget, the reconcile flags, the audit flags, and `turn_evidence_required`.
+
+A phase is closed only on the success path, so a killed run leaves its phase `started`; the next
+attempt's `begin` marks it `interrupted`. That is a fact worth seeing, not an error.
+
 ## Configuration Reference
 
 All hardcoded values are centralized in `config.sh` and environment-overridable:
@@ -330,6 +359,40 @@ The ingest may not have finished. Check `lme.sh status` and wait for queue_depth
 
 ### FAILED episodes
 The ingest script retries FAILED episodes once. If episodes still fail, they hit the per-job LLM budget (`MENHIR_MAX_LLM_CALLS_PER_JOB=20`). Run `lme.sh retry` to reset+drain them.
+
+A scalar build then **stops** on any residual FAILED episode. This gate is strict and has no
+tolerance knob — a FAILED episode means a turn never reached the graph, so scalar views, user-founded
+views and recall accuracy would all be computed over a namespace that does not match the transcript.
+(`LME_KU_MAX_FAILURES_PER_NS` existed briefly and was reverted: it turned the stop into a log line
+and let builds ship silently-lossy namespaces.) If the failures are phatic turns that legitimately
+extract to zero edges, the fix is the evidence-only path below, not a tolerance.
+
+### Adaptive segmentation: extraction vs. evidence
+Under `LME_SEGMENTATION=adaptive`, a fact-free turn (`CONTEXT_ONLY`) is recorded as
+`:TurnEvidence` and **not** sent to extraction, so it creates no episode that could fail. Turns are
+never merged. Each user source turn has one stable evidence identity holding the original unsplit
+text, and all episode segments from that turn cite the same UUID; repeated identical turns use
+different source-position keys. CONTEXT_ONLY assistant turns carry their own `role`/`declarant`,
+which prevents assistant words from being filed under `declarant="user"` (menhir's evidence
+projection is fail-closed on `role='user' AND declarant='user'`).
+
+If a knowledge update is missing from the graph, check whether its turn was classified
+`CONTEXT_ONLY`: `segmentation_mode("user", text)` in `lib/claim_segmenter.py` is the decision, and
+`is_context_only_user_turn` is the fail-open gate. It bypasses extraction only for provably phatic
+acknowledgments and fact-free question frames; an unknown declarative or a first-person/possessive
+clause inside a question is extracted. `has_durable_signals` provides additional positive signals:
+state-change verbs (including a wh-question presupposition such as "Why did I move to Seattle?"),
+correction markers, named subjects, possessive assertions ("my mom uses the same app"), frequencies
+("three times a week"), and quantities. Bare yes/no questions remain conservative.
+
+### Stale enrichment on resume
+With `LME_KU_ALLOW_RESUME=1`, menhir's stale-lease recovery may already be enriching a previous
+run's episodes into namespaces this build is about to own. The ingest waits for those
+PENDING/ENRICHING rows to settle **before** resetting, then resets once. Order matters: a reset
+deletes the rows that prove a worker is alive, so settlement checked afterwards reads zero against
+a worker still mid-flight. If settlement cannot be confirmed — state unreadable, or still busy at
+the timeout — the build **raises** rather than resetting anyway. Re-running costs time; resetting
+under a live writer costs a corrupted namespace whose numbers still look plausible.
 
 ### Per-branch venv guard
 If a menhir variant enforces interpreter identity (e.g., frontier's `runtime.py`), `recall-ab` auto-detects and uses the variant's own `.venv` if it has one. Explicitly pass a worktree path to override: `lme.sh recall-ab /path/to/worktree 30`.

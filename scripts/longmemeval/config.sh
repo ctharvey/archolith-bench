@@ -75,6 +75,9 @@ LME_REQUIRE_TURN_EVIDENCE="${LME_REQUIRE_TURN_EVIDENCE:-0}"
 LME_SCALAR_STATE_ENABLED="${LME_SCALAR_STATE_ENABLED:-0}"
 LME_SCALAR_CONSOLIDATION_K="${LME_SCALAR_CONSOLIDATION_K:-3}"
 LME_SCALAR_CALL_BUDGET="${LME_SCALAR_CALL_BUDGET:-50}"
+# Number of distinct item namespaces enriched concurrently. The general framework remains
+# single-flight by default; guarded KU reingests opt into width 2.
+LME_INGEST_CONCURRENCY="${LME_INGEST_CONCURRENCY:-1}"
 # ---- Typed-scalar consistency gate (menhir-side, all default-off in menhir itself) ----
 # The gate groups k samples by an exact identity label (subject/attribute/scope/kind/unit/op/value)
 # and commits only what recurs in >= threshold*k samples. The model smears one fact's identity

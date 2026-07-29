@@ -13,6 +13,9 @@ MENHIR_URL="http://localhost:${MENHIR_PORT}"
 
 log(){ printf '[lme-build] %s\n' "$*" >&2; }
 die(){ printf '[lme-build] ERROR: %s\n' "$*" >&2; exit 1; }
+case "${LME_INGEST_CONCURRENCY}" in
+  ''|*[!0-9]*|0) die "LME_INGEST_CONCURRENCY must be a positive integer" ;;
+esac
 
 OPENAI_KEY="$("${MENHIR_FRONTIER_PY}" - "${MENHIR_FRONTIER}/.env" OPENAI_API_KEY <<'PY'
 import sys; from dotenv import dotenv_values; print(dotenv_values(sys.argv[1]).get(sys.argv[2],""))
@@ -68,6 +71,7 @@ cat > "${GRAPH_PROVENANCE_PATH}" <<EOF
   "requested_items": ${LIMIT},
   "namespace_prefix": "${LME_NS_PREFIX}",
   "segmentation": "${LME_SEGMENTATION}",
+  "ingest_concurrency": ${LME_INGEST_CONCURRENCY},
   "scalar_state_enabled": ${LME_SCALAR_STATE_ENABLED},
   "scalar_consolidation_k": ${LME_SCALAR_CONSOLIDATION_K},
   "scalar_threshold": "${LME_SCALAR_THRESHOLD}",
@@ -114,6 +118,9 @@ export LME_REQUIRE_TURN_EVIDENCE="${LME_REQUIRE_TURN_EVIDENCE}"
 # Raise the per-episode LLM extraction budget (default 10) so long turns finish enrichment
 # instead of hitting FAILED; the ingest script does a best-effort FAILED-retry for the rest.
 export MENHIR_MAX_LLM_CALLS_PER_JOB=20
+# Menhir allows this many distinct namespaces to enrich concurrently. ingest.py uses the same
+# value for its namespace window and keeps only one active episode in each namespace.
+export MENHIR_INGEST_CONCURRENCY="${LME_INGEST_CONCURRENCY}"
 export OTEL_SDK_DISABLED=true LANGFUSE_TRACING_ENABLED=false LANGFUSE_PUBLIC_KEY="" LANGFUSE_SECRET_KEY="" LANGFUSE_HOST=""
 export MENHIR_OPERATOR_KEY="" MENHIR_AGENT_KEY="" MENHIR_READONLY_KEY="" MENHIR_API_KEY=""
 export NEO4J_URI="bolt://localhost:${LME_BOLT}" NEO4J_USER="neo4j" NEO4J_PASSWORD="${LME_NEO4J_PW}" NEO4J_DATABASE="neo4j"
@@ -133,6 +140,7 @@ INGEST_ARGS=(
   --menhir-url "${MENHIR_URL}"
   --manifest "${LME_MANIFEST_PATH}"
   --segmentation "${LME_SEGMENTATION}"
+  --namespace-window "${LME_INGEST_CONCURRENCY}"
 )
 if [ "${LME_SCALAR_STATE_ENABLED}" = "1" ]; then
   INGEST_ARGS+=(

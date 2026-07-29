@@ -28,7 +28,7 @@ class _FakeResponse:
         return None
 
     def json(self) -> dict:  # pragma: no cover - trivial
-        return {"results": []}
+        return {"episode_id": "episode-1", "status": "QUEUED"}
 
 
 class _FakeHttpx:
@@ -72,7 +72,7 @@ def test_ingest_body_resolves_every_name(http_client):
     so any name the body references but the signature omits raises here.
     """
     client, fake = http_client
-    client.ingest(
+    result = client.ingest(
         "ns-1",
         "user",
         "hello world",
@@ -91,6 +91,7 @@ def test_ingest_body_resolves_every_name(http_client):
     assert payload["source"] == "user"
     assert payload["diff"] == "--- a\n+++ b\n"
     assert payload["occurred_at"] == "2024-01-01T00:00:00Z"
+    assert result == {"episode_id": "episode-1", "status": "QUEUED"}
 
 
 def test_ingest_omits_unset_optionals(http_client):

@@ -283,7 +283,15 @@ Both arms require a fresh graph, scalar consolidation, TurnEvidence, and View au
 recall scoring. The wrapper validates the frozen fixture, records its SHA-256 and all effective
 flags, enables consolidation and recall audit trails, refuses tracked dirty code, checks
 Docker/image/ports/container/volume/result isolation, and stops Neo4j after the run while preserving
-the stopped container and volume for inspection.
+the stopped container and volume for inspection. Ingest defaults to two concurrent item namespaces:
+the driver keeps one episode active in each namespace and submits its next episode only after the
+prior one reaches a terminal state. This preserves chronological processing inside each namespace
+while Menhir enriches distinct namespaces concurrently. Set `LME_KU_INGEST_CONCURRENCY=1` for the
+legacy serial path; the guarded wrapper accepts widths 1 through 4 and records the effective value
+in run and graph provenance. Resume resets are fail-closed and remove the incomplete namespace's
+graph partition, scalar state, and TurnEvidence before resubmission. Each manifest row records
+enrichment LLM-task and processing-attempt totals; a scalar window with residual FAILED episodes
+stops before further paid work or consolidation.
 
 Run the no-spend preflights first:
 

@@ -61,6 +61,11 @@ export MENHIR_PERSONAL_MEMORY_CONSOLIDATION_AUDIT_ENABLED="${LME_CONSOLIDATION_A
 export LME_KU_ALLOW_RESUME="${LME_KU_ALLOW_RESUME:-0}"
 export LME_KU_KEEP_NEO4J_UP="${LME_KU_KEEP_NEO4J_UP:-0}"
 export LME_KU_ALLOW_DIRTY="${LME_KU_ALLOW_DIRTY:-0}"
+export LME_INGEST_CONCURRENCY="${LME_KU_INGEST_CONCURRENCY:-2}"
+case "${LME_INGEST_CONCURRENCY}" in
+  1|2|3|4) ;;
+  *) die "LME_KU_INGEST_CONCURRENCY must be an integer from 1 through 4" ;;
+esac
 if [ "${LME_KU_ALLOW_RESUME}" = "1" ]; then
   export LME_REQUIRE_FRESH="0"
 else
@@ -175,7 +180,7 @@ PY
 )"
 [ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY in menhir .env"
 
-log "preflight PASS: arm=${ARM} run=${RUN_ID} fresh=${LME_REQUIRE_FRESH} scalar=1 threshold=${LME_SCALAR_THRESHOLD} reconcile=${LME_SCALAR_RECONCILE_ATTRIBUTE}/${LME_SCALAR_RECONCILE_SCOPE}/${LME_SCALAR_RECONCILE_SUBJECT} authority=${LME_SCALAR_VIEW_AUTHORITY_ENABLED} turn_evidence=${LME_REQUIRE_TURN_EVIDENCE} audits=${LME_CONSOLIDATION_AUDIT_ENABLED}/${LME_RECALL_AUDIT_ENABLED}"
+log "preflight PASS: arm=${ARM} run=${RUN_ID} fresh=${LME_REQUIRE_FRESH} scalar=1 threshold=${LME_SCALAR_THRESHOLD} reconcile=${LME_SCALAR_RECONCILE_ATTRIBUTE}/${LME_SCALAR_RECONCILE_SCOPE}/${LME_SCALAR_RECONCILE_SUBJECT} authority=${LME_SCALAR_VIEW_AUTHORITY_ENABLED} turn_evidence=${LME_REQUIRE_TURN_EVIDENCE} audits=${LME_CONSOLIDATION_AUDIT_ENABLED}/${LME_RECALL_AUDIT_ENABLED} ingest_concurrency=${LME_INGEST_CONCURRENCY}"
 
 if [ "${MODE}" = "--preflight-only" ]; then
   exit 0
@@ -203,6 +208,7 @@ cat > "${LME_RESULTS_DIR}/run_provenance.json" <<EOF
   "menhir_port": ${LME_PORT_BUILD},
   "recall_port": ${LME_KU_RECALL_PORT:-8125},
   "neo4j_heap": "${LME_NEO4J_HEAP}",
+  "ingest_concurrency": ${LME_INGEST_CONCURRENCY},
   "require_fresh": ${LME_REQUIRE_FRESH},
   "scalar_state_enabled": ${LME_SCALAR_STATE_ENABLED},
   "scalar_threshold": "${LME_SCALAR_THRESHOLD}",

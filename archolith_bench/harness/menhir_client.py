@@ -172,7 +172,7 @@ class HttpMenhirClient:
         flagged: bool = False,
         bootstrap_scope: str | None = None,
         turn_evidence_uuid: str | None = None,
-    ) -> None:
+    ) -> dict[str, Any] | None:
         """Ingest a snippet as a menhir episode in the group's namespace silo.
 
         ``source`` sets the episode provenance label menhir maps to an evidence kind
@@ -194,6 +194,9 @@ class HttpMenhirClient:
         ``reference_time`` so temporal-KG edges reflect historical event dates
         rather than ingestion time.  ``session_id`` pins all turns of one LME
         haystack session to the same menhir session silo.
+
+        Returns Menhir's ingest response, including ``episode_id`` when content
+        was submitted, or ``None`` when ``content`` is empty.
         """
         if not content:
             return
@@ -220,6 +223,7 @@ class HttpMenhirClient:
             headers=self._headers,
         )
         response.raise_for_status()
+        return response.json()
 
     def ingest_raw(
         self,

@@ -7,24 +7,29 @@ Resumability:
   FULLY-ENRICHED item.
 - On restart, items already in the manifest are SKIPPED.
 - An item NOT in the manifest may have partial data from a prior crash, so its namespace is
-  RESET (DELETE /api/namespace) before re-ingesting -- guarantees no duplicate episodes.
+  force-reset before re-ingesting. The reset removes the graph partition, scalar state, and
+  namespace-keyed TurnEvidence -- guaranteeing no duplicate evidence or episodes.
 - Per-turn ingest has bounded retry/backoff; if it still fails the script exits non-zero and a
   re-run resumes from the manifest.
 
-Enrichment completeness (why a per-item DRAIN exists):
+Enrichment completeness (why a namespace-window DRAIN exists):
 - The HTTP ingest `wait=true` is best-effort with a 60s/episode cap, so slow episodes (which need
   up to MENHIR_MAX_LLM_CALLS_PER_JOB extraction calls) leave a PENDING/ENRICHING backlog behind a
   single background worker. Marking an item "done" the instant its last turn POST returns would
   record a HALF-ENRICHED namespace -- recall would then run against an incomplete graph.
-- So after ingesting an item's turns we DRAIN: poll until menhir's queue_depth==0 (authoritative
-  unprocessed-work count, from /api/stats) AND no episode is PENDING or ENRICHING (the two
-  non-terminal lifecycle states, read from Neo4j) -- stable across two polls -- before writing the
-  manifest. This makes "manifest done" mean "fully enriched", and keeps resume correct. (Gating on
-  ENRICHING alone let the drain settle while a PENDING backlog the worker had not yet claimed still
-  existed, which then slipped an unenriched namespace into scalar consolidation and aborted the run.)
-- Benchmark mode disables the scheduler, so FAILED episodes are never auto-retried. After draining
-  we run one best-effort FAILED-retry pass (force_reset_failed_episode + re-drain) to recover the
-  episodes that hit the per-job LLM budget.
+- A bounded window keeps exactly one active episode per namespace. When one reaches a terminal
+  state, the driver submits that namespace's next chronological episode. Menhir can therefore
+  enrich distinct namespaces concurrently without ever claiming later work from the same namespace.
+- After submitting a window we DRAIN: poll until menhir's queue_depth==0 (authoritative
+  unprocessed-work count, from /api/stats) AND no episode in any window namespace is PENDING or
+  ENRICHING (the two non-terminal lifecycle states, read from Neo4j) -- stable across two polls --
+  before writing the manifest. This makes "manifest done" mean "fully enriched", and keeps resume
+  correct. (Gating on ENRICHING alone let the drain settle while a PENDING backlog the worker had
+  not yet claimed still existed, which then slipped an unenriched namespace into scalar
+  consolidation and aborted the run.)
+- Benchmark mode disables the scheduler, so FAILED episodes are never auto-retried. The window
+  scheduler immediately makes one best-effort retry before it advances that namespace; a residual
+  failure is recorded in the final manifest.
 """
 from __future__ import annotations
 
@@ -35,6 +40,8 @@ import re
 import subprocess
 import sys
 import time
+from collections.abc import Iterator
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -86,6 +93,22 @@ _SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
 _SPLIT_MIN_LENGTH = int(os.getenv("LME_SPLIT_MIN_LENGTH", "100"))
 
 
+@dataclass(frozen=True)
+class IngestTurn:
+    role: str
+    content: str
+    occurred_at: str | None
+    session_id: str
+
+
+@dataclass
+class WindowItem:
+    item: dict
+    question_id: str
+    namespace: str
+    turns: int = 0
+
+
 def _split_sentences(text: str, min_length: int = _SPLIT_MIN_LENGTH) -> list[str]:
     """Split *text* on sentence boundaries when it exceeds *min_length* chars.
 
@@ -122,7 +145,7 @@ def _ingest_turn(
     tries: int = 4,
     occurred_at: str | None = None,
     session_id: str | None = None,
-) -> None:
+) -> str:
     """Ingest one turn with bounded exponential backoff on transient errors.
 
     For user turns, records :TurnEvidence first so the ``source="user"`` claim
@@ -130,9 +153,10 @@ def _ingest_turn(
     gate downgrades the claim to ``agent_inference`` and writes a noisy
     admission-denial entity.
 
-    Uses wait=False: the per-item drain is the real completeness guarantee,
-    so we don't block per-turn.  This removes ~11k blocking round-trips and
-    lets the single enrichment worker drain back-to-back with no idle gaps.
+    Uses wait=False: the namespace-window scheduler is the completeness
+    guarantee, so we do not block on an HTTP request per turn. It still keeps
+    at most one episode active per namespace while allowing different
+    namespaces to use multiple enrichment workers.
     """
     is_user = role.strip().lower() == "user"
     turn_evidence_uuid: str | None = None
@@ -164,7 +188,7 @@ def _ingest_turn(
 
     for attempt in range(tries):
         try:
-            client.ingest(
+            result = client.ingest(
                 ns,
                 role,
                 content,
@@ -177,7 +201,10 @@ def _ingest_turn(
                 turn_evidence_uuid=turn_evidence_uuid,
                 wait=False,
             )
-            return
+            episode_uuid = str((result or {}).get("episode_id") or "")
+            if not episode_uuid:
+                raise RuntimeError(f"menhir did not return an episode id for namespace {ns}")
+            return episode_uuid
         except (httpx.HTTPError,) as exc:
             if attempt == tries - 1:
                 raise
@@ -218,13 +245,30 @@ def _ns_state_counts(ns: str) -> dict[str, int]:
         "sum(CASE WHEN e.processing_state='READY' THEN 1 ELSE 0 END) AS ready, "
         "sum(CASE WHEN e.processing_state='ENRICHING' THEN 1 ELSE 0 END) AS enriching, "
         "sum(CASE WHEN e.processing_state='FAILED' THEN 1 ELSE 0 END) AS failed, "
+        "sum(coalesce(toInteger(e.processing_llm_tasks_total), 0)) AS llm_tasks, "
+        "sum(coalesce(toInteger(e.processing_attempts), 0)) AS processing_attempts, "
         "count(*) AS total;"
     )
-    if not rows or len(rows[0]) < 5:
-        return {"pending": -1, "ready": -1, "enriching": -1, "failed": -1, "total": -1}
+    if not rows or len(rows[0]) < 7:
+        return {
+            "pending": -1,
+            "ready": -1,
+            "enriching": -1,
+            "failed": -1,
+            "llm_tasks": -1,
+            "processing_attempts": -1,
+            "total": -1,
+        }
     r = rows[0]
-    return {"pending": int(r[0] or 0), "ready": int(r[1] or 0), "enriching": int(r[2] or 0),
-            "failed": int(r[3] or 0), "total": int(r[4] or 0)}
+    return {
+        "pending": int(r[0] or 0),
+        "ready": int(r[1] or 0),
+        "enriching": int(r[2] or 0),
+        "failed": int(r[3] or 0),
+        "llm_tasks": int(r[4] or 0),
+        "processing_attempts": int(r[5] or 0),
+        "total": int(r[6] or 0),
+    }
 
 
 def _cypher_count(query: str) -> int:
@@ -291,17 +335,8 @@ def _consolidate_scalar(
     return result
 
 
-def _failed_uuids(ns: str, limit: int = 2000) -> list[str]:
-    rows = _cypher(
-        f"MATCH (e:Episodic {{namespace:'{ns}'}}) WHERE e.processing_state='FAILED' "
-        f"RETURN e.uuid AS uuid LIMIT {limit};"
-    )
-    return [r[0] for r in rows if r and r[0]]
-
-
 def _queue_depth(admin: httpx.Client, menhir_url: str) -> int:
-    """menhir's authoritative count of unprocessed enrichment work (global; == current
-    namespace because items are ingested one at a time). -1 if unavailable."""
+    """Menhir's authoritative global count of unprocessed enrichment work. -1 if unavailable."""
     try:
         resp = admin.get(menhir_url.rstrip("/") + "/api/stats")
         resp.raise_for_status()
@@ -318,56 +353,228 @@ def _backend(admin: httpx.Client, menhir_url: str, op: str, body: dict | None = 
     return resp.json()
 
 
-def _drain(ns: str, admin: httpx.Client, menhir_url: str, *,
-           idle_polls: int = 2, poll_s: float = 2.0, timeout_s: float = 1800.0) -> dict:
-    """Block until enrichment for the current namespace is fully settled: queue_depth==0 AND no
-    episode in a non-terminal lifecycle state (PENDING or ENRICHING), stable for `idle_polls`
-    consecutive checks (or `timeout_s` elapses). Returns the last state-count snapshot (with
-    timed_out flag).
+def _reset_namespace(admin: httpx.Client, menhir_url: str, namespace: str) -> None:
+    """Fully clear one throwaway namespace, including namespace-keyed TurnEvidence.
 
-    PENDING is gated on, not just ENRICHING: an episode the single background worker has not yet
-    claimed sits in PENDING with enriching==0, so gating on ENRICHING alone let the drain settle
-    while an unenriched backlog remained -- that empty namespace then reached scalar consolidation,
-    which hard-fails when phase3 finds nothing dirty and aborts the whole run. Waiting on PENDING
-    closes the hole; `timeout_s` still bounds a namespace whose backlog genuinely never clears."""
+    The ordinary DELETE endpoint has a 200-node safety ceiling and does not purge TurnEvidence.
+    This benchmark owns its isolated namespace, so force-delete the graph partition explicitly,
+    then call the Phase-3 reset to clear evidence that is keyed by namespace rather than group_id.
+    """
+    _backend(
+        admin,
+        menhir_url,
+        "delete_namespace",
+        {"namespace": namespace, "force": True},
+    )
+    response = admin.post(
+        menhir_url.rstrip("/") + "/api/phase3/reset",
+        params={"namespace": namespace},
+        timeout=300.0,
+    )
+    response.raise_for_status()
+
+
+def _drain_many(
+    namespaces: list[str],
+    admin: httpx.Client,
+    menhir_url: str,
+    *,
+    idle_polls: int = 2,
+    poll_s: float = 2.0,
+    timeout_s: float = 1800.0,
+) -> dict[str, dict[str, int | bool]]:
+    """Block until the global queue and every supplied namespace are fully settled.
+
+    PENDING is gated on, not just ENRICHING: an episode a worker has not yet claimed sits in
+    PENDING with enriching==0. Unknown queue/state counts are treated as in-flight, and the
+    settled condition must remain true for ``idle_polls`` consecutive checks.
+    """
+    ordered_namespaces = list(dict.fromkeys(namespaces))
+    if not ordered_namespaces:
+        raise ValueError("at least one namespace is required to drain")
     t0 = time.time()
     settled = 0
-    last = {"pending": -1, "ready": -1, "enriching": -1, "failed": -1, "total": -1}
+    last = {
+        namespace: {
+            "pending": -1,
+            "ready": -1,
+            "enriching": -1,
+            "failed": -1,
+            "llm_tasks": -1,
+            "processing_attempts": -1,
+            "total": -1,
+        }
+        for namespace in ordered_namespaces
+    }
     while time.time() - t0 < timeout_s:
         qd = _queue_depth(admin, menhir_url)
-        last = _ns_state_counts(ns)
+        last = {namespace: _ns_state_counts(namespace) for namespace in ordered_namespaces}
         # pending/enriching==-1 means cypher timed out / Neo4j temporarily unreachable. Treat
         # unknown as in-flight so we keep polling rather than settling early; only settle when
         # cypher confirms both non-terminal counts are 0.
-        pending = last["pending"] if last["pending"] >= 0 else 1
-        enriching = last["enriching"] if last["enriching"] >= 0 else 1
-        in_flight = pending + enriching
+        in_flight = 0
+        for state in last.values():
+            pending = state["pending"] if state["pending"] >= 0 else 1
+            enriching = state["enriching"] if state["enriching"] >= 0 else 1
+            in_flight += pending + enriching
         if qd == 0 and in_flight == 0:
             settled += 1
             if settled >= idle_polls:
-                last["timed_out"] = False
-                return last
+                return {namespace: {**state, "timed_out": False} for namespace, state in last.items()}
         else:
             settled = 0
         time.sleep(poll_s)
-    last["timed_out"] = True
-    return last
+    return {namespace: {**state, "timed_out": True} for namespace, state in last.items()}
 
 
-def _retry_failed(ns: str, admin: httpx.Client, menhir_url: str) -> int:
-    """Best-effort: re-enqueue FAILED episodes in the namespace (the scheduler that normally
-    retries them is off in benchmark mode). Returns the number re-enqueued."""
-    uuids = _failed_uuids(ns)
-    if not uuids:
-        return 0
-    requeued = 0
-    for u in uuids:
+def _drain(
+    ns: str,
+    admin: httpx.Client,
+    menhir_url: str,
+    *,
+    idle_polls: int = 2,
+    poll_s: float = 2.0,
+    timeout_s: float = 1800.0,
+) -> dict[str, int | bool]:
+    """Backward-compatible single-namespace wrapper around :func:`_drain_many`."""
+    return _drain_many(
+        [ns],
+        admin,
+        menhir_url,
+        idle_polls=idle_polls,
+        poll_s=poll_s,
+        timeout_s=timeout_s,
+    )[ns]
+
+
+def _episode_processing(
+    admin: httpx.Client,
+    menhir_url: str,
+    episode_uuid: str,
+) -> dict | None:
+    """Fetch one episode's lifecycle row without touching Neo4j directly."""
+    try:
+        result = _backend(
+            admin,
+            menhir_url,
+            "fetch_episode_processing",
+            {"episode_uuid": episode_uuid},
+        )
+    except Exception:
+        return None
+    return result if isinstance(result, dict) else None
+
+
+def _ingest_window(
+    window: list[WindowItem],
+    turn_iterators: list[Iterator[IngestTurn]],
+    client: HttpMenhirClient,
+    admin: httpx.Client,
+    menhir_url: str,
+    *,
+    timeout_s: float,
+    poll_s: float = 0.1,
+) -> dict[str, int]:
+    """Keep one episode active per namespace while distinct namespaces run concurrently.
+
+    A later episode is not submitted until the preceding episode in that namespace reaches READY
+    or FAILED. This is stronger than relying on the per-namespace extraction lock: multiple workers
+    can claim queued episodes before they reach that lock, so pre-filling a namespace could reorder
+    temporal updates.
+    """
+    if len(window) != len(turn_iterators):
+        raise ValueError("window and turn iterator counts must match")
+
+    active: dict[int, tuple[str, bool]] = {}
+    requeued = {state.namespace: 0 for state in window}
+    started_at = time.time()
+
+    def submit_next(index: int) -> bool:
         try:
-            if _backend(admin, menhir_url, "force_reset_failed_episode", {"episode_uuid": u}):
-                requeued += 1
-        except Exception:
-            pass  # internal endpoint unavailable / auth -> leave FAILED, report residual
+            turn = next(turn_iterators[index])
+        except StopIteration:
+            return False
+        state = window[index]
+        episode_uuid = _ingest_turn(
+            client,
+            state.namespace,
+            turn.role,
+            turn.content,
+            occurred_at=turn.occurred_at,
+            session_id=turn.session_id,
+        )
+        state.turns += 1
+        active[index] = (episode_uuid, False)
+        return True
+
+    for index in range(len(window)):
+        submit_next(index)
+
+    while active:
+        if time.time() - started_at >= timeout_s:
+            pending = ", ".join(
+                f"{window[index].namespace}:{episode_uuid}"
+                for index, (episode_uuid, _) in active.items()
+            )
+            raise RuntimeError(
+                "namespace-window episode scheduler timed out; refusing to submit later turns: "
+                + pending
+            )
+
+        progressed = False
+        for index, (episode_uuid, already_retried) in list(active.items()):
+            row = _episode_processing(admin, menhir_url, episode_uuid)
+            if row is None:
+                continue
+            processing_state = str(row.get("processing_state") or "").upper().rsplit(".", 1)[-1]
+            if processing_state == "READY":
+                active.pop(index, None)
+                submit_next(index)
+                progressed = True
+            elif processing_state == "FAILED":
+                if not already_retried:
+                    try:
+                        reset = _backend(
+                            admin,
+                            menhir_url,
+                            "force_reset_failed_episode",
+                            {"episode_uuid": episode_uuid},
+                        )
+                    except Exception:
+                        reset = False
+                    if reset:
+                        try:
+                            _backend(
+                                admin,
+                                menhir_url,
+                                "enqueue_pending_episode",
+                                {"episode_uuid": episode_uuid},
+                            )
+                        except Exception:
+                            # An idle worker's lease-recovery poll will still discover the PENDING
+                            # row. Keep monitoring the same episode instead of advancing out of order.
+                            pass
+                        active[index] = (episode_uuid, True)
+                        requeued[window[index].namespace] += 1
+                        progressed = True
+                        continue
+                # A terminal failure has no later retry that could reorder this namespace. Record
+                # it in the final state counts and continue with the next chronological episode.
+                active.pop(index, None)
+                submit_next(index)
+                progressed = True
+
+        if active and not progressed:
+            time.sleep(poll_s)
+
     return requeued
+
+
+def _positive_int(raw: str) -> int:
+    value = int(raw)
+    if value < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return value
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -386,7 +593,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="namespace prefix for ingested items (default: LME_NS_PREFIX or lme-)",
     )
     ap.add_argument("--drain-timeout", type=float, default=1800.0,
-                    help="max seconds to wait for an item's enrichment to settle")
+                    help="max seconds to wait for a namespace window's enrichment to settle")
+    ap.add_argument(
+        "--namespace-window",
+        type=_positive_int,
+        default=os.getenv("LME_INGEST_CONCURRENCY", "1"),
+        help="number of item namespaces to enrich concurrently before draining (default: 1)",
+    )
     ap.add_argument("--consolidate-scalar", action="store_true",
                     help="run scalar-only Phase 3 consolidation before manifesting each namespace")
     ap.add_argument("--consolidation-k", type=int, default=3)
@@ -424,6 +637,93 @@ def _namespace(question_id: str, prefix: str) -> str:
     return f"{clean_prefix}{question_id}"
 
 
+def _iter_item_turns(
+    adapter: LongMemEvalMemoryAdapter,
+    item: dict,
+    namespace: str,
+    segmentation: str,
+) -> Iterator[IngestTurn]:
+    haystack_dates = item.get("haystack_dates") or []
+    haystack_session_ids = item.get("haystack_session_ids") or []
+    for session_index, session in enumerate(adapter.sessions(item)):
+        session_date = haystack_dates[session_index] if session_index < len(haystack_dates) else None
+        raw_session_id = (
+            haystack_session_ids[session_index]
+            if session_index < len(haystack_session_ids)
+            else None
+        )
+        occurred_at = _parse_lme_date(session_date)
+        # Namespace-qualify the session id. LongMemEval reuses raw session ids across temporal
+        # variants; sharing them lets Graphiti deduplicate the second namespace against the first.
+        session_id = (
+            f"{namespace}-{raw_session_id}"
+            if raw_session_id
+            else f"{namespace}-s{session_index}"
+        )
+        for turn in session:
+            content = turn.get("content", "")
+            if not content:
+                continue
+            role = turn.get("role", "user")
+            contents: list[str]
+            if segmentation == "none":
+                contents = [content]
+            elif segmentation == "sentence":
+                contents = _split_sentences(content)
+            elif segmentation == "user-sentence":
+                contents = (
+                    _split_sentences(content)
+                    if role.strip().lower() == "user"
+                    else [content]
+                )
+            elif segmentation == "adaptive":
+                mode = decide_segmentation(role, content)
+                if mode == SegmentationMode.SKIP:
+                    contents = []
+                elif mode == SegmentationMode.SEGMENT_CLAIMS:
+                    contents = [
+                        content,
+                        *[claim.text for claim in _heuristic_extract_claims_sync(content, role)],
+                    ]
+                else:
+                    contents = [content]
+            else:
+                contents = [content]
+            for segmented_content in contents:
+                yield IngestTurn(
+                    role=role,
+                    content=segmented_content,
+                    occurred_at=occurred_at,
+                    session_id=session_id,
+                )
+
+
+def _write_manifest(path: Path, manifest: list[dict]) -> None:
+    """Atomically checkpoint completed namespaces for safe resume after interruption."""
+    temporary_path = path.with_suffix(path.suffix + ".tmp")
+    temporary_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    temporary_path.replace(path)
+
+
+def _require_no_failed_episodes(
+    drained_by_namespace: dict[str, dict[str, int | bool]],
+) -> None:
+    """Stop a scalar build before more paid work when a completed window is incomplete."""
+    residual_failures = {
+        namespace: int(drained.get("failed", 0))
+        for namespace, drained in drained_by_namespace.items()
+        if int(drained.get("failed", 0)) > 0
+    }
+    if residual_failures:
+        details = ", ".join(
+            f"{namespace}={failed}" for namespace, failed in residual_failures.items()
+        )
+        raise RuntimeError(
+            "scalar namespace window has residual FAILED episodes after immediate retry; "
+            "refusing further paid work: " + details
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
 
@@ -452,150 +752,120 @@ def main(argv: list[str] | None = None) -> int:
     remaining = [it for it in items if str(it.get("question_id") or "") not in done_ids]
     print(f"to ingest this run: {len(remaining)} items", flush=True)
 
-    for n, item in enumerate(remaining):
-        qid = str(item.get("question_id") or f"lme-{n}")
-        ns = _namespace(qid, args.namespace_prefix)
-        # Item not in manifest -> may be partially ingested from a prior crash; reset clean.
-        try:
-            client.reset(ns)
-        except Exception:
-            pass
-        turns = 0
-        t0 = time.time()
-        haystack_dates = item.get("haystack_dates") or []
-        haystack_session_ids = item.get("haystack_session_ids") or []
-        for s_idx, session in enumerate(adapter.sessions(item)):
-            s_date = haystack_dates[s_idx] if s_idx < len(haystack_dates) else None
-            s_id = haystack_session_ids[s_idx] if s_idx < len(haystack_session_ids) else None
-            occurred_at = _parse_lme_date(s_date)
-            # Namespace-qualify the session id. The LongMemEval fixture reuses identical
-            # haystack_session_ids across temporal-variant question pairs (e.g. 89941a93/89941a94,
-            # 07741c44/07741c45); ingesting each item into its own namespace but sharing the raw
-            # session id lets Graphiti's entity resolution dedup the second item's nodes against the
-            # first item's already-resolved (cross-namespace) nodes, which menhir's namespace filter
-            # then drops -- leaving dangling edge endpoints, orphan-pruned nodes, and a collapsed
-            # (zero TurnEvidence) extraction. Qualifying by namespace guarantees per-item isolation.
-            session_id = f"{ns}-{s_id}" if s_id else f"{ns}-s{s_idx}"
-            for turn in session:
-                content = turn.get("content", "")
-                if not content:
-                    continue
-                role = turn.get("role", "user")
-                seg = args.segmentation
-
-                if seg == "none":
-                    # Arm A: no splitting at all
-                    _ingest_turn(client, ns, role, content,
-                                 occurred_at=occurred_at, session_id=session_id)
-                    turns += 1
-
-                elif seg == "sentence":
-                    # Arm B: legacy blind sentence split
-                    for sentence in _split_sentences(content):
-                        _ingest_turn(client, ns, role, sentence,
-                                     occurred_at=occurred_at, session_id=session_id)
-                        turns += 1
-
-                elif seg == "user-sentence":
-                    # Arm C: split only user messages, assistant whole
-                    if role.strip().lower() == "user":
-                        for sentence in _split_sentences(content):
-                            _ingest_turn(client, ns, role, sentence,
-                                         occurred_at=occurred_at, session_id=session_id)
-                            turns += 1
-                    else:
-                        _ingest_turn(client, ns, role, content,
-                                     occurred_at=occurred_at, session_id=session_id)
-                        turns += 1
-
-                elif seg == "adaptive":
-                    # Arm D: claim-aware segmentation
-                    mode = decide_segmentation(role, content)
-
-                    if mode == SegmentationMode.SKIP:
-                        continue
-
-                    elif mode == SegmentationMode.CONTEXT_ONLY:
-                        # Ingest as context but don't extract — use wait=False
-                        # and mark as assistant/low-priority so extraction
-                        # treats it as background context
-                        _ingest_turn(client, ns, role, content,
-                                     occurred_at=occurred_at, session_id=session_id)
-                        turns += 1
-
-                    elif mode == SegmentationMode.EXTRACT_WHOLE:
-                        _ingest_turn(client, ns, role, content,
-                                     occurred_at=occurred_at, session_id=session_id)
-                        turns += 1
-
-                    elif mode == SegmentationMode.SEGMENT_CLAIMS:
-                        # Ingest the original turn first (preserves context)
-                        _ingest_turn(client, ns, role, content,
-                                     occurred_at=occurred_at, session_id=session_id)
-                        turns += 1
-                        # Then extract and ingest individual claim segments
-                        claims = _heuristic_extract_claims_sync(content, role)
-                        for claim in claims:
-                            _ingest_turn(client, ns, role, claim.text,
-                                         occurred_at=occurred_at, session_id=session_id)
-                            turns += 1
-
-                else:
-                    # Fallback: no splitting
-                    _ingest_turn(client, ns, role, content,
-                                 occurred_at=occurred_at, session_id=session_id)
-                    turns += 1
-
-        # DRAIN: wait for this item's enrichment to fully settle before recording it as done,
-        # so "manifest done" == "fully enriched" (recall A/B then sees a complete graph).
-        drained = _drain(ns, admin, args.menhir_url, timeout_s=args.drain_timeout)
-        # Best-effort FAILED-retry (scheduler is off in benchmark mode), then re-drain once.
-        requeued = 0
-        if drained.get("failed", 0) > 0:
-            requeued = _retry_failed(ns, admin, args.menhir_url)
-            if requeued:
-                drained = _drain(ns, admin, args.menhir_url, timeout_s=args.drain_timeout)
-
-        scalar_result: dict = {}
-        scalar_counts: dict[str, int] = {}
-        if args.consolidate_scalar:
-            scalar_result = _consolidate_scalar(
-                admin,
-                args.menhir_url,
-                ns,
-                k=args.consolidation_k,
-                call_budget=args.consolidation_call_budget,
+    completed_this_run = 0
+    for window_start in range(0, len(remaining), args.namespace_window):
+        raw_window = remaining[window_start:window_start + args.namespace_window]
+        window = [
+            WindowItem(
+                item=item,
+                question_id=str(item.get("question_id") or f"lme-{window_start + index}"),
+                namespace=_namespace(
+                    str(item.get("question_id") or f"lme-{window_start + index}"),
+                    args.namespace_prefix,
+                ),
             )
-            scalar_counts = _scalar_counts(ns)
-            if scalar_counts["turn_evidence"] <= 0:
-                raise RuntimeError(f"no TurnEvidence captured for scalar namespace {ns}")
+            for index, item in enumerate(raw_window)
+        ]
+        window_started = time.time()
 
-        manifest.append({
-            "question_id": qid, "namespace": ns,
-            "fixture": str(Path(args.fixture).resolve()) if args.fixture else None,
-            "question": adapter.question(item), "answer": str(item.get("answer", "")),
-            "question_type": item.get("question_type"), "turns": turns,
-            "episodes": drained.get("total"), "ready": drained.get("ready"),
-            "failed_remaining": drained.get("failed"), "failed_requeued": requeued,
-            "drain_timed_out": drained.get("timed_out", False),
-            "scalar_consolidated": bool(
-                args.consolidate_scalar
-                and int(scalar_result.get("scalar_namespaces_processed", 0)) == 1
-                and int(scalar_result.get("llm_calls", 0)) >= args.consolidation_k
-            ),
-            "scalar_llm_calls": int(scalar_result.get("llm_calls", 0)),
-            "scalar_states_written": int(scalar_result.get("scalar_states_written", 0)),
-            **scalar_counts,
-        })
-        manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-        elapsed = time.time() - t_all
-        rate = (n + 1) / elapsed if elapsed else 0
-        eta = (len(remaining) - (n + 1)) / rate if rate else 0
-        flag = " DRAIN-TIMEOUT" if drained.get("timed_out") else ""
-        print(f"[{len(done_ids)+n+1}/{len(items)}] {qid} ns={ns} turns={turns} "
-              f"episodes={drained.get('total')} ready={drained.get('ready')} "
-              f"failed={drained.get('failed')} requeued={requeued} "
-              f"item={time.time()-t0:.0f}s total={elapsed:.0f}s eta={eta/3600:.1f}h{flag}", flush=True)
+        # An interrupted window has no manifest rows, so fully reset every namespace before
+        # resubmitting. This must include TurnEvidence, which is not group_id-keyed.
+        for state in window:
+            _reset_namespace(admin, args.menhir_url, state.namespace)
+
+        turn_iterators = [
+            _iter_item_turns(adapter, state.item, state.namespace, args.segmentation)
+            for state in window
+        ]
+        requeued_by_namespace = _ingest_window(
+            window,
+            turn_iterators,
+            client,
+            admin,
+            args.menhir_url,
+            timeout_s=args.drain_timeout,
+        )
+
+        namespaces = [state.namespace for state in window]
+        drained_by_namespace = _drain_many(
+            namespaces,
+            admin,
+            args.menhir_url,
+            timeout_s=args.drain_timeout,
+        )
+        timed_out = [
+            namespace
+            for namespace, drained in drained_by_namespace.items()
+            if drained.get("timed_out")
+        ]
+        if timed_out:
+            raise RuntimeError(
+                "namespace-window drain timed out; refusing to manifest incomplete namespaces: "
+                + ", ".join(timed_out)
+            )
+        if args.consolidate_scalar:
+            _require_no_failed_episodes(drained_by_namespace)
+
+        # Scalar consolidation remains sequential: it is a small fraction of build time and
+        # parallel calls would add provider-rate and graph-write risk without material speedup.
+        for state in window:
+            drained = drained_by_namespace[state.namespace]
+            requeued = requeued_by_namespace[state.namespace]
+            scalar_result: dict = {}
+            scalar_counts: dict[str, int] = {}
+            if args.consolidate_scalar:
+                scalar_result = _consolidate_scalar(
+                    admin,
+                    args.menhir_url,
+                    state.namespace,
+                    k=args.consolidation_k,
+                    call_budget=args.consolidation_call_budget,
+                )
+                scalar_counts = _scalar_counts(state.namespace)
+                if scalar_counts["turn_evidence"] <= 0:
+                    raise RuntimeError(
+                        f"no TurnEvidence captured for scalar namespace {state.namespace}"
+                    )
+
+            manifest.append({
+                "question_id": state.question_id,
+                "namespace": state.namespace,
+                "fixture": str(Path(args.fixture).resolve()) if args.fixture else None,
+                "question": adapter.question(state.item),
+                "answer": str(state.item.get("answer", "")),
+                "question_type": state.item.get("question_type"),
+                "turns": state.turns,
+                "episodes": drained.get("total"),
+                "ready": drained.get("ready"),
+                "failed_remaining": drained.get("failed"),
+                "failed_requeued": requeued,
+                "enrichment_llm_tasks": drained.get("llm_tasks"),
+                "processing_attempts": drained.get("processing_attempts"),
+                "drain_timed_out": drained.get("timed_out", False),
+                "namespace_window": args.namespace_window,
+                "scalar_consolidated": bool(
+                    args.consolidate_scalar
+                    and int(scalar_result.get("scalar_namespaces_processed", 0)) == 1
+                    and int(scalar_result.get("llm_calls", 0)) >= args.consolidation_k
+                ),
+                "scalar_llm_calls": int(scalar_result.get("llm_calls", 0)),
+                "scalar_states_written": int(scalar_result.get("scalar_states_written", 0)),
+                **scalar_counts,
+            })
+            _write_manifest(manifest_path, manifest)
+            completed_this_run += 1
+            elapsed = time.time() - t_all
+            rate = completed_this_run / elapsed if elapsed else 0
+            eta = (len(remaining) - completed_this_run) / rate if rate else 0
+            print(
+                f"[{len(done_ids)+completed_this_run}/{len(items)}] {state.question_id} "
+                f"ns={state.namespace} turns={state.turns} episodes={drained.get('total')} "
+                f"ready={drained.get('ready')} failed={drained.get('failed')} "
+                f"requeued={requeued} llm_tasks={drained.get('llm_tasks')} "
+                f"window={time.time()-window_started:.0f}s "
+                f"total={elapsed:.0f}s eta={eta/3600:.1f}h",
+                flush=True,
+            )
 
     print(f"\nDONE: manifest has {len(manifest)}/{len(items)} items -> {args.manifest}", flush=True)
     return 0

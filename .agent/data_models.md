@@ -9,7 +9,9 @@ JSON array. In addition to the standard `question_id`, `question_type`, `questio
 `haystack_sessions`, `haystack_dates`, and `haystack_session_ids` fields, the item carries
 `fixture_expectations`: the isolated namespace, current subject/object/fact matchers, stale object,
 minimum turn count, and required Menhir commit. The persistent ingester records the resolved fixture
-path in each manifest row.
+path in each manifest row. Each parsed `haystack_dates` value is the shared `occurred_at` world time
+for the session's episodes and TurnEvidence; Menhir's later server receive time is a separate
+`recorded_at` processing timestamp.
 
 
 ## Bootstrap Hygiene Models (`bootstrap_hygiene/`)

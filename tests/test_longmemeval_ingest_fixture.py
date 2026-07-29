@@ -499,6 +499,37 @@ def test_context_only_turns_keep_their_own_boundaries_and_role() -> None:
     assert "That's a great question!" not in user_text
 
 
+def test_lme_session_date_reaches_turn_evidence_as_world_time() -> None:
+    item = {
+        "sessions": [[{"role": "user", "content": "I have added 25 postcards."}]],
+        "haystack_dates": ["2023/11/30 (Thu) 20:25"],
+        "haystack_session_ids": ["answer-a-2"],
+    }
+    turn = next(iter(ingest._iter_item_turns(_FakeSessionAdapter(), item, "lme-a", "none")))
+    evidence: list[dict] = []
+
+    class FakeClient:
+        def record_turn_evidence(self, namespace, text, **kwargs):
+            evidence.append({"namespace": namespace, "text": text, **kwargs})
+            return {"turn_id": "turn-25"}
+
+        def ingest(self, *args, **kwargs):
+            return {"episode_id": "episode-25"}
+
+    ingest._ingest_turn(
+        FakeClient(),
+        "lme-a",
+        turn.role,
+        turn.content,
+        occurred_at=turn.occurred_at,
+        session_id=turn.session_id,
+        turn_key=turn.turn_key,
+    )
+
+    assert turn.occurred_at == "2023-11-30T20:25:00+00:00"
+    assert evidence[0]["occurred_at"] == turn.occurred_at
+
+
 def test_evidence_only_turn_records_one_record_and_creates_no_episode() -> None:
     evidence: list[dict] = []
     episodes: list[dict] = []
@@ -556,6 +587,7 @@ def test_required_evidence_without_turn_id_fails_closed(
 
 def test_extracting_user_turn_still_grounds_on_user_evidence() -> None:
     evidence: list[dict] = []
+    episodes: list[dict] = []
 
     class FakeClient:
         def record_turn_evidence(self, namespace, text, **kwargs):
@@ -563,14 +595,22 @@ def test_extracting_user_turn_still_grounds_on_user_evidence() -> None:
             return {"turn_id": "turn-1"}
 
         def ingest(self, *args, **kwargs):
+            episodes.append(kwargs)
             assert kwargs["turn_evidence_uuid"] == "turn-1"
             assert kwargs["source"] == "user"
             return {"episode_id": "episode-1"}
 
     assert ingest._ingest_turn(
-        FakeClient(), "ns-a", "user", "I moved to Portland.", session_id="ns-a-s0"
+        FakeClient(),
+        "ns-a",
+        "user",
+        "I moved to Portland.",
+        session_id="ns-a-s0",
+        occurred_at="2023-11-30T20:25:00Z",
     ) == "episode-1"
     assert evidence[0]["declarant"] == "user"
+    assert evidence[0]["occurred_at"] == "2023-11-30T20:25:00Z"
+    assert episodes[0]["occurred_at"] == "2023-11-30T20:25:00Z"
 
 
 class _RecordingClient:

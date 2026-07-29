@@ -15,6 +15,7 @@ RETURN t.turn_id AS id,
        coalesce(t.role, t.declarant, "unknown") AS role,
        t.text AS text,
        t.session_id AS session_id,
+       toString(t.occurred_at) AS occurred_at,
        toString(t.recorded_at) AS recorded_at,
        collect(DISTINCT a.assertion_id) AS founds
 ORDER BY recorded_at, id

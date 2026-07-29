@@ -219,6 +219,7 @@ def _ingest_turn(
                     role=normalized_role,
                     declarant=normalized_role,
                     session_id=session_id,
+                    occurred_at=occurred_at,
                     turn_key=turn_key,
                 )
                 turn_evidence_uuid = ev.get("turn_id")

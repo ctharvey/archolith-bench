@@ -23,6 +23,7 @@ class _Driver:
                 "role": "user",
                 "text": "I have added 25 postcards.",
                 "session_id": "s2",
+                "occurred_at": "2023-11-30T20:25:00Z",
                 "recorded_at": "2026-07-29T13:00:00Z",
                 "founds": ["assert-25"],
             }]
@@ -133,6 +134,8 @@ def test_reader_correlates_vote_receipt_to_graph_assertions(tmp_path):
     data = reader.read("lme-postcards")
 
     assert data["evidence"][0]["founds"] == ["assert-25"]
+    assert data["evidence"][0]["occurred_at"] == "2023-11-30T20:25:00Z"
+    assert data["evidence"][0]["recorded_at"] == "2026-07-29T13:00:00Z"
     assert data["assertions"][0]["value"] == "25"
     assert data["views"][0]["current"] is True
     assert data["audit_pass_id"] == "cap-matching"

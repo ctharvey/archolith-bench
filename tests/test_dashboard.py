@@ -162,3 +162,5 @@ def test_render_html_adds_scalar_viewer_only_when_enabled():
     assert "How one scalar view is made" in viewer
     assert 'const preferred = "lme-postcards"' in viewer
     assert "/api/scalar-task?namespace=" in viewer
+    assert '"source " + when(t.occurred_at) : "source time unavailable"' in viewer
+    assert "ingested ${when(t.recorded_at)}" in viewer

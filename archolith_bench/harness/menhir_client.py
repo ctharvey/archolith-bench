@@ -131,6 +131,7 @@ class HttpMenhirClient:
         role: str = "user",
         declarant: str = "user",
         session_id: str | None = None,
+        occurred_at: str | None = None,
         source_kind: str = "archolith-bench",
         source_client: str | None = "archolith_bench",
         turn_key: str | None = None,
@@ -138,7 +139,10 @@ class HttpMenhirClient:
         """Capture one user turn as :TurnEvidence so a subsequent ``source="user"`` ingest
         can cite its UUID and pass the admission gate.
 
-        Returns ``{turn_id, created, recorded_at}``.
+        ``occurred_at`` is the source/world time for historical replay. Menhir keeps it
+        separate from the server-side ``recorded_at`` processing cursor.
+
+        Returns ``{turn_id, created, recorded_at, occurred_at}``.
         """
         url = self._base_url.rstrip("/") + "/api/turn-evidence"
         payload: dict[str, Any] = {
@@ -152,6 +156,8 @@ class HttpMenhirClient:
             payload["source_client"] = source_client
         if session_id is not None:
             payload["session_id"] = session_id
+        if occurred_at is not None:
+            payload["occurred_at"] = occurred_at
         if turn_key is not None:
             payload["turn_key"] = turn_key
         response = self._client.post(url, json=payload, headers=self._headers)
@@ -678,9 +684,14 @@ class StubScalarStateClient:
         """Return a fresh isolated namespace id."""
         return uuid.uuid4().hex
 
-    def record_turn_evidence(self, namespace: str, text: str, **_: Any) -> dict[str, Any]:
+    def record_turn_evidence(self, namespace: str, text: str, **kwargs: Any) -> dict[str, Any]:
         """Record a grounding turn (returns a fake turn_id the ingest can cite)."""
-        return {"turn_id": uuid.uuid4().hex, "created": True, "recorded_at": "stub"}
+        return {
+            "turn_id": uuid.uuid4().hex,
+            "created": True,
+            "recorded_at": "stub",
+            "occurred_at": kwargs.get("occurred_at"),
+        }
 
     def ingest(self, group_id: str, role: str, content: str, **_: Any) -> None:
         """Store the ingested episode body for later folding."""

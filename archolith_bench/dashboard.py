@@ -451,7 +451,9 @@ def _scalar_viewer_shell(default_namespace: str | None) -> str:
     const transcript = rows.map((t, i) => {
       const founded = list(t.founds).map(id => assertions.get(id)).filter(Boolean);
       return `<article class="turn ${founded.length ? "founded" : ""}">
-        <div class="turn-meta"><span>${i + 1}</span><b>${h(t.role)}</b><span>${when(t.recorded_at)}</span></div>
+        <div class="turn-meta"><span>${i + 1}</span><b>${h(t.role)}</b>
+          <span>${t.occurred_at ? "source " + when(t.occurred_at) : "source time unavailable"}</span>
+          <span>ingested ${when(t.recorded_at)}</span></div>
         <div class="turn-text">${h(t.text)}</div>
         ${founded.length ? `<div class="founds">FOUNDS ${founded.map(a =>
           `<span>${h(a.attribute)} = ${h(a.value)}${a.unit ? " " + h(a.unit) : ""}</span>`
@@ -463,7 +465,9 @@ def _scalar_viewer_shell(default_namespace: str | None) -> str:
     ).join("");
     return `<div class="stage-panel"><div class="stage-intro">
       <div><h3>Source boundary</h3><p>Every user turn is preserved as <code>TurnEvidence</code>.
-      A <code>FOUNDS</code> edge marks the exact turn that grounded a committed assertion.</p></div>
+      Source time says when it happened; ingested time says when Menhir recorded it. A
+      <code>FOUNDS</code> edge marks the exact turn that grounded a committed assertion. Older
+      graphs may show source time as unavailable because that field was not captured yet.</p></div>
       <label class="toggle"><input type="checkbox" ${state.onlyFounded ? "checked" : ""}
         onchange="window.scalarFounded(this.checked)"> only founding turns</label></div>
       <div class="transcript">${transcript || '<p class="empty">No evidence rows in this graph.</p>'}</div>

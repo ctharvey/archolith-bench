@@ -37,7 +37,9 @@ The benchmark is a **CLI tool**, not a service. It runs offline, sending control
 four scalar measurement boundaries separate (`TurnEvidence` → gate → `TypedAssertion` → View),
 while the optional SQLite path reads the behavior-neutral consolidation receipt. Audit selection
 is graph-correlated by `source_key`/`assertion_id`; a newer telemetry pass from a different graph
-attempt is not presented as provenance for the graph currently on screen.
+attempt is not presented as provenance for the graph currently on screen. Evidence cards display
+both `occurred_at` source/world time and `recorded_at` Menhir-ingest time; historical LME ordering
+must never be inferred from the latter.
 
 The browser calls `/api/scalar-tasks` for manifest-scoped choices and
 `/api/scalar-task?namespace=...` for one snapshot. Bolt credentials and the telemetry path remain
@@ -213,7 +215,9 @@ Also computes `turn_one_orientation_score` via restart/bootstrap: replays the sc
 The persistent LongMemEval builder lives under `scripts/longmemeval/`. Its Python ingester accepts
 either the Hugging Face dataset or an explicit offline JSON fixture. Fixture runs use the same
 `HttpMenhirClient`, per-turn ingestion, queue drain, failed-episode retry, manifest, promotion,
-and Graphiti-backed graph mutation as a normal build.
+and Graphiti-backed graph mutation as a normal build. Parsed `haystack_dates` are sent as
+`occurred_at` on both the episode and its `TurnEvidence`; Menhir retains its own `recorded_at`
+separately for processing cursors.
 
 `run_suburbs_fixture.sh` is the canonical extraction-regression entrypoint. It gives the run a
 dedicated Neo4j container, volume, ports, manifest, logs, and result directory; refuses accidental

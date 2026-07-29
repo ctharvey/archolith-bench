@@ -1,5 +1,16 @@
 # archolith-bench Changelog
 
+## 2026-07-29 - LongMemEval source time reaches scalar evidence
+
+The persistent LME ingester now sends each parsed `haystack_dates` session timestamp to both the
+normal episode ingest and `TurnEvidence` capture. This closes the split where Graphiti episodes
+retained 2023 world time but scalar assertions were grounded to the 2026 server receive time.
+Client-contract and fixture regressions prove the same timestamp crosses both writes.
+
+The scalar task explorer now reads `TurnEvidence.occurred_at` and labels source time separately
+from Menhir ingestion time. Older graphs state that source time is unavailable instead of
+mislabeling their receive timestamp as historical provenance.
+
 ## 2026-07-29 - Interactive scalar-state task explorer
 
 The checkpoint dashboard now has an optional read-only, single-task scalar explorer. It correlates

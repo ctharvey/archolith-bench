@@ -110,6 +110,24 @@ def test_ingest_skips_empty_content(http_client):
     assert fake.posts == []
 
 
+def test_record_turn_evidence_forwards_source_time(http_client):
+    client, fake = http_client
+
+    client.record_turn_evidence(
+        "ns-1",
+        "I have added 25 postcards.",
+        session_id="s-1",
+        occurred_at="2023-11-30T20:25:00Z",
+        turn_key="turn-25",
+    )
+
+    payload = fake.posts[0]["json"]
+    assert fake.posts[0]["url"].endswith("/api/turn-evidence")
+    assert payload["session_id"] == "s-1"
+    assert payload["occurred_at"] == "2023-11-30T20:25:00Z"
+    assert payload["turn_key"] == "turn-25"
+
+
 def test_ingest_raw_body_resolves_every_name(http_client):
     """ingest_raw() posts an exact episode body for deterministic probes."""
     client, fake = http_client

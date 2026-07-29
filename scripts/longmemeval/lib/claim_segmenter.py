@@ -117,6 +117,17 @@ _SUBJECT_PATTERN = re.compile(
 )
 _FIRST_PERSON = re.compile(r"\b[Ii]\b")
 
+# Common sentence-starting words that are not proper-noun subjects.
+# Shared between detect_claim_risk_signals and _has_extractable_content.
+_COMMON_SENTENCE_STARTERS = frozenset({
+    "The", "This", "That", "These", "Those", "What", "Where", "When",
+    "How", "Why", "Which", "Who", "Here", "There", "Some", "Many",
+    "Most", "Any", "Each", "Every", "Both", "All", "One", "Two",
+    "Can", "Could", "Would", "Should", "Will", "May", "Might",
+    "For", "And", "But", "Also", "Yes", "Yeah", "Sure", "Thanks",
+    "Great", "Good", "Nice", "Sounds", "Let",
+})
+
 
 def detect_claim_risk_signals(text: str) -> ClaimRiskSignals:
     """Stage A: analyze a message for signals that suggest multiple durable claims."""
@@ -144,15 +155,7 @@ def detect_claim_risk_signals(text: str) -> ClaimRiskSignals:
     # Multiple subjects — distinct named entities appearing as sentence subjects
     named_subjects = set(_SUBJECT_PATTERN.findall(text))
     # Filter out common non-name words that happen to be capitalized at sentence start
-    _COMMON_STARTERS = {
-        "The", "This", "That", "These", "Those", "What", "Where", "When",
-        "How", "Why", "Which", "Who", "Here", "There", "Some", "Many",
-        "Most", "Any", "Each", "Every", "Both", "All", "One", "Two",
-        "Can", "Could", "Would", "Should", "Will", "May", "Might",
-        "For", "And", "But", "Also", "Yes", "Yeah", "Sure", "Thanks",
-        "Great", "Good", "Nice", "Sounds", "Let",
-    }
-    named_subjects -= _COMMON_STARTERS
+    named_subjects -= _COMMON_SENTENCE_STARTERS
     signals.has_multiple_subjects = len(named_subjects) >= 2
 
     # Buried update: long message with a correction marker or state-change verb
@@ -167,7 +170,7 @@ def detect_claim_risk_signals(text: str) -> ClaimRiskSignals:
     if signals.sentence_count >= 3:
         sentence_subjects = []
         for sent in sentences:
-            subjs = set(_SUBJECT_PATTERN.findall(sent)) - _COMMON_STARTERS
+            subjs = set(_SUBJECT_PATTERN.findall(sent)) - _COMMON_SENTENCE_STARTERS
             locs = set(_LOCATION_PREP.findall(sent))
             sentence_subjects.append(subjs | locs)
         # If non-overlapping subject sets across sentences, likely topic shift
@@ -178,6 +181,44 @@ def detect_claim_risk_signals(text: str) -> ClaimRiskSignals:
                     break
 
     return signals
+
+
+def _has_extractable_content(text: str) -> bool:
+    """Check whether a user turn contains signals suggesting extractable durable facts.
+
+    Returns False for turns that are purely social, reactive, or phatic —
+    e.g. "Thanks again for your help!", "That sounds great!", "I see." —
+    turns where gpt-4o-mini would produce only ``{"name":"user"}`` with
+    zero edges, causing CombinedExtractionCollapsedError.
+
+    Conservative: only considers turns under 200 chars.  Any positive signal
+    (first-person durable statement, state-change verb, correction marker,
+    proper-noun subject) returns True immediately.  False-positive
+    CONTEXT_ONLY classification is low-risk because the fold logic in
+    ``_iter_item_turns`` preserves the content as context for the next
+    extractable turn.
+    """
+    # Long messages might contain subtle durable facts — let them through
+    if len(text) > 200:
+        return True
+    # First-person durable statements ("I live", "I bought", etc.)
+    if _FIRST_PERSON_DURABLE.search(text):
+        return True
+    # State-change verbs ("moved", "started", "quit", etc.)
+    if _STATE_CHANGE_VERBS.search(text):
+        return True
+    # Correction markers ("actually", "used to", "no longer", etc.)
+    # "again" is excluded when preceded by "thank*" — social pleasantry,
+    # not a state-change correction.
+    for m in _CORRECTION_MARKERS.finditer(text):
+        if m.group().lower() == "again" and re.search(r"\bthank", text, re.IGNORECASE):
+            continue
+        return True
+    # Proper-noun subjects at sentence boundaries (potential named entities)
+    named = set(_SUBJECT_PATTERN.findall(text)) - _COMMON_SENTENCE_STARTERS
+    if named:
+        return True
+    return False
 
 
 def is_short_and_coherent(text: str, max_chars: int = 300, max_sentences: int = 3) -> bool:
@@ -302,6 +343,12 @@ def segmentation_mode(
     # {"name":"user"} with zero edges and fails the pipeline.  Returning
     # CONTEXT_ONLY lets the ingest fold it into the adjacent extractable turn.
     if is_purely_interrogative(content):
+        return SegmentationMode.CONTEXT_ONLY
+
+    # Short turns with no durable-content signals — social pleasantries,
+    # acknowledgments, reactive commentary.  Folded into the next extractable
+    # turn so content is preserved as context.
+    if not _has_extractable_content(content):
         return SegmentationMode.CONTEXT_ONLY
 
     if is_short_and_coherent(content, max_short_chars, max_short_sentences):

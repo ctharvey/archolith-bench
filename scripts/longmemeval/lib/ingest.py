@@ -600,6 +600,14 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=os.getenv("LME_INGEST_CONCURRENCY", "1"),
         help="number of item namespaces to enrich concurrently before draining (default: 1)",
     )
+    ap.add_argument(
+        "--manifest-item-limit",
+        type=_positive_int,
+        help=(
+            "hard checkpoint: ingest only the first N loaded items while keeping --limit as "
+            "the full fixture size for a later manifest-backed resume"
+        ),
+    )
     ap.add_argument("--consolidate-scalar", action="store_true",
                     help="run scalar-only Phase 3 consolidation before manifesting each namespace")
     ap.add_argument("--consolidation-k", type=int, default=3)
@@ -749,7 +757,21 @@ def main(argv: list[str] | None = None) -> int:
     client = HttpMenhirClient(args.menhir_url)
     admin = httpx.Client(timeout=120.0)
     t_all = time.time()
-    remaining = [it for it in items if str(it.get("question_id") or "") not in done_ids]
+    target_items = (
+        items[:args.manifest_item_limit]
+        if args.manifest_item_limit is not None
+        else items
+    )
+    remaining = [
+        it
+        for it in target_items
+        if str(it.get("question_id") or "") not in done_ids
+    ]
+    if len(target_items) < len(items):
+        print(
+            f"HARD CHECKPOINT: targeting {len(target_items)}/{len(items)} loaded items",
+            flush=True,
+        )
     print(f"to ingest this run: {len(remaining)} items", flush=True)
 
     completed_this_run = 0
@@ -867,7 +889,11 @@ def main(argv: list[str] | None = None) -> int:
                 flush=True,
             )
 
-    print(f"\nDONE: manifest has {len(manifest)}/{len(items)} items -> {args.manifest}", flush=True)
+    outcome = "CHECKPOINT" if len(target_items) < len(items) else "DONE"
+    print(
+        f"\n{outcome}: manifest has {len(manifest)}/{len(items)} items -> {args.manifest}",
+        flush=True,
+    )
     return 0
 
 

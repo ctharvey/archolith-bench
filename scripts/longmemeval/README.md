@@ -293,12 +293,20 @@ graph partition, scalar state, and TurnEvidence before resubmission. Each manife
 enrichment LLM-task and processing-attempt totals; a scalar window with residual FAILED episodes
 stops before further paid work or consolidation.
 
+For an independently reviewed spend gate, set `LME_KU_CHECKPOINT_ITEMS=2`. The ingester hard-limits
+the first build to the first two fixture items, validates and persists their manifest, and then the
+wrapper waits without starting item 3. After inspecting the live graph and audit evidence, create
+the marker named in the wrapper log (`continue-after-checkpoint-2` in that run's results directory).
+The same process then resumes from the manifest and processes the remaining 76 items before recall.
+The checkpoint count and target are recorded in run and graph provenance.
+
 Run the no-spend preflights first:
 
 ```bash
 LME_KU_RUN_ID=scalar-current-baseline-20260728 LME_KU_ARM=baseline \
   ./scripts/longmemeval/run_knowledge_update_buildout.sh --preflight-only
 LME_KU_RUN_ID=scalar-current-candidate-20260728 LME_KU_ARM=candidate \
+  LME_KU_CHECKPOINT_ITEMS=2 \
   ./scripts/longmemeval/run_knowledge_update_buildout.sh --preflight-only
 ```
 

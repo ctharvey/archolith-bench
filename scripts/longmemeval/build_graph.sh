@@ -16,6 +16,16 @@ die(){ printf '[lme-build] ERROR: %s\n' "$*" >&2; exit 1; }
 case "${LME_INGEST_CONCURRENCY}" in
   ''|*[!0-9]*|0) die "LME_INGEST_CONCURRENCY must be a positive integer" ;;
 esac
+LME_INGEST_STOP_AFTER_ITEMS="${LME_INGEST_STOP_AFTER_ITEMS:-0}"
+case "${LME_INGEST_STOP_AFTER_ITEMS}" in
+  *[!0-9]*) die "LME_INGEST_STOP_AFTER_ITEMS must be a non-negative integer" ;;
+esac
+[ "${LME_INGEST_STOP_AFTER_ITEMS}" -le "${LIMIT}" ] ||
+  die "LME_INGEST_STOP_AFTER_ITEMS cannot exceed the requested item limit"
+INGEST_TARGET="${LIMIT}"
+if [ "${LME_INGEST_STOP_AFTER_ITEMS}" -gt 0 ]; then
+  INGEST_TARGET="${LME_INGEST_STOP_AFTER_ITEMS}"
+fi
 
 OPENAI_KEY="$("${MENHIR_FRONTIER_PY}" - "${MENHIR_FRONTIER}/.env" OPENAI_API_KEY <<'PY'
 import sys; from dotenv import dotenv_values; print(dotenv_values(sys.argv[1]).get(sys.argv[2],""))
@@ -69,6 +79,7 @@ cat > "${GRAPH_PROVENANCE_PATH}" <<EOF
   "variant": "${LONGMEMEVAL_VARIANT}",
   "fixture": "${LME_FIXTURE_PATH:-}",
   "requested_items": ${LIMIT},
+  "ingest_target_items": ${INGEST_TARGET},
   "namespace_prefix": "${LME_NS_PREFIX}",
   "segmentation": "${LME_SEGMENTATION}",
   "ingest_concurrency": ${LME_INGEST_CONCURRENCY},
@@ -142,6 +153,9 @@ INGEST_ARGS=(
   --segmentation "${LME_SEGMENTATION}"
   --namespace-window "${LME_INGEST_CONCURRENCY}"
 )
+if [ "${LME_INGEST_STOP_AFTER_ITEMS}" -gt 0 ]; then
+  INGEST_ARGS+=(--manifest-item-limit "${LME_INGEST_STOP_AFTER_ITEMS}")
+fi
 if [ "${LME_SCALAR_STATE_ENABLED}" = "1" ]; then
   INGEST_ARGS+=(
     --consolidate-scalar
@@ -152,7 +166,7 @@ fi
 "${BENCH_PY}" "$(dirname "${BASH_SOURCE[0]}")/lib/ingest.py" "${INGEST_ARGS[@]}"
 
 if [ "${LME_SCALAR_STATE_ENABLED}" = "1" ]; then
-  "${BENCH_PY}" - "${LME_MANIFEST_PATH}" "${LME_REQUIRE_SCALAR_OUTPUT}" "${LIMIT}" <<'PY'
+  "${BENCH_PY}" - "${LME_MANIFEST_PATH}" "${LME_REQUIRE_SCALAR_OUTPUT}" "${INGEST_TARGET}" <<'PY'
 import json
 import sys
 from pathlib import Path

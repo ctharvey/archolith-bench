@@ -62,10 +62,15 @@ export LME_KU_ALLOW_RESUME="${LME_KU_ALLOW_RESUME:-0}"
 export LME_KU_KEEP_NEO4J_UP="${LME_KU_KEEP_NEO4J_UP:-0}"
 export LME_KU_ALLOW_DIRTY="${LME_KU_ALLOW_DIRTY:-0}"
 export LME_INGEST_CONCURRENCY="${LME_KU_INGEST_CONCURRENCY:-2}"
+export LME_KU_CHECKPOINT_ITEMS="${LME_KU_CHECKPOINT_ITEMS:-0}"
 case "${LME_INGEST_CONCURRENCY}" in
   1|2|3|4) ;;
   *) die "LME_KU_INGEST_CONCURRENCY must be an integer from 1 through 4" ;;
 esac
+case "${LME_KU_CHECKPOINT_ITEMS}" in
+  *[!0-9]*) die "LME_KU_CHECKPOINT_ITEMS must be a non-negative integer" ;;
+esac
+export LME_INGEST_STOP_AFTER_ITEMS="${LME_KU_CHECKPOINT_ITEMS}"
 if [ "${LME_KU_ALLOW_RESUME}" = "1" ]; then
   export LME_REQUIRE_FRESH="0"
 else
@@ -140,6 +145,8 @@ print(len(rows), hashlib.sha256(raw).hexdigest())
 PY
 )
 [ "${KU_COUNT}" = "78" ] || die "expected the frozen 78-item fixture, found ${KU_COUNT}"
+[ "${LME_KU_CHECKPOINT_ITEMS}" -lt "${KU_COUNT}" ] ||
+  die "LME_KU_CHECKPOINT_ITEMS must be smaller than the full fixture"
 log "fixture: ${KU_COUNT} knowledge-update items; sha256=${FIXTURE_SHA256}"
 
 # ---- guard against clobbering ----
@@ -180,7 +187,7 @@ PY
 )"
 [ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY in menhir .env"
 
-log "preflight PASS: arm=${ARM} run=${RUN_ID} fresh=${LME_REQUIRE_FRESH} scalar=1 threshold=${LME_SCALAR_THRESHOLD} reconcile=${LME_SCALAR_RECONCILE_ATTRIBUTE}/${LME_SCALAR_RECONCILE_SCOPE}/${LME_SCALAR_RECONCILE_SUBJECT} authority=${LME_SCALAR_VIEW_AUTHORITY_ENABLED} turn_evidence=${LME_REQUIRE_TURN_EVIDENCE} audits=${LME_CONSOLIDATION_AUDIT_ENABLED}/${LME_RECALL_AUDIT_ENABLED} ingest_concurrency=${LME_INGEST_CONCURRENCY}"
+log "preflight PASS: arm=${ARM} run=${RUN_ID} fresh=${LME_REQUIRE_FRESH} scalar=1 threshold=${LME_SCALAR_THRESHOLD} reconcile=${LME_SCALAR_RECONCILE_ATTRIBUTE}/${LME_SCALAR_RECONCILE_SCOPE}/${LME_SCALAR_RECONCILE_SUBJECT} authority=${LME_SCALAR_VIEW_AUTHORITY_ENABLED} turn_evidence=${LME_REQUIRE_TURN_EVIDENCE} audits=${LME_CONSOLIDATION_AUDIT_ENABLED}/${LME_RECALL_AUDIT_ENABLED} ingest_concurrency=${LME_INGEST_CONCURRENCY} checkpoint_items=${LME_KU_CHECKPOINT_ITEMS}"
 
 if [ "${MODE}" = "--preflight-only" ]; then
   exit 0
@@ -209,6 +216,7 @@ cat > "${LME_RESULTS_DIR}/run_provenance.json" <<EOF
   "recall_port": ${LME_KU_RECALL_PORT:-8125},
   "neo4j_heap": "${LME_NEO4J_HEAP}",
   "ingest_concurrency": ${LME_INGEST_CONCURRENCY},
+  "checkpoint_items": ${LME_KU_CHECKPOINT_ITEMS},
   "require_fresh": ${LME_REQUIRE_FRESH},
   "scalar_state_enabled": ${LME_SCALAR_STATE_ENABLED},
   "scalar_threshold": "${LME_SCALAR_THRESHOLD}",
@@ -239,6 +247,47 @@ trap cleanup_all EXIT
 # ---- Phase 1: build graph ----
 log "======== PHASE 1: BUILD GRAPH (${KU_COUNT} items) ========"
 "${SCRIPT_DIR}/build_graph.sh" "${KU_COUNT}"
+if [ "${LME_KU_CHECKPOINT_ITEMS}" -gt 0 ]; then
+  CHECKPOINT_READY="${LME_RESULTS_DIR}/checkpoint-${LME_KU_CHECKPOINT_ITEMS}-ready.json"
+  CHECKPOINT_CONTINUE="${LME_RESULTS_DIR}/continue-after-checkpoint-${LME_KU_CHECKPOINT_ITEMS}"
+  "${BENCH_PY}" - "${LME_MANIFEST_PATH}" "${CHECKPOINT_READY}" \
+    "${LME_KU_CHECKPOINT_ITEMS}" <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+manifest_path = Path(sys.argv[1])
+ready_path = Path(sys.argv[2])
+expected = int(sys.argv[3])
+rows = json.loads(manifest_path.read_text(encoding="utf-8"))
+if len(rows) != expected:
+    raise SystemExit(
+        f"checkpoint refused: manifest has {len(rows)} rows, expected {expected}"
+    )
+ready_path.write_text(
+    json.dumps(
+        {
+            "status": "ready-for-independent-review",
+            "manifest_items": len(rows),
+            "question_ids": [row["question_id"] for row in rows],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        },
+        indent=2,
+    ),
+    encoding="utf-8",
+)
+PY
+  log "HARD CHECKPOINT reached after ${LME_KU_CHECKPOINT_ITEMS} items."
+  log "Waiting for independent review marker: ${CHECKPOINT_CONTINUE}"
+  while [ ! -f "${CHECKPOINT_CONTINUE}" ]; do
+    sleep 5
+  done
+  log "checkpoint review marker found; resuming remaining $((KU_COUNT-LME_KU_CHECKPOINT_ITEMS)) items"
+  export LME_INGEST_STOP_AFTER_ITEMS=0
+  export LME_REQUIRE_FRESH=0
+  "${SCRIPT_DIR}/build_graph.sh" "${KU_COUNT}"
+fi
 log "build complete"
 
 # ---- Phase 2: recall+QA scoring ----

@@ -51,11 +51,16 @@ def test_ingest_parser_accepts_fixture_and_namespace_prefix() -> None:
 
 
 def test_ingest_parser_accepts_namespace_window() -> None:
-    args = ingest._parse_args(["--namespace-window", "2"])
+    args = ingest._parse_args(
+        ["--namespace-window", "2", "--manifest-item-limit", "2"]
+    )
     assert args.namespace_window == 2
+    assert args.manifest_item_limit == 2
 
     with pytest.raises(SystemExit):
         ingest._parse_args(["--namespace-window", "0"])
+    with pytest.raises(SystemExit):
+        ingest._parse_args(["--manifest-item-limit", "0"])
 
 
 def test_ingest_parser_accepts_scalar_consolidation_controls() -> None:
@@ -89,7 +94,10 @@ def test_current_scalar_buildout_wrapper_is_fail_closed() -> None:
     assert '"consolidation_audit_enabled": ${LME_CONSOLIDATION_AUDIT_ENABLED}' in script
     assert '"recall_audit_enabled": ${LME_RECALL_AUDIT_ENABLED}' in script
     assert 'LME_KU_INGEST_CONCURRENCY:-2' in script
+    assert 'LME_KU_CHECKPOINT_ITEMS:-0' in script
+    assert 'while [ ! -f "${CHECKPOINT_CONTINUE}" ]' in script
     assert '"ingest_concurrency": ${LME_INGEST_CONCURRENCY}' in script
+    assert '"checkpoint_items": ${LME_KU_CHECKPOINT_ITEMS}' in script
     assert (
         'MENHIR_PERSONAL_MEMORY_SCALAR_VIEW_AUTHORITY_ENABLED="${LME_SCALAR_VIEW_AUTHORITY_ENABLED}"'
         in script
@@ -102,6 +110,8 @@ def test_build_graph_wires_same_namespace_window_into_menhir_workers() -> None:
 
     assert 'export MENHIR_INGEST_CONCURRENCY="${LME_INGEST_CONCURRENCY}"' in script
     assert '--namespace-window "${LME_INGEST_CONCURRENCY}"' in script
+    assert '--manifest-item-limit "${LME_INGEST_STOP_AFTER_ITEMS}"' in script
+    assert '"ingest_target_items": ${INGEST_TARGET}' in script
     assert '"ingest_concurrency": ${LME_INGEST_CONCURRENCY}' in script
 
 
@@ -396,6 +406,15 @@ def test_main_submits_a_namespace_window_round_robin_and_manifests_after_drain(
                 {"role": "assistant", "content": "b2"},
             ]],
         },
+        {
+            "question_id": "c",
+            "question": "Question C?",
+            "answer": "C",
+            "question_type": "knowledge-update",
+            "sessions": [[
+                {"role": "user", "content": "c1"},
+            ]],
+        },
     ]
     submitted: list[tuple[str, str]] = []
     reset: list[str] = []
@@ -454,6 +473,8 @@ def test_main_submits_a_namespace_window_round_robin_and_manifests_after_drain(
     result = ingest.main(
         [
             "--limit",
+            "3",
+            "--manifest-item-limit",
             "2",
             "--namespace-window",
             "2",

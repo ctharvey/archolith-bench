@@ -1,5 +1,14 @@
 # archolith-bench Changelog
 
+## 2026-07-28 - Hard review checkpoint for paid scalar reingest
+
+Added an optional `LME_KU_CHECKPOINT_ITEMS` gate to the guarded knowledge-update buildout. The first
+build ingests and validates only the requested fixture prefix, then waits on an explicit
+run-scoped continuation marker before resuming from the atomic manifest. This prevents a monitoring
+race from spending on later namespace windows while the first completed items are under independent
+graph and audit review. Focused coverage verifies parser validation, wrapper wiring, and that a
+three-item input with a two-item manifest limit never submits the third namespace.
+
 ## 2026-07-22 - Scalar authority-leads e2e verdict
 
 Added the `SS_LEADS=1` scalar-state e2e branch and a deterministic verdict evaluator that checks

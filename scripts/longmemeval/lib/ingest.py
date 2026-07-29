@@ -374,6 +374,42 @@ def _reset_namespace(admin: httpx.Client, menhir_url: str, namespace: str) -> No
     response.raise_for_status()
 
 
+def _clear_stale_episodes(namespaces: list[str], *, poll_s: float = 2.0, timeout_s: float = 60.0) -> int:
+    """Wait for in-flight stale episodes to settle, then delete any FAILED leftovers.
+
+    When Menhir starts with ``ALLOW_RESUME`` it auto-recovers stale enrichment leases from a
+    previous killed run.  Those episodes begin enriching *before* the ingest script resets
+    namespaces, so they fail when their graph partition disappears.  This function lets that
+    race resolve and then purges the FAILED debris so ``_require_no_failed_episodes`` does not
+    trip on ghosts from an earlier run.
+    """
+    t0 = time.time()
+    # Wait until no PENDING/ENRICHING episodes remain in the target namespaces.
+    while time.time() - t0 < timeout_s:
+        still_in_flight = False
+        for ns in namespaces:
+            counts = _ns_state_counts(ns)
+            if counts.get("pending", 0) > 0 or counts.get("enriching", 0) > 0:
+                still_in_flight = True
+                break
+        if not still_in_flight:
+            break
+        time.sleep(poll_s)
+
+    # Delete any FAILED Episodic nodes left by stale enrichment.
+    total_cleared = 0
+    for ns in namespaces:
+        cleared = _cypher_count(
+            f"MATCH (e:Episodic {{namespace:'{ns}'}}) "
+            "WHERE e.processing_state = 'FAILED' "
+            "DETACH DELETE e RETURN count(e);"
+        )
+        if cleared > 0:
+            print(f"    cleared {cleared} stale FAILED episode(s) in {ns}", flush=True)
+            total_cleared += cleared
+    return total_cleared
+
+
 def _drain_many(
     namespaces: list[str],
     admin: httpx.Client,
@@ -794,6 +830,12 @@ def main(argv: list[str] | None = None) -> int:
         # resubmitting. This must include TurnEvidence, which is not group_id-keyed.
         for state in window:
             _reset_namespace(admin, args.menhir_url, state.namespace)
+
+        # Menhir's stale-lease recovery may have already started enriching old episodes into
+        # these namespaces before the reset above could run.  Let those in-flight episodes
+        # settle (they will fail because the namespace was just wiped) and then delete the
+        # FAILED debris so _require_no_failed_episodes does not trip on ghosts.
+        _clear_stale_episodes([state.namespace for state in window])
 
         turn_iterators = [
             _iter_item_turns(adapter, state.item, state.namespace, args.segmentation)

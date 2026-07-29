@@ -704,6 +704,9 @@ def _iter_item_turns(
             if raw_session_id
             else f"{namespace}-s{session_index}"
         )
+        # Buffer for CONTEXT_ONLY turns that should be folded into the next
+        # extractable turn rather than emitted as standalone episodes.
+        context_prefix: str = ""
         for turn in session:
             content = turn.get("content", "")
             if not content:
@@ -724,6 +727,13 @@ def _iter_item_turns(
                 mode = decide_segmentation(role, content)
                 if mode == SegmentationMode.SKIP:
                     contents = []
+                elif mode == SegmentationMode.CONTEXT_ONLY:
+                    # Fold into the next extractable turn so the combined
+                    # segment has enough context for meaningful extraction.
+                    # Without this, purely interrogative user turns produce
+                    # only {"name":"user"} with zero edges and fail.
+                    context_prefix += ("\n\n" if context_prefix else "") + content
+                    contents = []
                 elif mode == SegmentationMode.SEGMENT_CLAIMS:
                     contents = [
                         content,
@@ -733,6 +743,10 @@ def _iter_item_turns(
                     contents = [content]
             else:
                 contents = [content]
+            # Prepend any buffered context-only content to the first segment.
+            if contents and context_prefix:
+                contents[0] = context_prefix + "\n\n" + contents[0]
+                context_prefix = ""
             for segmented_content in contents:
                 yield IngestTurn(
                     role=role,
@@ -740,6 +754,16 @@ def _iter_item_turns(
                     occurred_at=occurred_at,
                     session_id=session_id,
                 )
+        # If context_prefix remains at session end, emit it as a standalone
+        # turn so the content is not silently lost.
+        if context_prefix:
+            yield IngestTurn(
+                role="user",
+                content=context_prefix,
+                occurred_at=occurred_at,
+                session_id=session_id,
+            )
+            context_prefix = ""
 
 
 def _write_manifest(path: Path, manifest: list[dict]) -> None:

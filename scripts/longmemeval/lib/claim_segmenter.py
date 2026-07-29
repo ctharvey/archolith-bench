@@ -188,6 +188,64 @@ def is_short_and_coherent(text: str, max_chars: int = 300, max_sentences: int = 
     return len([s for s in sentences if s.strip()]) <= max_sentences
 
 
+# First-person durable-fact patterns — statements that assert personal state,
+# preferences, plans, or experiences (as opposed to reactions about the topic).
+_FIRST_PERSON_DURABLE = re.compile(
+    r"\bI\s+(?:live|work|have|own|prefer|like|love|want|need|plan|moved|"
+    r"started|stopped|quit|joined|left|bought|sold|got|adopted|enrolled|"
+    r"graduated|retired|completed|wrote|finished|built|created|made|"
+    r"recently|just|finally|decided|chose|picked|applied|signed up|"
+    r"scheduled|booked|reserved|ordered)\b",
+    re.IGNORECASE,
+)
+
+# Reactive / non-durable first-person patterns — opinions about the conversation
+# topic rather than personal facts.
+_FIRST_PERSON_REACTIVE = re.compile(
+    r"\bI\s+(?:think|agree|see|understand|suppose|imagine|guess|feel like|"
+    r"like (?:the |that |this |it)|wonder|hope|bet|mean|"
+    r"appreciate|enjoy (?:the |that |this ))\b",
+    re.IGNORECASE,
+)
+
+
+def is_purely_interrogative(text: str) -> bool:
+    """Check if a user message is purely asking questions or reacting without personal facts.
+
+    Returns True for turns like "What do you think about X?" or "I think that sounds
+    great. What kind of elements were you thinking of?" — turns where the user is
+    engaging with the topic but not stating any durable personal fact.
+    """
+    sentences = _SENTENCE_BOUNDARY.split(text)
+    real = [s.strip() for s in sentences if s.strip()]
+    if not real:
+        return True
+
+    questions = sum(1 for s in real if s.rstrip().endswith("?"))
+
+    # Must have at least one question
+    if questions == 0:
+        return False
+
+    # If ALL sentences are questions, definitely interrogative
+    if questions == len(real):
+        return True
+
+    # Mixed: non-question sentences exist. Check if they contain durable facts.
+    for s in real:
+        if s.rstrip().endswith("?"):
+            continue
+        # State-change verbs or correction markers → durable content
+        if _STATE_CHANGE_VERBS.search(s) or _CORRECTION_MARKERS.search(s):
+            return False
+        # First-person durable statements → personal fact
+        if _FIRST_PERSON_DURABLE.search(s):
+            return False
+
+    # Non-question sentences are purely reactive ("I think that sounds great")
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Assistant turn classification
 # ---------------------------------------------------------------------------
@@ -238,7 +296,14 @@ def segmentation_mode(
             return SegmentationMode.EXTRACT_WHOLE
         return SegmentationMode.CONTEXT_ONLY
 
-    # User messages: always worth extracting, question is whether to segment
+    # User messages: check for purely interrogative turns before committing to
+    # extraction. A turn like "I think that sounds great. What kind of X were you
+    # thinking of?" has no durable personal fact — extracting it produces only
+    # {"name":"user"} with zero edges and fails the pipeline.  Returning
+    # CONTEXT_ONLY lets the ingest fold it into the adjacent extractable turn.
+    if is_purely_interrogative(content):
+        return SegmentationMode.CONTEXT_ONLY
+
     if is_short_and_coherent(content, max_short_chars, max_short_sentences):
         return SegmentationMode.EXTRACT_WHOLE
 

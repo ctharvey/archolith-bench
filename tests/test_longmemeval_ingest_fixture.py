@@ -91,6 +91,7 @@ def test_current_scalar_buildout_wrapper_is_fail_closed() -> None:
     assert 'LME_KU_ALLOW_DIRTY' in script
     assert 'status --porcelain --untracked-files=no' in script
     assert '"fixture_sha256": "${FIXTURE_SHA256}"' in script
+    assert 'FIXTURE_SHA256="${FIXTURE_SHA256//$\'\\r\'/}"' in script
     assert '"consolidation_audit_enabled": ${LME_CONSOLIDATION_AUDIT_ENABLED}' in script
     assert '"recall_audit_enabled": ${LME_RECALL_AUDIT_ENABLED}' in script
     assert 'LME_KU_INGEST_CONCURRENCY:-2' in script

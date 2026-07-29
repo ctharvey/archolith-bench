@@ -144,6 +144,9 @@ if any(not row.get("question") or not row.get("answer") for row in rows):
 print(len(rows), hashlib.sha256(raw).hexdigest())
 PY
 )
+# Windows Python writes CRLF even under Git Bash; `read` removes LF but leaves CR in the final
+# field. Strip it before interpolating the digest into JSON provenance.
+FIXTURE_SHA256="${FIXTURE_SHA256//$'\r'/}"
 [ "${KU_COUNT}" = "78" ] || die "expected the frozen 78-item fixture, found ${KU_COUNT}"
 [ "${LME_KU_CHECKPOINT_ITEMS}" -lt "${KU_COUNT}" ] ||
   die "LME_KU_CHECKPOINT_ITEMS must be smaller than the full fixture"

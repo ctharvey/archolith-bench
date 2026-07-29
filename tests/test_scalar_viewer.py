@@ -45,6 +45,33 @@ class _Driver:
                 "current": True,
                 "contributor_ids": ["assert-25"],
             }]
+        elif 'view_kind: "scalar_history"' in query:
+            rows = [{
+                "id": "hist-postcards",
+                "view_key": "sh_abc123",
+                "subject_uuid": "ent-postcards",
+                "subject": "user",
+                "attribute": "postcard_count",
+                "scope": "collection",
+                "value_kind": "count",
+                "unit": "postcards",
+                "entry_count": 2,
+                "signature": "sig123",
+                "op_counts": '{"delta": 2}',
+                "first_valid_at": "2023-08-11T00:00:00+00:00",
+                "last_valid_at": "2023-11-30T00:00:00+00:00",
+                "payload": json.dumps([
+                    {"assertion_id": "a1", "operation": "delta", "value": 17,
+                     "valid_at": "2023-08-11T00:00:00+00:00",
+                     "stated_span": "17 postcards since I started"},
+                    {"assertion_id": "a2", "operation": "delta", "value": 25,
+                     "valid_at": "2023-11-30T00:00:00+00:00",
+                     "stated_span": "25 postcards since I started"},
+                ]),
+                "valid_at": "2023-11-30T00:00:00+00:00",
+                "created_at": "2026-07-29T13:00:00Z",
+                "current": True,
+            }]
         else:
             rows = [{"subject": "user", "object": "postcards", "fact": "User collects postcards."}]
         return SimpleNamespace(records=rows)
@@ -138,6 +165,19 @@ def test_reader_correlates_vote_receipt_to_graph_assertions(tmp_path):
     assert data["evidence"][0]["recorded_at"] == "2026-07-29T13:00:00Z"
     assert data["assertions"][0]["value"] == "25"
     assert data["views"][0]["current"] is True
+    # scalar_history View is returned alongside scalar_state
+    assert len(data["history_views"]) == 1
+    hv = data["history_views"][0]
+    assert hv["id"] == "hist-postcards"
+    assert hv["attribute"] == "postcard_count"
+    assert hv["entry_count"] == 2
+    assert hv["current"] is True
+    # JSON payload was parsed into entries list
+    assert len(hv["entries"]) == 2
+    assert hv["entries"][0]["value"] == 17
+    assert hv["entries"][1]["value"] == 25
+    # op_counts JSON was parsed into dict
+    assert hv["op_counts"] == {"delta": 2}
     assert data["audit_pass_id"] == "cap-matching"
     assert [event["event"] for event in data["audit"]] == ["gate", "perceive"]
     assert data["audit"][0]["details"]["agreement"] == 2 / 3
@@ -197,3 +237,73 @@ def test_task_catalog_and_scoring_rows():
         "recalled": "postcard count = 25",
         "gold": "25",
     }]
+
+
+class _DeltaOnlyDriver(_Driver):
+    """Graph with delta-only postcards: scalar_state abstains, scalar_history materializes."""
+
+    def execute_query(self, query, **kwargs):
+        if 'view_kind: "scalar_state"' in query:
+            return SimpleNamespace(records=[])  # state abstains: no anchor
+        return super().execute_query(query, **kwargs)
+
+
+def test_postcard_delta_only_state_abstains_history_materializes():
+    """The postcard regression: scalar_state correctly abstains (no anchor),
+    but scalar_history materializes the two delta entries in source-time order.
+    The dashboard data model shows both projections' states correctly."""
+    reader = ScalarTaskReader(
+        neo4j_uri="bolt://unused",
+        neo4j_user="neo4j",
+        neo4j_password="unused",
+        driver=_DeltaOnlyDriver(),
+    )
+    data = reader.read("lme-postcards")
+
+    # scalar_state: abstained (empty — no anchor)
+    assert data["views"] == []
+
+    # scalar_history: materialized with two delta entries
+    assert len(data["history_views"]) == 1
+    hv = data["history_views"][0]
+    assert hv["attribute"] == "postcard_count"
+    assert hv["entry_count"] == 2
+    assert hv["op_counts"] == {"delta": 2}
+
+    # Entries are in source-time order
+    entries = hv["entries"]
+    assert entries[0]["valid_at"] == "2023-08-11T00:00:00+00:00"
+    assert entries[0]["value"] == 17
+    assert entries[0]["operation"] == "delta"
+    assert entries[1]["valid_at"] == "2023-11-30T00:00:00+00:00"
+    assert entries[1]["value"] == 25
+    assert entries[1]["operation"] == "delta"
+
+    # The answer is the latest delta (25), NOT the sum (42)
+    latest = entries[-1]
+    assert latest["value"] == 25
+    assert latest["value"] != 42  # never compute a total from unanchored deltas
+
+    # Source times are world/event times, not ingest times
+    assert "2023-08-11" in entries[0]["valid_at"]
+    assert "2023-11-30" in entries[1]["valid_at"]
+
+
+def test_history_view_payload_parsing_handles_raw_json():
+    """The reader correctly parses JSON payload and op_counts strings from Neo4j."""
+    reader = ScalarTaskReader(
+        neo4j_uri="bolt://unused",
+        neo4j_user="neo4j",
+        neo4j_password="unused",
+        driver=_Driver(),
+    )
+    data = reader.read("lme-postcards")
+    hv = data["history_views"][0]
+
+    # payload (JSON string) → entries (list of dicts)
+    assert isinstance(hv["entries"], list)
+    assert all(isinstance(e, dict) for e in hv["entries"])
+
+    # op_counts (JSON string) → dict
+    assert isinstance(hv["op_counts"], dict)
+    assert hv["op_counts"]["delta"] == 2

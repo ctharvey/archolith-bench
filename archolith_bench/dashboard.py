@@ -427,11 +427,14 @@ def _scalar_viewer_shell(default_namespace: str | None) -> str:
     const d = state.data || {};
     const gates = list(d.audit).filter(x => x.event === "gate");
     const scores = list(d.scoring);
+    const histCount = list(d.history_views).filter(v => v.current).length;
+    const viewLabel = currentViews().length + " state"
+      + (histCount ? ", " + histCount + " history" : "");
     return [
       list(d.evidence).filter(x => list(x.founds).length).length + "/" + list(d.evidence).length,
       gates.length,
       list(d.assertions).length,
-      currentViews().length + " current",
+      viewLabel,
       scores.length ? scores.length + " scored" : "pending",
     ];
   }
@@ -540,10 +543,38 @@ def _scalar_viewer_shell(default_namespace: str | None) -> str:
         <div class="muted">valid ${when(v.valid_at)}</div>
       </article>${i < views.length - 1 ? '<div class="supersede">→ later world time →</div>' : ""}`
     ).join("");
+    // scalar_history Views: advisory, ordered delta/assertion history per slot.
+    const hvs = list(d.history_views).filter(v => v.current);
+    const hCards = hvs.map(hv => {
+      const ops = hv.op_counts || {};
+      const deltaOnly = Object.keys(ops).length > 0 && Object.keys(ops).every(k => k === "delta");
+      const entries = list(hv.entries).map(e =>
+        `<tr><td>${when(e.valid_at)}</td><td>${h(e.operation)}</td>
+         <td>${h(e.value)}</td><td>${h(e.stated_span)}</td></tr>`
+      ).join("");
+      return `<article class="view-card advisory">
+        <div class="view-state">ADVISORY HISTORY</div>
+        <div><b>${h(hv.subject)}</b> · ${h(hv.attribute)}${hv.scope ? " · " + h(hv.scope) : ""}</div>
+        <div class="chips"><span>${hv.entry_count || 0} entries</span>
+          <span>${Object.entries(ops).map(([k,v]) => v + " " + k).join(", ")}</span></div>
+        ${deltaOnly ? '<div class="warning">advisory scalar history — not an absolute current total</div>' : ""}
+        ${entries ? `<table class="history-entries"><thead><tr>
+          <th>source time</th><th>operation</th><th>value</th><th>stated span</th>
+        </tr></thead><tbody>${entries}</tbody></table>` : ""}
+        <div class="muted">${when(hv.first_valid_at)} to ${when(hv.last_valid_at)}</div>
+      </article>`;
+    }).join("");
+    const stateEmpty = !cards;
+    const histEmpty = !hCards;
+    const noAbstain = stateEmpty && !histEmpty
+      ? '<p class="muted">scalar_state: abstained (no anchor). Advisory history is available below.</p>'
+      : "";
     return `<div class="stage-panel"><div class="stage-intro"><div><h3>Deterministic projection</h3>
       <p>The fold replays assertions by slot and world time. Views are rebuildable projections:
       old values remain visible for provenance, while exactly one value is current.</p></div></div>
-      <div class="views">${cards || '<p class="empty">No scalar_state view materialized.</p>'}</div></div>`;
+      <div class="views">${cards || '<p class="empty">No scalar_state view materialized.</p>'}</div>
+      ${noAbstain}
+      ${hCards ? '<h4>Advisory history</h4><div class="views">' + hCards + '</div>' : ""}</div>`;
   }
 
   function renderAnswer(d) {
@@ -553,6 +584,16 @@ def _scalar_viewer_shell(default_namespace: str | None) -> str:
     const viewRows = views.map(v =>
       `<div class="answer-source"><span>current scalar view</span><b>${h(v.attribute)} = ${h(v.display || v.value)}${v.unit ? " " + h(v.unit) : ""}</b></div>`
     ).join("");
+    // Advisory history as fallback state when scalar_state abstains
+    const hvs = list(d.history_views).filter(v => v.current);
+    const histRows = hvs.map(hv => {
+      const latest = list(hv.entries).slice(-1)[0];
+      const latestVal = latest ? h(latest.value) + " (" + h(latest.operation) + ", not absolute)" : "—";
+      return `<div class="answer-source advisory"><span>advisory history (latest delta)</span><b>${h(hv.attribute)} = ${latestVal}</b></div>`;
+    }).join("");
+    const stateBlock = viewRows || (histRows
+      ? '<p class="muted">scalar_state: abstained (no anchor)</p>' + histRows
+      : '<p class="empty">No current scalar view.</p>');
     const scoring = scores.length ? scores.map(s =>
       `<article class="score ${s.correct ? "okbox" : "nobox"}"><b>${h(s.arm)}</b>
        <span>${s.correct ? "correct" : "incorrect"}</span><p>${h(s.response)}</p>
@@ -562,7 +603,7 @@ def _scalar_viewer_shell(default_namespace: str | None) -> str:
     return `<div class="stage-panel answer-grid">
       <div class="answer-question"><span>BENCHMARK QUESTION</span><h3>${h(task.question)}</h3>
         <div class="gold"><span>gold answer</span><b>${h(task.answer)}</b></div></div>
-      <div><h3>Available state</h3>${viewRows || '<p class="empty">No current scalar view.</p>'}</div>
+      <div><h3>Available state</h3>${stateBlock}</div>
       <div class="score-wrap"><h3>Recall → model answer → scorer</h3>${scoring}</div></div>`;
   }
 

@@ -68,6 +68,28 @@ RETURN v.uuid AS id,
 ORDER BY valid_at, created_at, id
 """
 
+_HISTORY_VIEWS_QUERY = """
+MATCH (v:Entity {group_id: $namespace, view_kind: "scalar_history"})
+RETURN v.uuid AS id,
+       v.view_key AS view_key,
+       v.view_subject_uuid AS subject_uuid,
+       v.view_subject AS subject,
+       v.ss_attribute AS attribute,
+       v.ss_scope AS scope,
+       v.ss_kind AS value_kind,
+       v.ss_unit AS unit,
+       v.sh_entry_count AS entry_count,
+       v.sh_signature AS signature,
+       v.sh_op_counts AS op_counts,
+       v.sh_first_valid_at AS first_valid_at,
+       v.sh_last_valid_at AS last_valid_at,
+       v.view_payload AS payload,
+       toString(v.valid_at) AS valid_at,
+       toString(v.created_at) AS created_at,
+       coalesce(v.view_current, true) AS current
+ORDER BY valid_at, created_at, id
+"""
+
 _FACTS_QUERY = """
 MATCH (s:Entity {group_id: $namespace})-[r]->(o:Entity {group_id: $namespace})
 WHERE r.fact IS NOT NULL
@@ -256,6 +278,21 @@ class ScalarTaskReader:
         evidence = self._query(_EVIDENCE_QUERY, namespace)
         assertions = self._query(_ASSERTIONS_QUERY, namespace)
         views = self._query(_VIEWS_QUERY, namespace)
+        history_views = self._query(_HISTORY_VIEWS_QUERY, namespace)
+        # Parse the JSON payload + op_counts on history views for the dashboard.
+        for hv in history_views:
+            if isinstance(hv.get("payload"), str):
+                try:
+                    hv["entries"] = json.loads(hv["payload"])
+                except (json.JSONDecodeError, TypeError):
+                    hv["entries"] = []
+            else:
+                hv["entries"] = hv.get("payload") or []
+            if isinstance(hv.get("op_counts"), str):
+                try:
+                    hv["op_counts"] = json.loads(hv["op_counts"])
+                except (json.JSONDecodeError, TypeError):
+                    hv["op_counts"] = {}
         facts = self._query(_FACTS_QUERY, namespace)
         audit_pass_id, audit, audit_warning = self._read_audit(namespace, assertions)
         return {
@@ -263,6 +300,7 @@ class ScalarTaskReader:
             "evidence": evidence,
             "assertions": assertions,
             "views": views,
+            "history_views": history_views,
             "facts": facts,
             "audit_pass_id": audit_pass_id,
             "audit": audit,

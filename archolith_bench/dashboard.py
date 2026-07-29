@@ -61,6 +61,20 @@ class RunSnapshot:
         return mem.score - base.score
 
 
+@dataclass
+class IngestSnapshot:
+    """Completed LongMemEval graph-ingest items recorded in a run manifest."""
+
+    manifest: Path
+    source: str
+    items: list[dict] = field(default_factory=list)
+    mtime: float = 0.0
+
+    @property
+    def completed(self) -> int:
+        return len(self.items)
+
+
 def _parse_checkpoint_name(path: Path) -> tuple[str, str, str]:
     """`.checkpoint_<benchmark>_<variant>_<model>.jsonl` -> (benchmark, variant, model)."""
     stem = path.name
@@ -119,6 +133,36 @@ def read_checkpoint(path: Path) -> RunSnapshot:
                 "gold": (res.get("gold") or "").strip(),
             })
     return snap
+
+
+def read_ingest_manifest(path: Path) -> IngestSnapshot:
+    snap = IngestSnapshot(
+        manifest=path,
+        source=path.parent.name,
+        mtime=path.stat().st_mtime if path.exists() else 0.0,
+    )
+    if not path.exists():
+        return snap
+    try:
+        rows = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return snap
+    if isinstance(rows, list):
+        snap.items = [row for row in rows if isinstance(row, dict)]
+    return snap
+
+
+def scan_ingests(results_dir: Path, *, active_within_s: float | None = None) -> list[IngestSnapshot]:
+    if not results_dir.exists():
+        return []
+    paths = {p for p in results_dir.glob("manifest.json")}
+    paths |= {p for p in results_dir.rglob("manifest.json")}
+    snaps = [read_ingest_manifest(p) for p in sorted(paths)]
+    if active_within_s:
+        cutoff = time.time() - active_within_s
+        snaps = [s for s in snaps if s.mtime >= cutoff]
+    snaps.sort(key=lambda s: s.mtime, reverse=True)
+    return snaps
 
 
 def scan_runs(results_dir: Path, *, active_within_s: float | None = None) -> list[RunSnapshot]:
@@ -294,6 +338,41 @@ def _feed_rows_html(s: RunSnapshot, items_n: int) -> str:
     )
 
 
+def _ingest_rows_html(ingests: list[IngestSnapshot], total_items: int | None) -> str:
+    rows: list[str] = []
+    for ingest in ingests:
+        done = ingest.completed
+        pct = (done / total_items * 100.0) if total_items else None
+        progress = (
+            f'<div class="bar"><div class="fill" style="width:{min(100.0, pct):.1f}%"></div></div>'
+            f'<span class="muted">{done}/{total_items} ({pct:.1f}%)</span>'
+            if pct is not None
+            else f'<span class="muted">{done} completed</span>'
+        )
+        ready = sum(int(item.get("ready") or 0) for item in ingest.items)
+        failed = sum(int(item.get("failed_remaining") or 0) for item in ingest.items)
+        turn_evidence = sum(int(item.get("turn_evidence") or 0) for item in ingest.items)
+        scalar_views = sum(int(item.get("scalar_views") or 0) for item in ingest.items)
+        latest = ingest.items[-1] if ingest.items else {}
+        latest_question = latest.get("question") or latest.get("question_id") or "none yet"
+        if total_items and done >= total_items:
+            phase_note = "Graph ingest complete; recall/QA scoring should begin next."
+        else:
+            phase_note = "Graph ingest is active; accuracy appears after recall/QA checkpointing begins."
+        rows.append(
+            f"<div class='run'><h2>LongMemEval graph ingest "
+            f"<span class='src'>[{_esc(ingest.source)}]</span></h2>"
+            f"<div class='prog'>{progress}</div>"
+            "<table><thead><tr><th>completed</th><th>ready episodes</th><th>failed</th>"
+            "<th>turn evidence</th><th>scalar views</th></tr></thead>"
+            f"<tbody><tr><td>{done}</td><td>{ready}</td><td>{failed}</td>"
+            f"<td>{turn_evidence}</td><td>{scalar_views}</td></tr></tbody></table>"
+            f"<div class='muted'>latest completed: {_esc(latest_question)}</div>"
+            f"<div class='muted'>{phase_note}</div></div>"
+        )
+    return "".join(rows)
+
+
 def render_html(
     snaps: list[RunSnapshot],
     menhir: dict | None,
@@ -301,6 +380,7 @@ def render_html(
     total_items: int | None,
     refresh_s: int = 5,
     items_n: int = 20,
+    ingests: list[IngestSnapshot] | None = None,
 ) -> str:
     """Self-contained auto-refreshing HTML page for the same data as render()."""
     rows: list[str] = []
@@ -338,7 +418,10 @@ def render_html(
             f"<table><thead><tr><th>arm</th><th>done</th><th>acc</th><th>in_tok</th><th>out_tok</th></tr></thead>"
             f"<tbody>{arm_rows}</tbody></table>{lift}{feed_block}</div>"
         )
-    body = "".join(rows) or "<p class='muted'>No checkpoints yet — start a run with --resume.</p>"
+    ingest_rows = _ingest_rows_html(ingests or [], total_items)
+    body = ingest_rows + "".join(rows)
+    if not body:
+        body = "<p class='muted'>No ingest manifest or scoring checkpoints yet.</p>"
 
     if menhir is None:
         mh = "<span class='muted'>menhir: not probed</span>"
@@ -442,8 +525,16 @@ def serve_dashboard(
 
         def do_GET(self):  # noqa: N802
             snaps = scan_runs(results_dir, active_within_s=active_within_s)
+            ingests = scan_ingests(results_dir, active_within_s=active_within_s)
             menhir = probe_menhir(menhir_url) if menhir_url else None
-            page = render_html(snaps, menhir, total_items=total_items, refresh_s=refresh_s, items_n=items_n)
+            page = render_html(
+                snaps,
+                menhir,
+                total_items=total_items,
+                refresh_s=refresh_s,
+                items_n=items_n,
+                ingests=ingests,
+            )
             data = page.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")

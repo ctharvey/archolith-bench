@@ -6,9 +6,11 @@ import json
 
 from archolith_bench.dashboard import (
     _parse_checkpoint_name,
+    read_ingest_manifest,
     read_checkpoint,
     render,
     render_html,
+    scan_ingests,
     scan_runs,
 )
 
@@ -88,6 +90,37 @@ def test_scan_runs_empty_dir(tmp_path):
     assert scan_runs(tmp_path) == []
 
 
+def test_read_and_scan_ingest_manifest(tmp_path):
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps([
+        {"question_id": "q1", "ready": 2, "failed_remaining": 0, "turn_evidence": 3, "scalar_views": 1},
+        {"question_id": "q2", "ready": 4, "failed_remaining": 0, "turn_evidence": 5, "scalar_views": 2},
+        {"question_id": "q3", "ready": 6, "failed_remaining": 0, "turn_evidence": 7, "scalar_views": 3},
+    ]), encoding="utf-8")
+
+    snap = read_ingest_manifest(manifest)
+    assert snap.completed == 3
+    assert snap.source == tmp_path.name
+    assert scan_ingests(tmp_path) == [snap]
+
+
+def test_render_html_shows_ingest_progress_before_scoring(tmp_path):
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps([
+        {"question_id": "q1", "question": "One?", "ready": 2},
+        {"question_id": "q2", "question": "Two?", "ready": 3},
+        {"question_id": "q3", "question": "Three?", "ready": 4},
+    ]), encoding="utf-8")
+
+    html = render_html([], {"health": True}, total_items=78, ingests=scan_ingests(tmp_path))
+
+    assert "LongMemEval graph ingest" in html
+    assert "3/78 (3.8%)" in html
+    assert "latest completed: Three?" in html
+    assert "Graph ingest is active" in html
+    assert "No ingest manifest" not in html
+
+
 def test_render_html_is_valid_autorefreshing_page(tmp_path):
     ck = tmp_path / ".checkpoint_longmemeval-menhir_oracle_deepseek-v4-flash.jsonl"
     _write_checkpoint(ck, [
@@ -111,4 +144,4 @@ def test_render_html_is_valid_autorefreshing_page(tmp_path):
 def test_render_html_handles_no_runs_and_no_menhir():
     html = render_html([], None, total_items=None)
     assert "<!doctype html>" in html
-    assert "No checkpoints yet" in html
+    assert "No ingest manifest or scoring checkpoints yet" in html

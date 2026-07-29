@@ -338,6 +338,38 @@ def main(argv: list[str] | None = None) -> None:
     dash_p.add_argument("--port", type=int, default=8200, help="Web dashboard port (default: 8200)")
     dash_p.add_argument("--items", type=int, default=20,
                         help="Turn-by-turn feed length: latest N item results per run (default: 20)")
+    dash_p.add_argument(
+        "--scalar-neo4j-uri",
+        default=os.getenv("LME_DASHBOARD_NEO4J_URI"),
+        help="Enable the read-only one-task scalar viewer against this Bolt URI "
+             "(env: LME_DASHBOARD_NEO4J_URI)",
+    )
+    dash_p.add_argument(
+        "--scalar-neo4j-user",
+        default=os.getenv("LME_DASHBOARD_NEO4J_USER", "neo4j"),
+        help="Scalar viewer Neo4j user (env: LME_DASHBOARD_NEO4J_USER; default: neo4j)",
+    )
+    dash_p.add_argument(
+        "--scalar-neo4j-password",
+        default=os.getenv("LME_DASHBOARD_NEO4J_PASSWORD"),
+        help="Scalar viewer Neo4j password (prefer env: LME_DASHBOARD_NEO4J_PASSWORD)",
+    )
+    dash_p.add_argument(
+        "--scalar-telemetry-db",
+        type=Path,
+        default=(
+            Path(os.environ["LME_DASHBOARD_TELEMETRY_DB"])
+            if os.getenv("LME_DASHBOARD_TELEMETRY_DB")
+            else None
+        ),
+        help="Optional Menhir telemetry DB for exact k-sample vote receipts "
+             "(env: LME_DASHBOARD_TELEMETRY_DB)",
+    )
+    dash_p.add_argument(
+        "--scalar-task",
+        default=os.getenv("LME_DASHBOARD_SCALAR_TASK"),
+        help="Namespace selected when the scalar viewer opens (e.g. lme-01493427)",
+    )
     dash_p.add_argument("--active-within", type=float, default=300.0,
                         help="Only show runs whose checkpoint was written within N seconds "
                              "(active sessions). 0 = show all runs including finished ones (default: 300)")
@@ -1299,6 +1331,23 @@ def _run_dashboard(args: argparse.Namespace) -> None:
 
     try:
         if args.serve:
+            scalar_reader = None
+            if args.scalar_neo4j_uri:
+                if not args.scalar_neo4j_password:
+                    print(
+                        "ERROR: --scalar-neo4j-uri needs --scalar-neo4j-password "
+                        "(prefer LME_DASHBOARD_NEO4J_PASSWORD)",
+                        file=sys.stderr,
+                    )
+                    raise SystemExit(2)
+                from .scalar_viewer import ScalarTaskReader
+
+                scalar_reader = ScalarTaskReader(
+                    neo4j_uri=args.scalar_neo4j_uri,
+                    neo4j_user=args.scalar_neo4j_user,
+                    neo4j_password=args.scalar_neo4j_password,
+                    telemetry_db=args.scalar_telemetry_db,
+                )
             serve_dashboard(
                 args.results_dir,
                 menhir_url=args.menhir_url,
@@ -1308,6 +1357,8 @@ def _run_dashboard(args: argparse.Namespace) -> None:
                 refresh_s=int(args.interval),
                 items_n=args.items,
                 active_within_s=(args.active_within or None),
+                scalar_reader=scalar_reader,
+                scalar_default_namespace=args.scalar_task,
             )
         else:
             run_dashboard(

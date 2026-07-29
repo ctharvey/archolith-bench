@@ -1,5 +1,17 @@
 # archolith-bench Changelog
 
+## 2026-07-29 - Interactive scalar-state task explorer
+
+The checkpoint dashboard now has an optional read-only, single-task scalar explorer. It correlates
+manifest metadata, Neo4j `TurnEvidence`/`FOUNDS` provenance, immutable `TypedAssertion` rows,
+historical/current `scalar_state` Views, and any recall checkpoint already written for the task.
+When a Menhir telemetry DB is configured, the explorer selects the consolidation pass whose
+source/assertion IDs match the graph it is displaying, rather than blindly showing the newest pass
+from another benchmark attempt. This exposes the exact k-sample distribution, including accepted
+2-of-3 claims and abstentions. Graph credentials never reach the browser, task reads are restricted
+to manifest namespaces that actually exist in the connected graph, and all backing stores are
+opened through read-only query paths.
+
 ## 2026-07-29 - Scalar buildout correctness remediation
 
 Fixed four defects a review found in the knowledge-update buildout path. Each had the same

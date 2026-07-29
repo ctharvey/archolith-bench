@@ -373,6 +373,257 @@ def _ingest_rows_html(ingests: list[IngestSnapshot], total_items: int | None) ->
     return "".join(rows)
 
 
+def _scalar_viewer_shell(default_namespace: str | None) -> str:
+    """Interactive shell; task data is loaded on demand from read-only JSON routes."""
+    default_json = (
+        json.dumps(default_namespace or "")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+    )
+    return """
+<section id="scalar-viewer" class="viewer">
+  <div class="viewer-head">
+    <div>
+      <div class="eyebrow">READ-ONLY GRAPH EXPLORER</div>
+      <h2>How one scalar view is made</h2>
+      <p class="muted viewer-copy">Walk one completed task from transcript evidence through the
+      k-sample vote, durable assertions, deterministic fold, and benchmark answer.</p>
+    </div>
+    <div class="viewer-picker">
+      <label for="scalar-task">completed task</label>
+      <select id="scalar-task"></select>
+      <button id="scalar-load" type="button">inspect task</button>
+    </div>
+  </div>
+  <div id="scalar-status" class="muted">Loading completed tasks…</div>
+  <div id="scalar-body"></div>
+</section>
+<script>
+(() => {
+  const preferred = __DEFAULT_NAMESPACE__;
+  const state = {data: null, stage: 0, onlyFounded: false};
+  const stageMeta = [
+    ["1", "Evidence", "preserved source turns"],
+    ["2", "2-of-3 gate", "stochastic extraction vote"],
+    ["3", "Assertions", "durable typed events"],
+    ["4", "Scalar view", "deterministic fold"],
+    ["5", "Answer path", "recall and scoring"],
+  ];
+  const h = value => String(value == null ? "" : value)
+    .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+  const when = value => value ? h(String(value).replace("T", " ").replace("Z", " UTC")) : "—";
+  const list = value => Array.isArray(value) ? value : [];
+  const status = document.getElementById("scalar-status");
+  const body = document.getElementById("scalar-body");
+  const picker = document.getElementById("scalar-task");
+
+  function currentViews() {
+    return list(state.data && state.data.views).filter(v => v.current);
+  }
+
+  function stageCounts() {
+    const d = state.data || {};
+    const gates = list(d.audit).filter(x => x.event === "gate");
+    const scores = list(d.scoring);
+    return [
+      list(d.evidence).filter(x => list(x.founds).length).length + "/" + list(d.evidence).length,
+      gates.length,
+      list(d.assertions).length,
+      currentViews().length + " current",
+      scores.length ? scores.length + " scored" : "pending",
+    ];
+  }
+
+  function renderNav() {
+    const counts = stageCounts();
+    return `<div class="stage-nav">${stageMeta.map((s, i) =>
+      `<button type="button" class="stage ${i === state.stage ? "active" : ""}"
+        onclick="window.scalarStage(${i})"><span class="stage-num">${s[0]}</span>
+        <span><strong>${s[1]}</strong><small>${h(counts[i])}</small></span></button>`
+    ).join('<span class="stage-arrow">→</span>')}</div>`;
+  }
+
+  function renderEvidence(d) {
+    const assertions = new Map(list(d.assertions).map(a => [a.id, a]));
+    const rows = list(d.evidence).filter(t => !state.onlyFounded || list(t.founds).length);
+    const transcript = rows.map((t, i) => {
+      const founded = list(t.founds).map(id => assertions.get(id)).filter(Boolean);
+      return `<article class="turn ${founded.length ? "founded" : ""}">
+        <div class="turn-meta"><span>${i + 1}</span><b>${h(t.role)}</b><span>${when(t.recorded_at)}</span></div>
+        <div class="turn-text">${h(t.text)}</div>
+        ${founded.length ? `<div class="founds">FOUNDS ${founded.map(a =>
+          `<span>${h(a.attribute)} = ${h(a.value)}${a.unit ? " " + h(a.unit) : ""}</span>`
+        ).join("")}</div>` : ""}
+      </article>`;
+    }).join("");
+    const facts = list(d.facts).map(f =>
+      `<li><b>${h(f.subject)}</b> → ${h(f.object)}<span>${h(f.fact)}</span></li>`
+    ).join("");
+    return `<div class="stage-panel"><div class="stage-intro">
+      <div><h3>Source boundary</h3><p>Every user turn is preserved as <code>TurnEvidence</code>.
+      A <code>FOUNDS</code> edge marks the exact turn that grounded a committed assertion.</p></div>
+      <label class="toggle"><input type="checkbox" ${state.onlyFounded ? "checked" : ""}
+        onchange="window.scalarFounded(this.checked)"> only founding turns</label></div>
+      <div class="transcript">${transcript || '<p class="empty">No evidence rows in this graph.</p>'}</div>
+      <details><summary>Context graph facts (${list(d.facts).length})</summary>
+        <p class="muted">These aid ordinary recall, but they are not the typed assertion log folded
+        into the scalar view.</p><ul class="fact-list">${facts}</ul></details></div>`;
+  }
+
+  function voteDistribution(details) {
+    const dist = details.distribution || {};
+    const k = Number(details.k || 0);
+    return Object.entries(dist).map(([label, votes]) => {
+      const n = Number(votes || 0);
+      const pct = k ? (n / k * 100) : 0;
+      return `<div class="vote-row"><div><span>${h(label)}</span><b>${n}/${k || "?"}</b></div>
+        <div class="vote-bar"><i style="width:${pct}%"></i></div></div>`;
+    }).join("");
+  }
+
+  function renderGate(d) {
+    const gates = list(d.audit).filter(x => x.event === "gate");
+    const cards = gates.map(g => {
+      const x = g.details || {};
+      const accepted = g.state === "commit";
+      return `<article class="gate-card ${accepted ? "accepted" : "rejected"}">
+        <div class="gate-title"><span class="pill">${accepted ? "ACCEPTED" : "ABSTAINED"}</span>
+          <b>${Math.round(Number(x.agreement || 0) * 100)}% agreement</b>
+          <span>${h(x.reason || g.state)}</span></div>
+        ${voteDistribution(x)}
+        <div class="mono-id">source ${h(String(x.source_key || "").slice(0, 16))}…</div>
+      </article>`;
+    }).join("");
+    const warning = d.audit_warning ? `<div class="warning">${h(d.audit_warning)}</div>` : "";
+    return `<div class="stage-panel"><div class="stage-intro"><div><h3>Probabilistic boundary</h3>
+      <p>The extractor runs <em>k</em> times. Each sample gets one vote per grounded source claim.
+      At a 2-of-3 threshold, two matching readings commit; scattered readings abstain.</p></div>
+      <div class="receipt">${d.audit_pass_id ? "receipt " + h(d.audit_pass_id) : "no receipt"}</div>
+      </div>${warning}${cards || '<p class="empty">No matching gate receipt.</p>'}</div>`;
+  }
+
+  function renderAssertions(d) {
+    const cards = list(d.assertions).map((a, i) =>
+      `<article class="assertion">
+        <div class="assertion-num">${i + 1}</div><div>
+          <div class="assertion-value"><b>${h(a.subject)}</b><span>→</span>
+            <b>${h(a.attribute)}</b><span>=</span><strong>${h(a.value)}${a.unit ? " " + h(a.unit) : ""}</strong></div>
+          <blockquote>“${h(a.stated_span)}”</blockquote>
+          <div class="chips"><span>${h(a.value_kind)}</span><span>${h(a.operation)}</span>
+            <span>${h(a.evidence_tier)} evidence</span><span>${a.binding_pending ? "binding pending" : "subject bound"}</span></div>
+          <div class="muted">world time ${when(a.valid_at)} · learned ${when(a.learned_at)}</div>
+        </div>
+      </article>`
+    ).join("");
+    return `<div class="stage-panel"><div class="stage-intro"><div><h3>Durable event log</h3>
+      <p>A winning interpretation becomes an immutable <code>TypedAssertion</code>. It records
+      subject, slot, typed value, world time, source quote, and binding state.</p></div></div>
+      <div class="assertions">${cards || '<p class="empty">No TypedAssertions were emitted.</p>'}</div></div>`;
+  }
+
+  function renderViews(d) {
+    const views = list(d.views);
+    const cards = views.map((v, i) =>
+      `<article class="view-card ${v.current ? "current" : "history"}">
+        <div class="view-state">${v.current ? "CURRENT" : "SUPERSEDED"}</div>
+        <div class="view-value">${h(v.display || v.value)}${v.unit ? " " + h(v.unit) : ""}</div>
+        <div><b>${h(v.subject)}</b> · ${h(v.attribute)}${v.scope ? " · " + h(v.scope) : ""}</div>
+        <p>${h(v.summary)}</p>
+        <div class="chips"><span>${h(v.value_kind)}</span><span>${h(v.effective_tier)} effective tier</span>
+          <span>${list(v.contributor_ids).length} contributor</span></div>
+        <div class="muted">valid ${when(v.valid_at)}</div>
+      </article>${i < views.length - 1 ? '<div class="supersede">→ later world time →</div>' : ""}`
+    ).join("");
+    return `<div class="stage-panel"><div class="stage-intro"><div><h3>Deterministic projection</h3>
+      <p>The fold replays assertions by slot and world time. Views are rebuildable projections:
+      old values remain visible for provenance, while exactly one value is current.</p></div></div>
+      <div class="views">${cards || '<p class="empty">No scalar_state view materialized.</p>'}</div></div>`;
+  }
+
+  function renderAnswer(d) {
+    const task = d.task || {};
+    const views = currentViews();
+    const scores = list(d.scoring);
+    const viewRows = views.map(v =>
+      `<div class="answer-source"><span>current scalar view</span><b>${h(v.attribute)} = ${h(v.display || v.value)}${v.unit ? " " + h(v.unit) : ""}</b></div>`
+    ).join("");
+    const scoring = scores.length ? scores.map(s =>
+      `<article class="score ${s.correct ? "okbox" : "nobox"}"><b>${h(s.arm)}</b>
+       <span>${s.correct ? "correct" : "incorrect"}</span><p>${h(s.response)}</p>
+       <details><summary>recalled memory</summary><pre>${h(s.recalled)}</pre></details></article>`
+    ).join("") : `<div class="pending">Recall/QA has not written a checkpoint for this task yet.
+      The graph build can be inspected now; the final answer path becomes measurable during scoring.</div>`;
+    return `<div class="stage-panel answer-grid">
+      <div class="answer-question"><span>BENCHMARK QUESTION</span><h3>${h(task.question)}</h3>
+        <div class="gold"><span>gold answer</span><b>${h(task.answer)}</b></div></div>
+      <div><h3>Available state</h3>${viewRows || '<p class="empty">No current scalar view.</p>'}</div>
+      <div class="score-wrap"><h3>Recall → model answer → scorer</h3>${scoring}</div></div>`;
+  }
+
+  function render() {
+    const d = state.data;
+    if (!d) return;
+    const task = d.task || {};
+    const panels = [renderEvidence, renderGate, renderAssertions, renderViews, renderAnswer];
+    body.innerHTML = `<div class="task-hero"><div><span>${h(task.question_type || "task")}</span>
+      <h3>${h(task.question || d.namespace)}</h3></div><div class="task-id">${h(d.namespace)}</div></div>
+      ${renderNav()}${panels[state.stage](d)}
+      <div class="stage-controls"><button type="button" onclick="window.scalarStage(${Math.max(0, state.stage - 1)})"
+        ${state.stage === 0 ? "disabled" : ""}>← previous</button>
+      <span>${state.stage + 1} / ${stageMeta.length}</span>
+      <button type="button" onclick="window.scalarStage(${Math.min(stageMeta.length - 1, state.stage + 1)})"
+        ${state.stage === stageMeta.length - 1 ? "disabled" : ""}>next →</button></div>`;
+  }
+
+  window.scalarStage = i => { state.stage = Number(i); render(); body.scrollIntoView({behavior: "smooth", block: "start"}); };
+  window.scalarFounded = checked => { state.onlyFounded = Boolean(checked); render(); };
+
+  async function loadTask() {
+    const namespace = picker.value;
+    if (!namespace) return;
+    status.textContent = "Reading " + namespace + "…";
+    body.innerHTML = "";
+    try {
+      const response = await fetch("/api/scalar-task?namespace=" + encodeURIComponent(namespace), {cache: "no-store"});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "viewer request failed");
+      state.data = data;
+      state.stage = 0;
+      status.textContent = "Loaded from Neo4j" + (data.audit_pass_id ? " + vote receipt" : "");
+      render();
+    } catch (error) {
+      status.textContent = "Could not load task: " + error.message;
+    }
+  }
+
+  async function init() {
+    try {
+      const response = await fetch("/api/scalar-tasks", {cache: "no-store"});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "task catalog failed");
+      picker.replaceChildren(...data.tasks.map(task => {
+        const option = document.createElement("option");
+        option.value = task.namespace;
+        option.textContent = task.question_id + " · " + (task.question || task.namespace);
+        return option;
+      }));
+      const wanted = preferred || data.default_namespace;
+      if (wanted && data.tasks.some(task => task.namespace === wanted)) picker.value = wanted;
+      document.getElementById("scalar-load").addEventListener("click", loadTask);
+      if (picker.value) await loadTask();
+      else status.textContent = "No completed manifest tasks are available.";
+    } catch (error) {
+      status.textContent = "Scalar viewer unavailable: " + error.message;
+    }
+  }
+  init();
+})();
+</script>
+""".replace("__DEFAULT_NAMESPACE__", default_json)
+
+
 def render_html(
     snaps: list[RunSnapshot],
     menhir: dict | None,
@@ -381,6 +632,8 @@ def render_html(
     refresh_s: int = 5,
     items_n: int = 20,
     ingests: list[IngestSnapshot] | None = None,
+    scalar_viewer_enabled: bool = False,
+    scalar_default_namespace: str | None = None,
 ) -> str:
     """Self-contained auto-refreshing HTML page for the same data as render()."""
     rows: list[str] = []
@@ -464,6 +717,63 @@ def render_html(
    font-size:12.5px;color:#adbac7;white-space:pre-wrap;overflow-wrap:anywhere}}
  .snip:nth-child(even){{background:#131c28}}
  .snum{{display:inline-block;min-width:22px;color:#d29922;font-weight:bold}}
+ .viewer{{border:1px solid #30363d;border-radius:12px;padding:18px;margin:28px 0 12px;max-width:1060px;
+   background:linear-gradient(145deg,#101722,#0d1117 48%);box-shadow:0 12px 40px #0005}}
+ .viewer-head{{display:flex;justify-content:space-between;gap:28px;align-items:end}}
+ .viewer-head h2{{font-size:20px;margin:2px 0 4px}} .viewer-copy{{max-width:650px;margin:0}}
+ .eyebrow{{color:#58a6ff;font-size:11px;letter-spacing:.12em;font-weight:bold}}
+ .viewer-picker{{display:grid;grid-template-columns:auto auto;gap:6px;min-width:390px}}
+ .viewer-picker label{{grid-column:1/-1;color:#8b949e;font-size:11px;text-transform:uppercase}}
+ select,button{{font:inherit;color:#c9d1d9;background:#161b22;border:1px solid #30363d;border-radius:6px;padding:7px 9px}}
+ button{{cursor:pointer}} button:hover:not(:disabled){{border-color:#58a6ff;background:#1b2636}}
+ button:disabled{{cursor:default;opacity:.4}} .viewer-picker select{{min-width:280px;max-width:420px}}
+ #scalar-status{{margin:14px 0 8px}} .task-hero{{display:flex;justify-content:space-between;gap:20px;
+   align-items:start;padding:14px;border:1px solid #30363d;border-radius:8px;background:#0d1117}}
+ .task-hero span,.answer-question>span,.gold span,.answer-source span{{display:block;color:#8b949e;
+   font-size:10px;letter-spacing:.09em;text-transform:uppercase}}
+ .task-hero h3{{font:600 17px/1.4 ui-sans-serif,system-ui;margin:4px 0}} .task-id{{color:#d29922;white-space:nowrap}}
+ .stage-nav{{display:flex;align-items:stretch;margin:16px 0;overflow-x:auto}}
+ .stage{{display:flex;text-align:left;gap:8px;align-items:center;flex:1;min-width:118px;padding:10px;border-radius:8px}}
+ .stage.active{{border-color:#58a6ff;background:#12233a;box-shadow:inset 0 0 0 1px #58a6ff44}}
+ .stage-num{{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#21262d;color:#58a6ff}}
+ .stage strong,.stage small{{display:block}} .stage small{{color:#8b949e;margin-top:2px}} .stage-arrow{{padding:15px 4px;color:#484f58}}
+ .stage-panel{{min-height:300px;border-top:1px solid #30363d;padding-top:14px}}
+ .stage-intro{{display:flex;justify-content:space-between;gap:20px;align-items:start;margin-bottom:12px}}
+ .stage-intro h3,.answer-grid h3{{margin:0 0 4px;font-size:15px}} .stage-intro p{{margin:0;max-width:720px;color:#8b949e}}
+ code{{color:#79c0ff}} .toggle{{white-space:nowrap;color:#8b949e}} .toggle input{{accent-color:#1f6feb}}
+ .transcript{{display:grid;gap:7px;max-height:520px;overflow:auto;padding-right:5px}}
+ .turn{{border:1px solid #21262d;border-left:3px solid #30363d;border-radius:6px;padding:8px 10px;background:#0d1117}}
+ .turn.founded{{border-left-color:#3fb950;background:#0e1b15}} .turn-meta{{display:flex;gap:10px;color:#8b949e;font-size:11px}}
+ .turn-meta b{{color:#d2a8ff;text-transform:uppercase}} .turn-text{{font:13px/1.5 ui-sans-serif,system-ui;margin-top:3px}}
+ .founds{{margin-top:7px;color:#3fb950;font-size:10px;letter-spacing:.06em}} .founds span{{margin-left:8px;
+   padding:2px 6px;border:1px solid #2ea04366;border-radius:10px;letter-spacing:0}}
+ .fact-list{{max-height:260px;overflow:auto;padding-left:20px}} .fact-list li{{margin:5px 0}}
+ .fact-list span{{display:block;color:#8b949e}} .receipt,.mono-id{{color:#8b949e;font-size:11px}}
+ .gate-card{{border:1px solid #30363d;border-left:4px solid #f85149;border-radius:8px;padding:12px;margin:8px 0;background:#0d1117}}
+ .gate-card.accepted{{border-left-color:#3fb950}} .gate-title{{display:flex;gap:10px;align-items:center;margin-bottom:9px}}
+ .gate-title>span:last-child{{color:#8b949e}} .pill{{font-size:9px;letter-spacing:.08em;padding:2px 6px;border-radius:10px;background:#21262d}}
+ .accepted .pill{{color:#3fb950}} .rejected .pill{{color:#f85149}} .vote-row{{max-width:760px;margin:7px 0}}
+ .vote-row>div:first-child{{display:flex;justify-content:space-between;gap:12px}} .vote-bar{{height:5px;background:#21262d;border-radius:3px;overflow:hidden}}
+ .vote-bar i{{display:block;height:100%;background:#58a6ff}} .warning,.pending{{border:1px solid #d2992266;background:#2d220d;
+   color:#e3b341;border-radius:6px;padding:10px}} .assertions{{display:grid;gap:9px}}
+ .assertion{{display:grid;grid-template-columns:34px 1fr;gap:8px;border:1px solid #30363d;border-radius:8px;padding:12px;background:#0d1117}}
+ .assertion-num{{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#1f6feb;color:white}}
+ .assertion-value{{display:flex;gap:8px;align-items:center;flex-wrap:wrap}} .assertion-value strong{{color:#79c0ff;font-size:16px}}
+ blockquote{{margin:7px 0;color:#e6edf3;font:italic 14px/1.5 ui-serif,Georgia}} .chips{{display:flex;gap:5px;flex-wrap:wrap;margin:7px 0}}
+ .chips span{{font-size:10px;padding:2px 6px;border:1px solid #30363d;border-radius:10px;color:#8b949e}}
+ .views{{display:flex;align-items:stretch;overflow-x:auto;padding-bottom:6px}} .view-card{{min-width:240px;flex:1;border:1px solid #30363d;
+   border-top:4px solid #6e7681;border-radius:8px;padding:14px;background:#0d1117}} .view-card.current{{border-top-color:#3fb950;background:#0e1b15}}
+ .view-state{{color:#8b949e;font-size:10px;letter-spacing:.1em}} .current .view-state{{color:#3fb950}}
+ .view-value{{font-size:34px;color:#79c0ff;font-weight:bold;margin:4px 0}} .view-card p{{color:#8b949e}}
+ .supersede{{display:grid;place-items:center;min-width:135px;color:#d29922;text-align:center}}
+ .answer-grid{{display:grid;grid-template-columns:1fr 1fr;gap:16px}} .answer-question{{border:1px solid #30363d;border-radius:8px;padding:16px;background:#0d1117}}
+ .answer-question h3{{font:600 19px/1.5 ui-sans-serif,system-ui;margin:6px 0 16px}} .gold{{border-top:1px solid #30363d;padding-top:10px}}
+ .gold b{{font-size:22px;color:#3fb950}} .answer-source{{border:1px solid #2ea04366;border-radius:7px;padding:10px;margin:6px 0;background:#0e1b15}}
+ .answer-source b{{display:block;color:#79c0ff;margin-top:3px}} .score-wrap{{grid-column:1/-1}} .score{{border:1px solid #30363d;border-radius:7px;padding:10px}}
+ .score.okbox{{border-left:4px solid #3fb950}} .score.nobox{{border-left:4px solid #f85149}} .score pre{{white-space:pre-wrap}}
+ .empty{{color:#8b949e;font-style:italic}} .stage-controls{{display:flex;justify-content:space-between;align-items:center;margin-top:12px}}
+ @media (max-width:800px){{.viewer-head,.stage-intro{{display:block}}.viewer-picker{{margin-top:12px;min-width:0}}
+   .stage-arrow{{display:none}}.answer-grid{{grid-template-columns:1fr}}.viewer-picker select{{min-width:0}}}}
  footer{{color:#8b949e;margin-top:18px;max-width:900px}}
 </style></head><body>
 <h1>archolith-bench &mdash; memory benchmark</h1>
@@ -472,6 +782,7 @@ def render_html(
 <div style="margin:10px 0">{mh}</div>
 {body}
 </div>
+{_scalar_viewer_shell(scalar_default_namespace) if scalar_viewer_enabled else ""}
 <footer>Token columns are ANSWER-model only; menhir ingestion (OpenAI extraction+embedding)
 spend is not tracked by the bench. Progress is by item-count across arms.</footer>
 <script>
@@ -515,17 +826,82 @@ def serve_dashboard(
     refresh_s: int = 5,
     items_n: int = 20,
     active_within_s: float | None = None,
+    scalar_reader: object | None = None,
+    scalar_default_namespace: str | None = None,
 ) -> None:
     """Serve the dashboard as an auto-refreshing web page until interrupted."""
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from urllib.parse import parse_qs, urlparse
+
+    from .scalar_viewer import scoring_rows, task_catalog
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *a):  # silence access logs
             pass
 
+        def _send(self, status: int, data: bytes, content_type: str) -> None:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            self.wfile.write(data)
+
+        def _json(self, status: int, payload: dict) -> None:
+            self._send(
+                status,
+                json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8"),
+                "application/json; charset=utf-8",
+            )
+
         def do_GET(self):  # noqa: N802
+            route = urlparse(self.path)
             snaps = scan_runs(results_dir, active_within_s=active_within_s)
             ingests = scan_ingests(results_dir, active_within_s=active_within_s)
+            catalog = task_catalog(ingests)
+            if route.path == "/api/scalar-tasks":
+                graph_warning = None
+                if scalar_reader is not None:
+                    try:
+                        available = scalar_reader.available_namespaces()
+                        catalog = [
+                            item for item in catalog if item["namespace"] in available
+                        ]
+                    except Exception as exc:  # noqa: BLE001 - catalog remains useful if graph is down
+                        graph_warning = f"Could not filter tasks against the scalar graph: {exc}"
+                default = scalar_default_namespace
+                namespaces = {item["namespace"] for item in catalog}
+                if default not in namespaces:
+                    default = catalog[0]["namespace"] if catalog else None
+                self._json(200, {
+                    "tasks": catalog,
+                    "default_namespace": default,
+                    "reader_enabled": scalar_reader is not None,
+                    "graph_warning": graph_warning,
+                })
+                return
+            if route.path == "/api/scalar-task":
+                if scalar_reader is None:
+                    self._json(503, {"error": "The dashboard was not started with scalar graph access."})
+                    return
+                namespace = (parse_qs(route.query).get("namespace") or [""])[0]
+                task = next((item for item in catalog if item["namespace"] == namespace), None)
+                if task is None:
+                    self._json(404, {"error": "Unknown or incomplete manifest namespace."})
+                    return
+                try:
+                    payload = scalar_reader.read(namespace)
+                except Exception as exc:  # noqa: BLE001 - read-only explorer must return a useful error
+                    self._json(502, {"error": f"Could not read the scalar graph: {exc}"})
+                    return
+                payload["task"] = task
+                payload["scoring"] = scoring_rows(snaps, task["question_id"])
+                self._json(200, payload)
+                return
+            if route.path not in ("/", ""):
+                self._json(404, {"error": "Not found."})
+                return
             menhir = probe_menhir(menhir_url) if menhir_url else None
             page = render_html(
                 snaps,
@@ -534,13 +910,11 @@ def serve_dashboard(
                 refresh_s=refresh_s,
                 items_n=items_n,
                 ingests=ingests,
+                scalar_viewer_enabled=scalar_reader is not None,
+                scalar_default_namespace=scalar_default_namespace,
             )
             data = page.encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
+            self._send(200, data, "text/html; charset=utf-8")
 
     server = ThreadingHTTPServer((host, port), Handler)
     print(f"dashboard serving at http://{host}:{port}  (Ctrl-C to stop)")
@@ -549,6 +923,10 @@ def serve_dashboard(
     except KeyboardInterrupt:
         print("\n(dashboard stopped)")
         server.shutdown()
+    finally:
+        close = getattr(scalar_reader, "close", None)
+        if close:
+            close()
 
 
 def run_dashboard(

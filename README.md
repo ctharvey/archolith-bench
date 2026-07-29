@@ -28,6 +28,29 @@ and [`benchmarks/`](benchmarks/) for tracked evidence summaries.
 | `dashboard` | Live view of in-progress memory runs (terminal or `--serve` web); reads run checkpoints |
 | `ports` | Index running stack processes by label + port (find stray menhir/neo4j/dashboard instances) |
 
+### One-task scalar view explorer
+
+The web dashboard can add a read-only drill-down for tasks present in both the active LongMemEval
+ingest manifest and the connected graph. It walks one task through the actual scalar-state boundaries:
+
+1. preserved `TurnEvidence` and its `FOUNDS` links;
+2. the correlated k-sample vote receipt (including 2-of-3 distributions);
+3. immutable `TypedAssertion` events;
+4. superseded and current `scalar_state` Views from the deterministic fold;
+5. recall/model/scorer output once the QA checkpoint exists.
+
+Neo4j credentials stay server-side, and the API accepts only namespaces present in the loaded
+manifest. Configure the optional telemetry DB to show the exact vote distribution; without it,
+the graph stages remain available and the gate stage explains that the receipt is missing.
+
+```bash
+export LME_DASHBOARD_NEO4J_URI=bolt://127.0.0.1:7694
+export LME_DASHBOARD_NEO4J_USER=neo4j
+export LME_DASHBOARD_NEO4J_PASSWORD=...
+export LME_DASHBOARD_TELEMETRY_DB=/path/to/mcp_telemetry.db
+archolith-bench dashboard --results-dir results/run --serve --scalar-task lme-01493427
+```
+
 ### Harness: official benchmarks as direct-vs-proxy A/B
 
 Archolith is middleware, not a model, so a harness adapter never claims a standalone

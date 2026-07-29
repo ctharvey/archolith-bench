@@ -145,3 +145,20 @@ def test_render_html_handles_no_runs_and_no_menhir():
     html = render_html([], None, total_items=None)
     assert "<!doctype html>" in html
     assert "No ingest manifest or scoring checkpoints yet" in html
+
+
+def test_render_html_adds_scalar_viewer_only_when_enabled():
+    plain = render_html([], None, total_items=None)
+    viewer = render_html(
+        [],
+        None,
+        total_items=None,
+        scalar_viewer_enabled=True,
+        scalar_default_namespace="lme-postcards",
+    )
+
+    assert 'id="scalar-viewer"' not in plain
+    assert 'id="scalar-viewer"' in viewer
+    assert "How one scalar view is made" in viewer
+    assert 'const preferred = "lme-postcards"' in viewer
+    assert "/api/scalar-task?namespace=" in viewer

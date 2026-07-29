@@ -30,6 +30,20 @@ The benchmark is a **CLI tool**, not a service. It runs offline, sending control
 | Linting | ruff |
 | Testing | pytest |
 
+### Dashboard scalar explorer
+
+`archolith_bench/dashboard.py` owns the local HTTP surface and manifest/checkpoint allowlist.
+`archolith_bench/scalar_viewer.py` owns the read-only provenance model. Its Neo4j path keeps the
+four scalar measurement boundaries separate (`TurnEvidence` → gate → `TypedAssertion` → View),
+while the optional SQLite path reads the behavior-neutral consolidation receipt. Audit selection
+is graph-correlated by `source_key`/`assertion_id`; a newer telemetry pass from a different graph
+attempt is not presented as provenance for the graph currently on screen.
+
+The browser calls `/api/scalar-tasks` for manifest-scoped choices and
+`/api/scalar-task?namespace=...` for one snapshot. Bolt credentials and the telemetry path remain
+inside the dashboard process. The page refresh loop replaces only benchmark progress, so an open
+scalar walkthrough and its selected stage are not reset every five seconds.
+
 ## Data Flow
 
 ```

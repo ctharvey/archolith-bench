@@ -58,7 +58,7 @@ log "fixture: ${KU_COUNT} knowledge-update items (NO splitting, NO segmentation)
 log "LME_SEGMENTATION=${LME_SEGMENTATION}"
 
 # ---- guard against clobbering ----
-if docker ps -a --format '{{.Names}}' | grep -Fxq "${LME_NEO4J_NAME}"; then
+if lme_container_exists "${LME_NEO4J_NAME}"; then
   if [ "${LME_KU_ALLOW_RESUME:-0}" = "1" ]; then
     log "RESUME: reusing existing container ${LME_NEO4J_NAME}"
     docker start "${LME_NEO4J_NAME}" 2>/dev/null || true

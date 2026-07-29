@@ -71,7 +71,7 @@ PY
 )"; [ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY in ${MENHIR_MAIN}/.env"
 
 # ---- ensure the PRE-BUILT Neo4j is up (reuse only; never create, never reset) ----
-docker ps --format '{{.Names}}' | grep -qx "${LME_NEO4J_NAME}" \
+lme_container_running "${LME_NEO4J_NAME}" \
   || docker start "${LME_NEO4J_NAME}" >/dev/null 2>&1 \
   || die "pre-built ${LME_NEO4J_NAME} not found — run scripts/longmemeval/build_graph.sh first"
 for _ in $(seq 1 60); do curl -sf "http://localhost:${LME_HTTP}" >/dev/null 2>&1 && break; sleep 2; done

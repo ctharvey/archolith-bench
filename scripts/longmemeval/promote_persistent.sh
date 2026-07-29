@@ -24,7 +24,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 NS_PREFIX="${LME_NS_PREFIX:-lme-}"
 log(){ printf '[lme-promote] %s\n' "$*" >&2; }
 
-docker ps --format '{{.Names}}' | grep -qx "${LME_NEO4J_NAME}" \
+lme_container_running "${LME_NEO4J_NAME}" \
   || { log "ERROR: ${LME_NEO4J_NAME} not running"; exit 1; }
 
 log "promoting SESSION -> PERSISTENT for namespaces prefixed '${NS_PREFIX}'..."

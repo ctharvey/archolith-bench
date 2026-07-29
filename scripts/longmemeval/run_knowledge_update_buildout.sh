@@ -157,7 +157,7 @@ export LME_FIXTURE_COUNT="${KU_COUNT}"
 log "fixture: ${KU_COUNT} knowledge-update items; sha256=${FIXTURE_SHA256}"
 
 # ---- guard against clobbering ----
-if docker ps -a --format '{{.Names}}' | grep -Fxq "${LME_NEO4J_NAME}"; then
+if lme_container_exists "${LME_NEO4J_NAME}"; then
   if [ "${LME_KU_ALLOW_RESUME:-0}" = "1" ]; then
     log "RESUME: reusing existing container ${LME_NEO4J_NAME}"
     docker start "${LME_NEO4J_NAME}" 2>/dev/null || true
@@ -321,7 +321,7 @@ MENHIR_PID=""
 cleanup_all(){
   [ -n "${MENHIR_PID}" ] && kill "${MENHIR_PID}" 2>/dev/null || true
   if [ "${LME_KU_KEEP_NEO4J_UP}" != "1" ] &&
-     docker ps --format '{{.Names}}' | grep -Fxq "${LME_NEO4J_NAME}"; then
+     lme_container_running "${LME_NEO4J_NAME}"; then
     log "stopping ${LME_NEO4J_NAME}; container and volume are preserved for inspection"
     docker stop "${LME_NEO4J_NAME}" >/dev/null || true
   fi

@@ -36,6 +36,20 @@ LME_NEO4J_IMAGE="${LME_NEO4J_IMAGE:-neo4j:5.26-community}"
 # A one-item smoke needs a tiny fraction of this; override it rather than paying full freight.
 LME_NEO4J_HEAP="${LME_NEO4J_HEAP:-2G}"
 
+# Avoid `docker ps | grep -q` for container detection. Every caller enables
+# `set -o pipefail`; when the wanted container is near the start of a long list,
+# grep exits after the match and Docker can receive SIGPIPE, turning a true match
+# into status 1. Container inspect is exact and emits no multi-row pipeline.
+lme_container_exists() {
+  docker container inspect "$1" >/dev/null 2>&1
+}
+
+lme_container_running() {
+  local running
+  running="$(docker container inspect --format '{{.State.Running}}' "$1" 2>/dev/null || true)"
+  [ "${running}" = "true" ]
+}
+
 # ---- Menhir serve ports (one per workflow) ----
 LME_PORT_BUILD="${LME_PORT_BUILD:-8102}"               # build_graph.sh
 LME_PORT_RECALL="${LME_PORT_RECALL:-8103}"             # recall_ab.sh (shared persistent graph)

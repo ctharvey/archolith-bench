@@ -25,7 +25,7 @@ die() { printf '[retry] ERROR: %s\n' "$*" >&2; exit 1; }
 
 # ---- preflight --------------------------------------------------------------
 command -v docker >/dev/null 2>&1 || die "docker not on PATH"
-docker ps --format '{{.Names}}' | grep -qx "${LME_NEO4J_NAME}" \
+lme_container_running "${LME_NEO4J_NAME}" \
   || die "${LME_NEO4J_NAME} is not running — start it with: docker start ${LME_NEO4J_NAME}"
 [ -f "${MENHIR_FRONTIER_PY}" ] || die "menhir-frontier venv python missing: ${MENHIR_FRONTIER_PY}"
 [ -f "${MENHIR_FRONTIER_BIN}" ] || [ -f "${MENHIR_FRONTIER_BIN}.exe" ] \

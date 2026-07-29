@@ -42,7 +42,7 @@ command -v docker >/dev/null 2>&1 || die "docker is not on PATH"
 log "Menhir fix commit and fixture contract verified"
 
 if [ "${LME_FIXTURE_ALLOW_RESUME:-0}" != "1" ]; then
-  if docker ps -a --format '{{.Names}}' | grep -Fxq "${LME_NEO4J_NAME}"; then
+  if lme_container_exists "${LME_NEO4J_NAME}"; then
     die "container ${LME_NEO4J_NAME} already exists; choose a new LME_FIXTURE_RUN_ID or set LME_FIXTURE_ALLOW_RESUME=1"
   fi
   if docker volume inspect "${LME_NEO4J_VOL}" >/dev/null 2>&1; then

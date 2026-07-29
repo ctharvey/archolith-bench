@@ -41,7 +41,7 @@ VOLUME_PRE_EXISTED="false"
 docker volume inspect "${LME_NEO4J_VOL}" >/dev/null 2>&1 && VOLUME_PRE_EXISTED="true"
 
 CONTAINER_PRE_EXISTED="false"
-docker ps -a --format '{{.Names}}' | grep -qx "${LME_NEO4J_NAME}" && CONTAINER_PRE_EXISTED="true"
+lme_container_exists "${LME_NEO4J_NAME}" && CONTAINER_PRE_EXISTED="true"
 if [ "${LME_REQUIRE_FRESH}" = "1" ]; then
   [ "${VOLUME_PRE_EXISTED}" = "false" ] || die "fresh build refused: volume already exists: ${LME_NEO4J_VOL}"
   [ "${CONTAINER_PRE_EXISTED}" = "false" ] || die "fresh build refused: container already exists: ${LME_NEO4J_NAME}"
@@ -49,8 +49,8 @@ if [ "${LME_REQUIRE_FRESH}" = "1" ]; then
 fi
 
 GRAPH_FRESH="false"
-if ! docker ps --format '{{.Names}}' | grep -qx "${LME_NEO4J_NAME}"; then
-  if docker ps -a --format '{{.Names}}' | grep -qx "${LME_NEO4J_NAME}"; then
+if ! lme_container_running "${LME_NEO4J_NAME}"; then
+  if lme_container_exists "${LME_NEO4J_NAME}"; then
     log "starting existing ${LME_NEO4J_NAME}..."; docker start "${LME_NEO4J_NAME}" >/dev/null
   else
     log "creating persistent Neo4j ${LME_NEO4J_NAME} (bolt ${LME_BOLT})..."

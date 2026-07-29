@@ -116,6 +116,32 @@ def test_build_graph_wires_same_namespace_window_into_menhir_workers() -> None:
     assert '"ingest_concurrency": ${LME_INGEST_CONCURRENCY}' in script
 
 
+def test_longmemeval_container_guards_do_not_use_pipefail_sensitive_grep() -> None:
+    config = (ROOT / "scripts" / "longmemeval" / "config.sh").read_text(encoding="utf-8")
+    assert "lme_container_exists()" in config
+    assert "lme_container_running()" in config
+    assert "docker container inspect" in config
+
+    for relative_path in (
+        "build_graph.sh",
+        "promote_persistent.sh",
+        "recall_ab.sh",
+        "retry.sh",
+        "run_knowledge_update_buildout.sh",
+        "run_ku_adaptive.sh",
+        "run_ku_adaptive_full.sh",
+        "run_ku_nosplit.sh",
+        "run_ku_nosplit_full.sh",
+        "run_ku_split15.sh",
+        "run_suburbs_fixture.sh",
+    ):
+        script = (ROOT / "scripts" / "longmemeval" / relative_path).read_text(
+            encoding="utf-8"
+        )
+        assert "docker ps --format '{{.Names}}' | grep -" not in script
+        assert "docker ps -a --format '{{.Names}}' | grep -" not in script
+
+
 def test_buildout_wrapper_records_every_phase_with_effective_settings() -> None:
     """Provenance must describe the phases that ran, not the intent captured at preflight."""
     script = (

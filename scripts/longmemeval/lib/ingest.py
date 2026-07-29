@@ -775,20 +775,45 @@ def _write_manifest(path: Path, manifest: list[dict]) -> None:
 
 def _require_no_failed_episodes(
     drained_by_namespace: dict[str, dict[str, int | bool]],
+    *,
+    max_failures_per_namespace: int = 0,
 ) -> None:
-    """Stop a scalar build before more paid work when a completed window is incomplete."""
+    """Stop a scalar build before more paid work when a completed window is incomplete.
+
+    ``max_failures_per_namespace`` (default 0, override via ``LME_KU_MAX_FAILURES_PER_NS``)
+    allows a small number of FAILED episodes per namespace without stopping the build.
+    Evidence projections of phatic/negated content sometimes produce entities but zero
+    edges even after the bounded repair — these are logged but acceptable for benchmark
+    scoring.  Setting this to 0 preserves the strict original behaviour.
+    """
+    threshold = int(os.getenv("LME_KU_MAX_FAILURES_PER_NS", str(max_failures_per_namespace)))
     residual_failures = {
         namespace: int(drained.get("failed", 0))
         for namespace, drained in drained_by_namespace.items()
-        if int(drained.get("failed", 0)) > 0
+        if int(drained.get("failed", 0)) > threshold
     }
+    # Always log failures even when under threshold
+    minor_failures = {
+        namespace: int(drained.get("failed", 0))
+        for namespace, drained in drained_by_namespace.items()
+        if 0 < int(drained.get("failed", 0)) <= threshold
+    }
+    if minor_failures:
+        details = ", ".join(
+            f"{namespace}={failed}" for namespace, failed in minor_failures.items()
+        )
+        print(
+            f"    tolerated {sum(minor_failures.values())} FAILED episode(s) under "
+            f"threshold {threshold}: {details}",
+            flush=True,
+        )
     if residual_failures:
         details = ", ".join(
             f"{namespace}={failed}" for namespace, failed in residual_failures.items()
         )
         raise RuntimeError(
             "scalar namespace window has residual FAILED episodes after immediate retry; "
-            "refusing further paid work: " + details
+            f"refusing further paid work (threshold={threshold}): " + details
         )
 
 

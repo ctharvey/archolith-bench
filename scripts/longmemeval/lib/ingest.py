@@ -473,7 +473,7 @@ def _ingest_window(
     menhir_url: str,
     *,
     timeout_s: float,
-    poll_s: float = 0.1,
+    poll_s: float = 1.0,
 ) -> dict[str, int]:
     """Keep one episode active per namespace while distinct namespaces run concurrently.
 

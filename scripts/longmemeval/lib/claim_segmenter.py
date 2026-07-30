@@ -268,13 +268,13 @@ def has_durable_signals(text: str) -> bool:
 
     A miss here silently drops a knowledge update from graph extraction, so the
     signal set deliberately covers the shapes LongMemEval knowledge-update items
-    use: first-person durable verbs, state-change verbs (inflected or presupposed
-    by a wh-question), correction markers, named sentence subjects, possessive
-    assertions ("my mom uses the same app"), frequencies ("three times a week"),
-    and quantities ("$2,400", "three years").
+    use: first-person durable verbs in declarative clauses, state-change verbs
+    (inflected or presupposed by a wh-question), correction markers, named
+    sentence subjects, possessive assertions ("my mom uses the same app"),
+    frequencies ("three times a week"), and quantities ("$2,400", "three years").
     """
     return bool(
-        _FIRST_PERSON_DURABLE.search(text)
+        _has_first_person_durable_assertion(text)
         or _STATE_CHANGE_VERBS.search(text)
         or _PRESUPPOSITIONAL_CHANGE.search(text)
         or _has_correction_signal(text)
@@ -388,6 +388,24 @@ _REACTIVE_CLAUSE = re.compile(
 
 def _clauses(sentence: str) -> list[str]:
     return [clause.strip() for clause in _CLAUSE_BOUNDARY.split(sentence) if clause.strip()]
+
+
+def _has_first_person_durable_assertion(text: str) -> bool:
+    """Whether a declarative clause contains a first-person durable verb.
+
+    The durable-verb regex is intentionally broad, but applying it to a complete
+    question mistakes embedded phrases such as "the pair I need?" for knowledge
+    updates. Check the same clause boundaries used by
+    :func:`has_first_person_declarative` and ignore clauses that ask rather than
+    tell.
+    """
+    for sentence in _SENTENCE_BOUNDARY.split(text):
+        for clause in _clauses(sentence):
+            if clause.rstrip().endswith("?") or _QUESTION_CLAUSE.match(clause):
+                continue
+            if _FIRST_PERSON_DURABLE.search(clause):
+                return True
+    return False
 
 
 def has_first_person_declarative(text: str) -> bool:

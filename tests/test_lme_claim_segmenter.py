@@ -98,6 +98,26 @@ def test_yes_no_questions_stay_conservative(text: str) -> None:
     assert segmenter.segmentation_mode("user", text) == MODE.CONTEXT_ONLY
 
 
+def test_first_person_durable_signal_is_clause_aware() -> None:
+    """A durable verb nested inside a question object is not itself an assertion."""
+    fact_free_question = (
+        "What's the best way to organize my shoe rack to make it easy to find the pair I need? "
+        "Should I sort them by type, color, or occasion?"
+    )
+    declarative_then_question = (
+        "I need to get some fresh herbs like cilantro and parsley for my fajitas, "
+        "do you have any tips on how to keep them fresh for a longer period?"
+    )
+
+    # Both strings contain the same lexical signal; only one uses it in a declarative clause.
+    assert segmenter._FIRST_PERSON_DURABLE.search(fact_free_question)
+    assert segmenter._FIRST_PERSON_DURABLE.search(declarative_then_question)
+    assert segmenter._has_first_person_durable_assertion(fact_free_question) is False
+    assert segmenter._has_first_person_durable_assertion(declarative_then_question) is True
+    assert segmenter.segmentation_mode("user", fact_free_question) == MODE.CONTEXT_ONLY
+    assert segmenter.segmentation_mode("user", declarative_then_question) == MODE.EXTRACT_WHOLE
+
+
 @pytest.mark.parametrize(
     "text",
     [

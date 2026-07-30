@@ -111,6 +111,8 @@ def test_current_scalar_buildout_wrapper_is_fail_closed() -> None:
     )
     assert 'scalar_history=${LME_SCALAR_HISTORY_ENABLED}' in script
     assert '--preflight-only' in script
+    assert '[ "${LME_NONCANONICAL}" = "1" ] && PROVENANCE_BEGIN_ARGS+=("--noncanonical")' in script
+    assert '"${PROVENANCE_BEGIN_ARGS[@]}"' in script
 
 
 def test_build_graph_wires_same_namespace_window_into_menhir_workers() -> None:

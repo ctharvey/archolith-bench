@@ -318,7 +318,10 @@ EOF
 # clock, and overwriting the record replaces what happened with what this attempt intends.
 # `begin` also refuses a resume whose run_id/arm/fixture/container identity disagrees with
 # the record, and marks phases the killed attempt left open as interrupted.
-"${BENCH_PY}" "${PROVENANCE_TOOL}" begin "${PROVENANCE_PATH}" "${ATTEMPT_RECORD}" ||
+PROVENANCE_BEGIN_ARGS=()
+[ "${LME_NONCANONICAL}" = "1" ] && PROVENANCE_BEGIN_ARGS+=("--noncanonical")
+"${BENCH_PY}" "${PROVENANCE_TOOL}" begin "${PROVENANCE_PATH}" "${ATTEMPT_RECORD}" \
+  "${PROVENANCE_BEGIN_ARGS[@]}" ||
   die "provenance refused this attempt; see the error above"
 rm -f "${ATTEMPT_RECORD}"
 log "provenance recorded: ${PROVENANCE_PATH}"

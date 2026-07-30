@@ -90,6 +90,8 @@ export PYTHONPATH="${SRC_DIR}/src"          # load the variant's source over the
 EMPTY_ENV="$(mktemp)"; export ENV_FILE="${EMPTY_ENV}"
 export MENHIR_LOG_DIR="${RUN_OUTPUT_DIR}/menhir-logs"; mkdir -p "${MENHIR_LOG_DIR}"
 export MENHIR_BENCHMARK_MODE=1 MENHIR_API_HOST=127.0.0.1 MENHIR_API_PORT="${MENHIR_PORT}"
+# Per-run telemetry: recall menhir writes its own SQLite sidecar alongside the recall results.
+export MENHIR_MCP_TELEMETRY_DB="${RUN_OUTPUT_DIR}/mcp_telemetry.db"
 export OTEL_SDK_DISABLED=true LANGFUSE_TRACING_ENABLED=false LANGFUSE_PUBLIC_KEY="" LANGFUSE_SECRET_KEY="" LANGFUSE_HOST=""
 export MENHIR_OPERATOR_KEY="" MENHIR_AGENT_KEY="" MENHIR_READONLY_KEY="" MENHIR_API_KEY=""
 export NEO4J_URI="bolt://localhost:${LME_BOLT}" NEO4J_USER="neo4j" NEO4J_PASSWORD="${LME_NEO4J_PW}" NEO4J_DATABASE="neo4j"

@@ -102,12 +102,16 @@ cat > "${GRAPH_ATTEMPT_RECORD}" <<EOF
   "scalar_canonical_self": ${LME_SCALAR_CANONICAL_SELF},
   "scalar_output_required": ${LME_REQUIRE_SCALAR_OUTPUT},
   "turn_evidence_required": ${LME_REQUIRE_TURN_EVIDENCE},
+  "menhir_commit": "$(git -C "${MENHIR_MAIN}" rev-parse HEAD 2>/dev/null || echo unknown)",
+  "bench_commit": "$(git -C "${BENCH_DIR}" rev-parse HEAD 2>/dev/null || echo unknown)",
   "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "build_started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 EOF
-"${BENCH_PY}" "${GRAPH_PROVENANCE_TOOL}" begin "${GRAPH_PROVENANCE_PATH}" "${GRAPH_ATTEMPT_RECORD}" ||
-  die "graph provenance refused this attempt (container/volume identity mismatch); see above"
+PROVENANCE_BEGIN_ARGS=("begin" "${GRAPH_PROVENANCE_PATH}" "${GRAPH_ATTEMPT_RECORD}")
+[ "${LME_NONCANONICAL}" = "1" ] && PROVENANCE_BEGIN_ARGS+=("--noncanonical")
+"${BENCH_PY}" "${GRAPH_PROVENANCE_TOOL}" "${PROVENANCE_BEGIN_ARGS[@]}" ||
+  die "graph provenance refused this attempt (identity or commit mismatch); see above"
 rm -f "${GRAPH_ATTEMPT_RECORD}"
 # A phase is only reproducible if it names the code that ran it and the data it ran on.
 # build_graph.sh can be invoked directly, so the fixture hash/count are recorded when the
@@ -128,8 +132,10 @@ fi
   "${GRAPH_FIXTURE_SETTINGS[@]}" \
   --setting "menhir_commit=$(git -C "${MENHIR_MAIN}" rev-parse HEAD 2>/dev/null || echo unknown)" \
   --setting "bench_commit=$(git -C "${BENCH_DIR}" rev-parse HEAD 2>/dev/null || echo unknown)" \
-  --setting "menhir_dirty=$([ -n "$(git -C "${MENHIR_MAIN}" status --porcelain --untracked-files=no 2>/dev/null)" ] && echo true || echo false)" \
-  --setting "bench_dirty=$([ -n "$(git -C "${BENCH_DIR}" status --porcelain --untracked-files=no 2>/dev/null)" ] && echo true || echo false)" \
+  --setting "menhir_dirty=$([ -n "$(git -C "${MENHIR_MAIN}" status --porcelain 2>/dev/null)" ] && echo true || echo false)" \
+  --setting "bench_dirty=$([ -n "$(git -C "${BENCH_DIR}" status --porcelain 2>/dev/null)" ] && echo true || echo false)" \
+  --setting "menhir_untracked=$(git -C "${MENHIR_MAIN}" ls-files --others --exclude-standard 2>/dev/null | wc -l | tr -d ' ')" \
+  --setting "bench_untracked=$(git -C "${BENCH_DIR}" ls-files --others --exclude-standard 2>/dev/null | wc -l | tr -d ' ')" \
   --setting "dataset=${LME_DATASET}" \
   --setting "variant=${LONGMEMEVAL_VARIANT}" \
   --setting "namespace_prefix=${LME_NS_PREFIX}" \
@@ -149,6 +155,22 @@ fi
   --setting "scalar_reconcile_subject=${LME_SCALAR_RECONCILE_SUBJECT}" \
   --setting "turn_evidence_required=${LME_REQUIRE_TURN_EVIDENCE}"
 log "graph provenance recorded: ${GRAPH_PROVENANCE_PATH} (graph_fresh=${GRAPH_FRESH})"
+
+# ---- untracked-file preflight ----
+# Tracked-only dirty checks prove committed source is clean, but untracked .py files in
+# src/ or scripts/ can shadow committed modules and make the executed code differ from what
+# the commit hash claims. Warn loudly; refuse in canonical mode.
+MENHIR_UNTRACKED="$(git -C "${MENHIR_MAIN}" ls-files --others --exclude-standard -- 'src/' 'scripts/' 2>/dev/null || true)"
+BENCH_UNTRACKED="$(git -C "${BENCH_DIR}" ls-files --others --exclude-standard -- 'scripts/' 'archolith_bench/' 2>/dev/null || true)"
+if [ -n "${MENHIR_UNTRACKED}" ] || [ -n "${BENCH_UNTRACKED}" ]; then
+  log "WARNING: untracked source files detected:"
+  [ -n "${MENHIR_UNTRACKED}" ] && printf '  menhir: %s\n' ${MENHIR_UNTRACKED} >&2
+  [ -n "${BENCH_UNTRACKED}" ] && printf '  bench:  %s\n' ${BENCH_UNTRACKED} >&2
+  if [ "${LME_NONCANONICAL}" != "1" ]; then
+    die "canonical build refused: untracked source files may shadow committed code. Commit them, remove them, or set LME_NONCANONICAL=1."
+  fi
+  log "continuing (LME_NONCANONICAL=1)"
+fi
 
 # ---- temp menhir for ingestion (stopped on exit; Neo4j persists) ----
 MENHIR_PID=""
@@ -185,6 +207,11 @@ export MENHIR_MAX_LLM_CALLS_PER_JOB=20
 # Menhir allows this many distinct namespaces to enrich concurrently. ingest.py uses the same
 # value for its namespace window and keeps only one active episode in each namespace.
 export MENHIR_INGEST_CONCURRENCY="${LME_INGEST_CONCURRENCY}"
+# Per-run telemetry: each build gets its own SQLite sidecar so vote receipts, lifecycle
+# events, and scalar audit trails are preserved with the results and attributable to this
+# exact run. The dashboard's ScalarTaskReader reads from this path.
+export MENHIR_MCP_TELEMETRY_DB="${LME_RESULTS_DIR}/mcp_telemetry.db"
+log "telemetry DB: ${MENHIR_MCP_TELEMETRY_DB}"
 export OTEL_SDK_DISABLED=true LANGFUSE_TRACING_ENABLED=false LANGFUSE_PUBLIC_KEY="" LANGFUSE_SECRET_KEY="" LANGFUSE_HOST=""
 export MENHIR_OPERATOR_KEY="" MENHIR_AGENT_KEY="" MENHIR_READONLY_KEY="" MENHIR_API_KEY=""
 export NEO4J_URI="bolt://localhost:${LME_BOLT}" NEO4J_USER="neo4j" NEO4J_PASSWORD="${LME_NEO4J_PW}" NEO4J_DATABASE="neo4j"

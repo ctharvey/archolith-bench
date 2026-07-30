@@ -83,14 +83,14 @@ def test_resume_preserves_phases_and_original_start(tmp_path: Path) -> None:
     )
     provenance._write_atomic(path, document)
 
-    _begin(path, started_at="2026-07-30T09:00:00Z", resumed=True, menhir_commit="cccc333")
+    _begin(path, started_at="2026-07-30T09:00:00Z", resumed=True)
     resumed = provenance._read(path)
 
     # The earlier attempt's work is still on record, dated when it actually happened.
     assert resumed["first_started_at"] == "2026-07-29T00:00:00Z"
     assert [phase["phase"] for phase in resumed["phases"]] == ["build-graph"]
-    assert [attempt["menhir_commit"] for attempt in resumed["attempts"]] == ["aaaa111", "cccc333"]
-    assert resumed["latest_attempt"]["menhir_commit"] == "cccc333"
+    assert [attempt["menhir_commit"] for attempt in resumed["attempts"]] == ["aaaa111", "aaaa111"]
+    assert resumed["latest_attempt"]["menhir_commit"] == "aaaa111"
     assert resumed["last_started_at"] == "2026-07-30T09:00:00Z"
 
 
@@ -134,17 +134,14 @@ def test_resume_never_restates_the_top_level_record(tmp_path: Path) -> None:
 def test_every_attempt_is_kept_in_full(tmp_path: Path) -> None:
     path = tmp_path / "run_provenance.json"
     _begin(path, menhir_commit="aaaa111")
-    _begin(path, started_at="2026-07-30T09:00:00Z", resumed=True, menhir_commit="bbbb222")
-    _begin(path, started_at="2026-07-31T09:00:00Z", resumed=True, menhir_commit="cccc333")
+    _begin(path, started_at="2026-07-30T09:00:00Z", resumed=True, menhir_commit="aaaa111")
+    _begin(path, started_at="2026-07-31T09:00:00Z", resumed=True, menhir_commit="aaaa111")
     document = provenance._read(path)
 
     assert document["attempt_count"] == 3
     assert [attempt["attempt"] for attempt in document["attempts"]] == [1, 2, 3]
-    assert [attempt["menhir_commit"] for attempt in document["attempts"]] == [
-        "aaaa111",
-        "bbbb222",
-        "cccc333",
-    ]
+    # All attempts share the same commit (canonical mode enforces this).
+    assert all(a["menhir_commit"] == "aaaa111" for a in document["attempts"])
     # Full snapshots, not a four-field summary.
     assert document["attempts"][0]["fixture_sha256"] == "deadbeef"
     assert document["attempts"][0]["container"] == "menhir-lme-ku-baseline-20260729"
@@ -331,3 +328,75 @@ def test_cli_round_trip_records_a_full_run(tmp_path: Path) -> None:
     assert document["phases"][0]["status"] == "completed"
     assert document["phases"][0]["effective_settings"]["segmentation"] == "adaptive"
     assert not path.with_suffix(".json.tmp").exists()
+
+
+# ---------------------------------------------------------------------------
+# Commit immutability (canonical vs noncanonical)
+# ---------------------------------------------------------------------------
+
+def test_canonical_resume_refuses_menhir_commit_drift(tmp_path: Path) -> None:
+    path = tmp_path / "run_provenance.json"
+    _begin(path, menhir_commit="aaaa111")
+
+    with pytest.raises(provenance.ProvenanceMismatch, match="menhir_commit"):
+        provenance.begin(path, _attempt(menhir_commit="dddd444", resumed=True))
+
+
+def test_canonical_resume_refuses_bench_commit_drift(tmp_path: Path) -> None:
+    path = tmp_path / "run_provenance.json"
+    _begin(path, bench_commit="bbbb222")
+
+    with pytest.raises(provenance.ProvenanceMismatch, match="bench_commit"):
+        provenance.begin(path, _attempt(bench_commit="eeee555", resumed=True))
+
+
+def test_noncanonical_permits_commit_drift(tmp_path: Path) -> None:
+    path = tmp_path / "run_provenance.json"
+    _begin(path, menhir_commit="aaaa111", bench_commit="bbbb222")
+
+    document = provenance.begin(
+        path,
+        _attempt(menhir_commit="dddd444", bench_commit="eeee555", resumed=True),
+        noncanonical=True,
+    )
+
+    assert document["noncanonical"] is True
+    assert document["latest_attempt"]["menhir_commit"] == "dddd444"
+
+
+def test_noncanonical_labels_even_first_attempt(tmp_path: Path) -> None:
+    path = tmp_path / "run_provenance.json"
+    document = provenance.begin(path, _attempt(), noncanonical=True)
+
+    assert document["noncanonical"] is True
+
+
+def test_canonical_resume_with_same_commits_is_allowed(tmp_path: Path) -> None:
+    path = tmp_path / "run_provenance.json"
+    _begin(path, menhir_commit="aaaa111", bench_commit="bbbb222")
+
+    # Same commits — no error
+    _begin(path, started_at="2026-07-30T09:00:00Z", resumed=True,
+           menhir_commit="aaaa111", bench_commit="bbbb222")
+    document = provenance._read(path)
+    assert document["attempt_count"] == 2
+    assert "noncanonical" not in document
+
+
+def test_commits_stored_in_identity(tmp_path: Path) -> None:
+    path = tmp_path / "run_provenance.json"
+    _begin(path, menhir_commit="aaaa111", bench_commit="bbbb222")
+    document = provenance._read(path)
+
+    assert document["identity"]["menhir_commit"] == "aaaa111"
+    assert document["identity"]["bench_commit"] == "bbbb222"
+
+
+def test_cli_noncanonical_flag(tmp_path: Path) -> None:
+    path = tmp_path / "run_provenance.json"
+    record = tmp_path / "attempt.json"
+    record.write_text(json.dumps(_attempt()), encoding="utf-8")
+
+    assert provenance.main(["begin", str(path), str(record), "--noncanonical"]) == 0
+    document = provenance._read(path)
+    assert document["noncanonical"] is True

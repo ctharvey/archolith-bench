@@ -46,6 +46,14 @@ IMMUTABLE_KEYS = (
     "namespace_prefix",
 )
 
+# Code-commit keys are immutable in canonical mode. A resume that changes the Menhir or bench
+# commit is building a mixed-code graph, which makes the result unattributable. Canonical runs
+# refuse this; a ``noncanonical`` flag relaxes it for development iteration.
+COMMIT_KEYS = (
+    "menhir_commit",
+    "bench_commit",
+)
+
 # Phase statuses. "interrupted" is assigned retroactively: a phase recorded as started that
 # never recorded an end means the process died inside it.
 STATUS_STARTED = "started"
@@ -99,12 +107,28 @@ def identity_of(document: dict[str, Any]) -> dict[str, Any]:
     return {key: source[key] for key in IMMUTABLE_KEYS if key in source}
 
 
-def assert_same_run(previous: dict[str, Any], attempt: dict[str, Any]) -> None:
+def commits_of(document: dict[str, Any]) -> dict[str, Any]:
+    """The commit identity carried by *document*, ignoring keys it never had."""
+    stored = document.get("identity")
+    source = stored if isinstance(stored, dict) else document
+    return {key: source[key] for key in COMMIT_KEYS if key in source}
+
+
+def assert_same_run(
+    previous: dict[str, Any],
+    attempt: dict[str, Any],
+    *,
+    noncanonical: bool = False,
+) -> None:
     """Refuse a resume whose identity differs from the record it would extend.
 
     Only keys the earlier record actually carried are compared -- different wrappers write
     different subsets -- but a key that was present and is now absent counts as a mismatch,
     because it means the new attempt cannot demonstrate it is the same run.
+
+    In canonical mode (default), code commits are also immutable: a resume that changes
+    ``menhir_commit`` or ``bench_commit`` is building a mixed-code graph. Pass
+    ``noncanonical=True`` to relax commit checking for development iteration.
     """
     established = identity_of(previous)
     incoming = identity_of(attempt)
@@ -122,6 +146,24 @@ def assert_same_run(previous: dict[str, Any], attempt: dict[str, Any]) -> None:
             "refusing to resume: this attempt does not match the recorded run identity "
             f"({details})"
         )
+
+    if not noncanonical:
+        established_commits = commits_of(previous)
+        incoming_commits = commits_of(attempt)
+        commit_mismatched = {
+            key: (value, incoming_commits.get(key))
+            for key, value in established_commits.items()
+            if incoming_commits.get(key) != value
+        }
+        if commit_mismatched:
+            details = ", ".join(
+                f"{key}: recorded={recorded!r} attempted={attempted!r}"
+                for key, (recorded, attempted) in sorted(commit_mismatched.items())
+            )
+            raise ProvenanceMismatch(
+                "refusing canonical resume: code commits changed since the original attempt "
+                f"({details}). Set LME_NONCANONICAL=1 to permit mixed-code development runs."
+            )
 
 
 def mark_interrupted(phases: list[dict[str, Any]], at: str) -> int:
@@ -156,7 +198,12 @@ def manifest_state(manifest_path: Path | None) -> dict[str, Any]:
     }
 
 
-def begin(path: Path, attempt: dict[str, Any]) -> dict[str, Any]:
+def begin(
+    path: Path,
+    attempt: dict[str, Any],
+    *,
+    noncanonical: bool = False,
+) -> dict[str, Any]:
     """Start (or resume) a run. On resume this ADDS ONLY -- it never restates the top level.
 
     The top-level fields belong to the attempt that created the run, and they describe the
@@ -170,6 +217,10 @@ def begin(path: Path, attempt: dict[str, Any]) -> dict[str, Any]:
     So: the top level is written once and frozen. Every attempt, the first included, is stored
     whole in ``attempts``; ``latest_attempt`` mirrors the most recent for readers that want
     current values without walking the list.
+
+    When *noncanonical* is true, code-commit drift between attempts is permitted but the
+    document is labelled ``noncanonical`` so downstream consumers (ir-gate, the acceptance
+    report) can distinguish development iteration from an attributable canonical run.
     """
     started_at = attempt.get("started_at") or _now()
     snapshot = dict(attempt)
@@ -177,6 +228,7 @@ def begin(path: Path, attempt: dict[str, Any]) -> dict[str, Any]:
     if not path.exists():
         document = dict(attempt)
         document["identity"] = identity_of(attempt)
+        document["identity"].update(commits_of(attempt))
         document["first_started_at"] = started_at
         document["phases"] = []
         document["attempts"] = [{**snapshot, "attempt": 1, "phases_interrupted": 0}]
@@ -184,10 +236,14 @@ def begin(path: Path, attempt: dict[str, Any]) -> dict[str, Any]:
         # Present from the first write, so a reader never has to special-case attempt one.
         document["last_started_at"] = started_at
         document["attempt_count"] = 1
+        if noncanonical:
+            document["noncanonical"] = True
         return document
 
     document = _read(path)
-    assert_same_run(document, attempt)
+    assert_same_run(document, attempt, noncanonical=noncanonical)
+    if noncanonical and not document.get("noncanonical"):
+        document["noncanonical"] = True
     phases = document.setdefault("phases", [])
     interrupted = mark_interrupted(phases, started_at)
     attempts = document.setdefault("attempts", [])
@@ -244,6 +300,10 @@ def _build_parser() -> argparse.ArgumentParser:
     begin_parser = subparsers.add_parser("begin")
     begin_parser.add_argument("path", type=Path)
     begin_parser.add_argument("record", type=Path)
+    begin_parser.add_argument(
+        "--noncanonical", action="store_true",
+        help="Permit mixed-code resumes (commit drift). Labels the run noncanonical.",
+    )
 
     start_parser = subparsers.add_parser("phase-start")
     start_parser.add_argument("path", type=Path)
@@ -268,7 +328,9 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
 
     if args.verb == "begin":
-        document = begin(args.path, _read(args.record))
+        document = begin(
+            args.path, _read(args.record), noncanonical=args.noncanonical,
+        )
     elif args.verb == "phase-start":
         document = phase_start(
             _read(args.path),

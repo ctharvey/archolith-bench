@@ -85,6 +85,11 @@ LME_SCORER="${LME_SCORER:-llm-judge}"
 # default; override explicitly when reproducing an older arm.
 LME_SEGMENTATION="${LME_SEGMENTATION:-adaptive}"
 LME_REQUIRE_FRESH="${LME_REQUIRE_FRESH:-0}"
+# Noncanonical: permit code-commit drift on resume. A canonical run refuses to resume when the
+# menhir or bench commit changes; set this to 1 for development iteration where you expect to
+# resume a partially-built graph after a code change. The provenance file and all output will be
+# labelled noncanonical.
+LME_NONCANONICAL="${LME_NONCANONICAL:-0}"
 LME_REQUIRE_TURN_EVIDENCE="${LME_REQUIRE_TURN_EVIDENCE:-0}"
 LME_SCALAR_STATE_ENABLED="${LME_SCALAR_STATE_ENABLED:-0}"
 LME_SCALAR_CONSOLIDATION_K="${LME_SCALAR_CONSOLIDATION_K:-3}"

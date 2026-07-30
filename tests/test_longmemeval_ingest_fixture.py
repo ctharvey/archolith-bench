@@ -472,6 +472,105 @@ def test_ingest_window_retries_failure_before_advancing_namespace(
     assert requeued == {"ns-a": 1}
 
 
+def test_retry_failed_evidence_projections_enumerates_generated_children(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    queries: list[str] = []
+    operations: list[tuple[str, dict]] = []
+
+    def fake_cypher(query: str):
+        queries.append(query)
+        if "namespace:'ns-a'" in query:
+            return [["projection-a"], ["projection-b"]]
+        return []
+
+    def fake_backend(admin, url, operation, body):
+        operations.append((operation, body))
+        return True
+
+    monkeypatch.setattr(ingest, "_cypher", fake_cypher)
+    monkeypatch.setattr(ingest, "_backend", fake_backend)
+
+    requeued = ingest._retry_failed_evidence_projections(
+        ["ns-a", "ns-b", "ns-a"],
+        object(),
+        "http://menhir",
+    )
+
+    assert requeued == {"ns-a": 2, "ns-b": 0}
+    assert all("processing_state='FAILED'" in query for query in queries)
+    assert all("coalesce(e.is_evidence_projection, false)" in query for query in queries)
+    assert operations == [
+        ("force_reset_failed_episode", {"episode_uuid": "projection-a"}),
+        ("enqueue_pending_episode", {"episode_uuid": "projection-a"}),
+        ("force_reset_failed_episode", {"episode_uuid": "projection-b"}),
+        ("enqueue_pending_episode", {"episode_uuid": "projection-b"}),
+    ]
+
+
+def test_retry_failed_evidence_projection_fails_closed_when_enqueue_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        ingest,
+        "_failed_evidence_projection_uuids",
+        lambda namespace: ["projection-a"],
+    )
+    responses = iter([True, False])
+    monkeypatch.setattr(
+        ingest,
+        "_backend",
+        lambda admin, url, operation, body: next(responses),
+    )
+
+    with pytest.raises(RuntimeError, match="projection-a.*ns-a"):
+        ingest._retry_failed_evidence_projections(
+            ["ns-a"],
+            object(),
+            "http://menhir",
+        )
+
+
+def test_failed_evidence_projection_retry_redrains_and_updates_manifest_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    initial = {
+        "ns-a": {"failed": 1, "timed_out": False},
+        "ns-b": {"failed": 0, "timed_out": False},
+    }
+    settled = {
+        "ns-a": {"failed": 0, "timed_out": False},
+        "ns-b": {"failed": 0, "timed_out": False},
+    }
+    requeued = {"ns-a": 0, "ns-b": 0}
+    drain_calls: list[list[str]] = []
+
+    monkeypatch.setattr(
+        ingest,
+        "_retry_failed_evidence_projections",
+        lambda namespaces, admin, url: {"ns-a": 1, "ns-b": 0},
+    )
+
+    def fake_drain(namespaces, admin, url, **kwargs):
+        drain_calls.append(namespaces)
+        return settled
+
+    monkeypatch.setattr(ingest, "_drain_many", fake_drain)
+
+    result = ingest._retry_failed_evidence_projections_after_drain(
+        ["ns-a", "ns-b"],
+        object(),
+        "http://menhir",
+        initial,
+        requeued,
+        timeout_s=60.0,
+    )
+
+    assert result is settled
+    assert requeued == {"ns-a": 1, "ns-b": 0}
+    assert drain_calls == [["ns-a", "ns-b"]]
+
+
 def test_manifest_checkpoint_is_atomic(tmp_path: Path) -> None:
     manifest_path = tmp_path / "manifest.json"
     rows = [{"question_id": "one"}]

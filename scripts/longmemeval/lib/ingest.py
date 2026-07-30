@@ -28,8 +28,9 @@ Enrichment completeness (why a namespace-window DRAIN exists):
   not yet claimed still existed, which then slipped an unenriched namespace into scalar
   consolidation and aborted the run.)
 - Benchmark mode disables the scheduler, so FAILED episodes are never auto-retried. The window
-  scheduler immediately makes one best-effort retry before it advances that namespace; a residual
-  failure is recorded in the final manifest.
+  scheduler immediately retries submitted episodes once before advancing that namespace. After
+  drain, a bounded sweep retries generated evidence-projection episodes once; any residual failure
+  is recorded in the final manifest and blocks scalar consolidation.
 """
 from __future__ import annotations
 
@@ -573,6 +574,103 @@ def _drain(
     )[ns]
 
 
+def _failed_evidence_projection_uuids(namespace: str) -> list[str]:
+    """Return failed generated projection episodes in one namespace.
+
+    Submitted transcript episodes are retried by ``_ingest_window`` while their chronological
+    position is still active. Evidence projections are generated asynchronously by Menhir, so
+    their UUIDs are invisible to that scheduler and require this post-drain enumeration.
+    """
+    rows = _cypher(
+        f"MATCH (e:Episodic {{namespace:'{namespace}'}}) "
+        "WHERE e.processing_state='FAILED' "
+        "AND coalesce(e.is_evidence_projection, false) "
+        "RETURN e.uuid AS uuid ORDER BY e.uuid;"
+    )
+    return [str(row[0]) for row in rows if row and str(row[0]).strip()]
+
+
+def _retry_failed_evidence_projections(
+    namespaces: list[str],
+    admin: httpx.Client,
+    menhir_url: str,
+) -> dict[str, int]:
+    """Reset and enqueue each failed generated projection exactly once."""
+    requeued = {namespace: 0 for namespace in dict.fromkeys(namespaces)}
+    for namespace in requeued:
+        for episode_uuid in _failed_evidence_projection_uuids(namespace):
+            reset = _backend(
+                admin,
+                menhir_url,
+                "force_reset_failed_episode",
+                {"episode_uuid": episode_uuid},
+            )
+            if not reset:
+                raise RuntimeError(
+                    "could not reset failed evidence projection "
+                    f"{episode_uuid} in namespace {namespace}"
+                )
+            enqueued = _backend(
+                admin,
+                menhir_url,
+                "enqueue_pending_episode",
+                {"episode_uuid": episode_uuid},
+            )
+            if not enqueued:
+                raise RuntimeError(
+                    "could not enqueue reset evidence projection "
+                    f"{episode_uuid} in namespace {namespace}"
+                )
+            requeued[namespace] += 1
+    return requeued
+
+
+def _retry_failed_evidence_projections_after_drain(
+    namespaces: list[str],
+    admin: httpx.Client,
+    menhir_url: str,
+    drained_by_namespace: dict[str, dict[str, int | bool]],
+    requeued_by_namespace: dict[str, int],
+    *,
+    timeout_s: float,
+) -> dict[str, dict[str, int | bool]]:
+    """Retry generated projection failures once and return the resulting settled snapshot."""
+    if not any(
+        int(drained.get("failed", 0)) > 0
+        for drained in drained_by_namespace.values()
+    ):
+        return drained_by_namespace
+
+    projection_requeues = _retry_failed_evidence_projections(
+        namespaces,
+        admin,
+        menhir_url,
+    )
+    if not any(projection_requeues.values()):
+        return drained_by_namespace
+
+    for namespace, count in projection_requeues.items():
+        requeued_by_namespace[namespace] += count
+    retried_snapshot = _drain_many(
+        namespaces,
+        admin,
+        menhir_url,
+        timeout_s=timeout_s,
+    )
+    timed_out = [
+        namespace
+        for namespace, drained in retried_snapshot.items()
+        if drained.get("timed_out")
+    ]
+    if timed_out:
+        raise RuntimeError(
+            "namespace-window projection retry drain timed out; "
+            "refusing to manifest incomplete namespaces: "
+            + ", ".join(timed_out)
+        )
+    return retried_snapshot
+
+
 def _episode_processing(
     admin: httpx.Client,
     menhir_url: str,
@@ -903,7 +1001,7 @@ def _require_no_failed_episodes(
             f"{namespace}={failed}" for namespace, failed in residual_failures.items()
         )
         raise RuntimeError(
-            "scalar namespace window has residual FAILED episodes after immediate retry; "
+            "scalar namespace window has residual FAILED episodes after bounded retry; "
             "refusing further paid work: " + details
         )
 
@@ -1010,6 +1108,19 @@ def main(argv: list[str] | None = None) -> int:
                 "namespace-window drain timed out; refusing to manifest incomplete namespaces: "
                 + ", ".join(timed_out)
             )
+
+        # Menhir creates evidence-projection episodes asynchronously. Their UUIDs never pass
+        # through _ingest_window's submitted-episode scheduler, so enumerate and retry only
+        # those generated children here. Submitted parent episodes keep their existing one-retry
+        # limit and cannot accidentally receive a second attempt from this sweep.
+        drained_by_namespace = _retry_failed_evidence_projections_after_drain(
+            window_namespaces,
+            admin,
+            args.menhir_url,
+            drained_by_namespace,
+            requeued_by_namespace,
+            timeout_s=args.drain_timeout,
+        )
         if args.consolidate_scalar:
             _require_no_failed_episodes(drained_by_namespace)
 

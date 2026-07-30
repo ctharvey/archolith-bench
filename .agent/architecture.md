@@ -41,6 +41,12 @@ attempt is not presented as provenance for the graph currently on screen. Eviden
 both `occurred_at` source/world time and `recorded_at` Menhir-ingest time; historical LME ordering
 must never be inferred from the latter.
 
+The scalar explorer shows `scalar_state` and `scalar_history` Views side by side. History Views
+render advisory entry tables (source time / operation / value / stated span) with a delta-only
+warning; when `scalar_state` abstains, the answer section shows the abstention reason alongside the
+advisory history with the latest delta value. `ScalarTaskReader.read()` returns `history_views`
+with parsed JSON payload and op_counts.
+
 The browser calls `/api/scalar-tasks` for manifest-scoped choices and
 `/api/scalar-task?namespace=...` for one snapshot. Bolt credentials and the telemetry path remain
 inside the dashboard process. The page refresh loop replaces only benchmark progress, so an open

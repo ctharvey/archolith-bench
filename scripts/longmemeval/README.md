@@ -154,6 +154,31 @@ Every `recall-ab` run writes `results/lme-recall-<variant>/run_manifest.json` â€
 
 Reproduce a run from the manifest alone (modulo API randomness).
 
+## Per-run Telemetry
+
+Both `build_graph.sh` and `recall_ab.sh` export `MENHIR_MCP_TELEMETRY_DB` to a run-local SQLite
+path (`$LME_RESULTS_DIR/mcp_telemetry.db` for builds, `$RUN_OUTPUT_DIR/mcp_telemetry.db` for
+recall). This preserves vote receipts, lifecycle events, and scalar audit trails alongside results
+so the dashboard's `ScalarTaskReader` can display them and the acceptance validator can check for
+their presence.
+
+## Acceptance Validation
+
+`lme.sh validate [--expected N]` runs `lib/validate_run.py` against the current provenance file,
+manifest, and telemetry DB. It emits a machine-readable JSON report covering:
+
+- **manifest cardinality** (expected vs actual items)
+- **zero failed episodes** (strict zero-tolerance policy)
+- **projection counts** (assertions, scalar_state Views)
+- **namespace isolation** (all namespaces start with the configured prefix)
+- **commit immutability** (all attempts ran the same Menhir and bench code)
+- **canonical label** (warns if the run is marked noncanonical)
+- **telemetry presence** (DB exists and has lifecycle events)
+- **no interrupted phases** (all phases completed cleanly)
+
+Exit 0 on PASS; exit 1 on any FAIL check. The report is also written to
+`$LME_RESULTS_DIR/acceptance-report.json`.
+
 ## run_provenance.json Contract (append-only)
 
 A buildout is resumable, so its provenance file outlives the process that created it. Every write
@@ -163,7 +188,7 @@ it. This applies to `run_provenance.json` and to `graph-provenance-<container>.j
 | Field | Meaning |
 |---|---|
 | *(top level)* | Frozen after the first attempt. Describes the graph on disk â€” `graph_fresh`, `volume_pre_existed`, dataset, and the settings the data was actually ingested under. `lme.sh ir-gate` reads `graph_fresh` from here. |
-| `identity` | `run_id`, `arm`, fixture hash/count, container/volume, dataset, variant, and namespace prefix (when supplied by that wrapper). A resume that disagrees on any recorded identity field is **refused**. |
+| `identity` | `run_id`, `arm`, fixture hash/count, container/volume, dataset, variant, namespace prefix, `menhir_commit`, and `bench_commit` (when supplied by that wrapper). A resume that disagrees on any recorded identity field is **refused**. Code commits are also immutable in canonical mode; set `LME_NONCANONICAL=1` to permit mixed-code resumes for development iteration (the output is labelled `noncanonical`). |
 | `attempts[]` | Every attempt in full, first included, numbered, with `phases_interrupted`. |
 | `latest_attempt` | Mirror of the most recent attempt, for readers that want current values. |
 | `phases[]` | One entry per phase actually run. |
@@ -218,6 +243,7 @@ LONGMEMEVAL_VARIANT=oracle  # oracle|s|m (smaller variants for dev)
 LME_LIMIT=30                # items to ingest
 LME_RECALL_LIMIT=10         # recall top-k
 LME_PER_TYPE=15             # stratified sample per question type (analysis)
+LME_NONCANONICAL=0          # permit code-commit drift on resume (labels output noncanonical)
 
 # Paths (auto-derived from git root, but overridable)
 ARCH_DIR, BENCH_DIR, MENHIR_MAIN, MENHIR_FRONTIER  # MENHIR_FRONTIER now defaults to MENHIR_MAIN

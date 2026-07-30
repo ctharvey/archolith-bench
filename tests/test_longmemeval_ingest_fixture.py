@@ -87,6 +87,8 @@ def test_current_scalar_buildout_wrapper_is_fail_closed() -> None:
     assert "LME_KU_ARM must be exactly 'baseline' or 'candidate'" in script
     assert 'export LME_REQUIRE_FRESH="1"' in script
     assert 'export LME_SCALAR_STATE_ENABLED="1"' in script
+    assert 'export LME_SCALAR_HISTORY_ENABLED="1"' in script
+    assert '[ "${LME_SCALAR_HISTORY_ENABLED}" = "1" ]' in script
     assert 'export LME_REQUIRE_TURN_EVIDENCE="1"' in script
     assert 'LME_KU_ALLOW_DIRTY' in script
     assert 'status --porcelain --untracked-files=no' in script
@@ -103,6 +105,11 @@ def test_current_scalar_buildout_wrapper_is_fail_closed() -> None:
         'MENHIR_PERSONAL_MEMORY_SCALAR_VIEW_AUTHORITY_ENABLED="${LME_SCALAR_VIEW_AUTHORITY_ENABLED}"'
         in script
     )
+    assert (
+        'MENHIR_PERSONAL_MEMORY_SCALAR_HISTORY_ENABLED="${LME_SCALAR_HISTORY_ENABLED}"'
+        in script
+    )
+    assert 'scalar_history=${LME_SCALAR_HISTORY_ENABLED}' in script
     assert '--preflight-only' in script
 
 
@@ -114,6 +121,12 @@ def test_build_graph_wires_same_namespace_window_into_menhir_workers() -> None:
     assert '--manifest-item-limit "${LME_INGEST_STOP_AFTER_ITEMS}"' in script
     assert '"ingest_target_items": ${INGEST_TARGET}' in script
     assert '"ingest_concurrency": ${LME_INGEST_CONCURRENCY}' in script
+    assert (
+        'export MENHIR_PERSONAL_MEMORY_SCALAR_HISTORY_ENABLED="${LME_SCALAR_HISTORY_ENABLED}"'
+        in script
+    )
+    assert '"scalar_history_enabled": ${LME_SCALAR_HISTORY_ENABLED}' in script
+    assert '"scalar_history_views"' in script
 
 
 def test_longmemeval_container_guards_do_not_use_pipefail_sensitive_grep() -> None:
@@ -163,6 +176,7 @@ def test_buildout_wrapper_records_every_phase_with_effective_settings() -> None:
         "scalar_consolidation_k=%s",
         "scalar_consolidation_call_budget=%s",
         "scalar_reconcile_attribute=%s",
+        "scalar_history_enabled=%s",
         "consolidation_audit_enabled=%s",
         "turn_evidence_required=%s",
     ):
@@ -297,6 +311,30 @@ def test_namespace_state_counts_include_cost_and_retry_signals(
         "processing_attempts": 24,
         "total": 20,
     }
+
+
+def test_scalar_counts_include_state_history_and_turn_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    queries: list[str] = []
+
+    def fake_count(query: str) -> int:
+        queries.append(query)
+        return len(queries)
+
+    monkeypatch.setattr(ingest, "_cypher_count", fake_count)
+
+    counts = ingest._scalar_counts("ns-a")
+
+    assert counts == {
+        "turn_evidence": 1,
+        "typed_assertions": 2,
+        "scalar_views": 3,
+        "scalar_history_views": 4,
+        "user_founded_scalar_views": 5,
+    }
+    assert "view_kind:'scalar_state'" in queries[2]
+    assert "view_kind:'scalar_history'" in queries[3]
 
 
 def test_reset_namespace_force_deletes_graph_and_purges_turn_evidence(

@@ -94,6 +94,7 @@ cat > "${GRAPH_ATTEMPT_RECORD}" <<EOF
   "segmentation": "${LME_SEGMENTATION}",
   "ingest_concurrency": ${LME_INGEST_CONCURRENCY},
   "scalar_state_enabled": ${LME_SCALAR_STATE_ENABLED},
+  "scalar_history_enabled": ${LME_SCALAR_HISTORY_ENABLED},
   "scalar_consolidation_k": ${LME_SCALAR_CONSOLIDATION_K},
   "scalar_threshold": "${LME_SCALAR_THRESHOLD}",
   "scalar_reconcile_attribute": ${LME_SCALAR_RECONCILE_ATTRIBUTE},
@@ -147,6 +148,7 @@ fi
   --setting "ingest_target_items=${INGEST_TARGET}" \
   --setting "ingest_concurrency=${LME_INGEST_CONCURRENCY}" \
   --setting "scalar_state_enabled=${LME_SCALAR_STATE_ENABLED}" \
+  --setting "scalar_history_enabled=${LME_SCALAR_HISTORY_ENABLED}" \
   --setting "scalar_consolidation_k=${LME_SCALAR_CONSOLIDATION_K}" \
   --setting "scalar_consolidation_call_budget=${LME_SCALAR_CALL_BUDGET}" \
   --setting "scalar_threshold=${LME_SCALAR_THRESHOLD}" \
@@ -189,6 +191,7 @@ export MENHIR_LOG_DIR="${LME_RESULTS_DIR}/menhir-logs"; mkdir -p "${MENHIR_LOG_D
 export MENHIR_BENCHMARK_MODE=1 MENHIR_API_HOST=127.0.0.1 MENHIR_API_PORT="${MENHIR_PORT}"
 export MENHIR_PERSONAL_MEMORY_CONSOLIDATION_ENABLED=0
 export MENHIR_PERSONAL_MEMORY_SCALAR_STATE_ENABLED="${LME_SCALAR_STATE_ENABLED}"
+export MENHIR_PERSONAL_MEMORY_SCALAR_HISTORY_ENABLED="${LME_SCALAR_HISTORY_ENABLED}"
 export MENHIR_PERSONAL_MEMORY_SCALAR_VIEW_AUTHORITY_ENABLED=0
 # Typed-scalar gate relaxations. These are default-OFF inside menhir, so without these exports a
 # scalar build silently reproduces the unanimous-threshold baseline (20/100 correct current Views)
@@ -246,7 +249,8 @@ fi
 "${BENCH_PY}" "$(dirname "${BASH_SOURCE[0]}")/lib/ingest.py" "${INGEST_ARGS[@]}"
 
 if [ "${LME_SCALAR_STATE_ENABLED}" = "1" ]; then
-  "${BENCH_PY}" - "${LME_MANIFEST_PATH}" "${LME_REQUIRE_SCALAR_OUTPUT}" "${INGEST_TARGET}" <<'PY'
+  "${BENCH_PY}" - "${LME_MANIFEST_PATH}" "${LME_REQUIRE_SCALAR_OUTPUT}" "${INGEST_TARGET}" \
+    "${LME_SCALAR_HISTORY_ENABLED}" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -271,6 +275,9 @@ if require_output:
         raise SystemExit("scalar ingest validation failed: no TypedAssertion materialized")
     if sum(int(row.get("scalar_views", 0)) for row in rows) <= 0:
         raise SystemExit("scalar ingest validation failed: no scalar_state View materialized")
+    history_enabled = int(sys.argv[4])
+    if history_enabled and sum(int(row.get("scalar_history_views", 0)) for row in rows) <= 0:
+        raise SystemExit("scalar ingest validation failed: no scalar_history View materialized")
 print("scalar ingest validation: PASS", flush=True)
 PY
 fi

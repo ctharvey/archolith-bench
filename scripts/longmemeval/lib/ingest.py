@@ -354,6 +354,10 @@ def _scalar_counts(ns: str) -> dict[str, int]:
             f"MATCH (v:Entity {{group_id:'{ns}', view_kind:'scalar_state'}}) "
             "WHERE coalesce(v.view_current, true) RETURN count(v);"
         ),
+        "scalar_history_views": _cypher_count(
+            f"MATCH (v:Entity {{group_id:'{ns}', view_kind:'scalar_history'}}) "
+            "WHERE coalesce(v.view_current, true) RETURN count(v);"
+        ),
         "user_founded_scalar_views": _cypher_count(
             f"MATCH (t:TurnEvidence {{namespace:'{ns}', declarant:'user'}})-[:FOUNDS]->"
             f"(a:TypedAssertion {{namespace:'{ns}'}})<-[:CURRENT_ANCHOR]-"

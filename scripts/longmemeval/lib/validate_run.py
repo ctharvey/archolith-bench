@@ -25,7 +25,6 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -166,10 +165,15 @@ def validate(
                 int(row.get("scalar_views", 0))
                 for row in manifest if isinstance(row, dict)
             )
+            total_history_views = sum(
+                int(row.get("scalar_history_views", 0))
+                for row in manifest if isinstance(row, dict)
+            )
             checks.append(_check(
                 "projection_counts",
                 True,
-                f"{total_assertions} assertions, {total_views} scalar_state views",
+                f"{total_assertions} assertions, {total_views} scalar_state views, "
+                f"{total_history_views} scalar_history views",
                 severity="INFO",
             ))
 

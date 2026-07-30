@@ -52,6 +52,7 @@ esac
 
 # This dedicated wrapper must never silently fall back to the ordinary non-scalar LME defaults.
 export LME_SCALAR_STATE_ENABLED="1"
+export LME_SCALAR_HISTORY_ENABLED="1"
 export LME_REQUIRE_TURN_EVIDENCE="1"
 export LME_BACKFILL_DATES="0"
 export LME_SCALAR_VIEW_AUTHORITY_ENABLED="${LME_SCALAR_VIEW_AUTHORITY_ENABLED:-1}"
@@ -63,6 +64,8 @@ export LME_KU_KEEP_NEO4J_UP="${LME_KU_KEEP_NEO4J_UP:-0}"
 export LME_KU_ALLOW_DIRTY="${LME_KU_ALLOW_DIRTY:-0}"
 export LME_INGEST_CONCURRENCY="${LME_KU_INGEST_CONCURRENCY:-2}"
 export LME_KU_CHECKPOINT_ITEMS="${LME_KU_CHECKPOINT_ITEMS:-0}"
+[ "${LME_SCALAR_HISTORY_ENABLED}" = "1" ] ||
+  die "scalar history must be enabled for the knowledge-update buildout"
 case "${LME_INGEST_CONCURRENCY}" in
   1|2|3|4) ;;
   *) die "LME_KU_INGEST_CONCURRENCY must be an integer from 1 through 4" ;;
@@ -194,7 +197,7 @@ PY
 )"
 [ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY in menhir .env"
 
-log "preflight PASS: arm=${ARM} run=${RUN_ID} fresh=${LME_REQUIRE_FRESH} scalar=1 threshold=${LME_SCALAR_THRESHOLD} reconcile=${LME_SCALAR_RECONCILE_ATTRIBUTE}/${LME_SCALAR_RECONCILE_SCOPE}/${LME_SCALAR_RECONCILE_SUBJECT} authority=${LME_SCALAR_VIEW_AUTHORITY_ENABLED} turn_evidence=${LME_REQUIRE_TURN_EVIDENCE} audits=${LME_CONSOLIDATION_AUDIT_ENABLED}/${LME_RECALL_AUDIT_ENABLED} ingest_concurrency=${LME_INGEST_CONCURRENCY} checkpoint_items=${LME_KU_CHECKPOINT_ITEMS}"
+log "preflight PASS: arm=${ARM} run=${RUN_ID} fresh=${LME_REQUIRE_FRESH} scalar=1 scalar_history=${LME_SCALAR_HISTORY_ENABLED} threshold=${LME_SCALAR_THRESHOLD} reconcile=${LME_SCALAR_RECONCILE_ATTRIBUTE}/${LME_SCALAR_RECONCILE_SCOPE}/${LME_SCALAR_RECONCILE_SUBJECT} authority=${LME_SCALAR_VIEW_AUTHORITY_ENABLED} turn_evidence=${LME_REQUIRE_TURN_EVIDENCE} audits=${LME_CONSOLIDATION_AUDIT_ENABLED}/${LME_RECALL_AUDIT_ENABLED} ingest_concurrency=${LME_INGEST_CONCURRENCY} checkpoint_items=${LME_KU_CHECKPOINT_ITEMS}"
 
 if [ "${MODE}" = "--preflight-only" ]; then
   exit 0
@@ -236,6 +239,8 @@ phase_settings(){
     "${LME_SCALAR_RECONCILE_ATTRIBUTE}" "${LME_SCALAR_RECONCILE_SCOPE}"
   printf -- '--setting\nscalar_reconcile_subject=%s\n--setting\nscalar_view_authority_enabled=%s\n' \
     "${LME_SCALAR_RECONCILE_SUBJECT}" "${LME_SCALAR_VIEW_AUTHORITY_ENABLED}"
+  printf -- '--setting\nscalar_history_enabled=%s\n' \
+    "${LME_SCALAR_HISTORY_ENABLED}"
   printf -- '--setting\nconsolidation_audit_enabled=%s\n--setting\nrecall_audit_enabled=%s\n' \
     "${LME_CONSOLIDATION_AUDIT_ENABLED}" "${LME_RECALL_AUDIT_ENABLED}"
   printf -- '--setting\nturn_evidence_required=%s\n--setting\nbackfill_dates=%s\n' \
@@ -294,6 +299,7 @@ cat > "${ATTEMPT_RECORD}" <<EOF
   "checkpoint_items": ${LME_KU_CHECKPOINT_ITEMS},
   "require_fresh": ${LME_REQUIRE_FRESH},
   "scalar_state_enabled": ${LME_SCALAR_STATE_ENABLED},
+  "scalar_history_enabled": ${LME_SCALAR_HISTORY_ENABLED},
   "scalar_threshold": "${LME_SCALAR_THRESHOLD}",
   "scalar_reconcile_attribute": ${LME_SCALAR_RECONCILE_ATTRIBUTE},
   "scalar_reconcile_scope": ${LME_SCALAR_RECONCILE_SCOPE},
@@ -395,6 +401,7 @@ log "starting recall menhir on port ${RECALL_PORT}..."
     MENHIR_LOG_DIR="${LME_RESULTS_DIR}/menhir-recall-logs" \
     MENHIR_BENCHMARK_MODE=1 MENHIR_API_HOST=127.0.0.1 MENHIR_API_PORT="${RECALL_PORT}" \
     MENHIR_PERSONAL_MEMORY_SCALAR_STATE_ENABLED="${LME_SCALAR_STATE_ENABLED}" \
+    MENHIR_PERSONAL_MEMORY_SCALAR_HISTORY_ENABLED="${LME_SCALAR_HISTORY_ENABLED}" \
     MENHIR_PERSONAL_MEMORY_SCALAR_VIEW_AUTHORITY_ENABLED="${LME_SCALAR_VIEW_AUTHORITY_ENABLED}" \
     MENHIR_PERSONAL_MEMORY_RECALL_AUDIT_ENABLED="${LME_RECALL_AUDIT_ENABLED}" \
     OTEL_SDK_DISABLED=true LANGFUSE_TRACING_ENABLED=false LANGFUSE_PUBLIC_KEY="" LANGFUSE_SECRET_KEY="" LANGFUSE_HOST="" \

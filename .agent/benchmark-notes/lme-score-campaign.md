@@ -70,3 +70,23 @@ as supersedable `(subject, measure) → value` facts; event-log folds for un-sta
 answer is a lookup, not a fuzzy count. Rationale, failure-mode census, and the first test:
 **`menhir-frontier/.agent/plans/aggregation-as-consolidation.md`**. (Research docs incoming will
 steer specifics.)
+
+## TODO: attribute scalar LLM spend before another full ingest
+
+Before approving another expensive LongMemEval ingest, produce a 78-task attribution report that
+separates scalar extraction cost from answer lift. At minimum, report:
+
+- scalar LLM calls and estimated cost per namespace;
+- typed assertions and scalar state/history Views produced per call;
+- namespaces that paid for scalar inference but produced no scalar artifact;
+- answer paths that actually consumed scalar authority/history;
+- failures corrected by scalar structure versus temporal/provenance-rich content alone; and
+- cost per benchmark answer corrected by scalar processing.
+
+Use `lme-6071bd76` as the first negative-control regression: its namespace recorded three LLM calls
+and produced zero scalar assertions/Views, while source-time/current-vs-superseded recall metadata
+changed the answer from incorrect to correct without reingestion. Evaluate a staged gate
+(deterministic scalar-candidate detection, deterministic parsing for clear absolutes, two samples
+first, third only on disagreement) against the current always-3-call 2/3 policy. Do not optimize for
+raw scalar coverage; require measurable answer lift, grounded provenance, and lower cost per useful
+View.

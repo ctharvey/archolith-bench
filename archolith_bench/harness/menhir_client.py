@@ -7,10 +7,147 @@ HttpMenhirClient: HTTP client scaffolded for a real throwaway menhir instance.
 
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
 import uuid
 from typing import Any
 
 import httpx
+
+
+def _format_duration_alias(value: Any, unit: str) -> str | None:
+    """Return a human-readable duration and clock form for integral seconds."""
+    if unit.lower() not in {"s", "sec", "second", "seconds"}:
+        return None
+    try:
+        seconds_value = Decimal(str(value))
+    except InvalidOperation:
+        return None
+    if not seconds_value.is_finite() or seconds_value < 0 or seconds_value != seconds_value.to_integral_value():
+        return None
+
+    total_seconds = int(seconds_value)
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    parts: list[str] = []
+    if hours:
+        parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+    if minutes:
+        parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+    if seconds or not parts:
+        parts.append(f"{seconds} second{'s' if seconds != 1 else ''}")
+    clock = f"{hours}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes}:{seconds:02d}"
+    return f"{' '.join(parts)}; {clock}"
+
+
+def _format_authority_value(record: dict[str, Any]) -> str:
+    """Render a normalized scalar value without discarding its unit or familiar form."""
+    value = record.get("value")
+    unit = str(record.get("unit") or "").strip()
+    rendered = str(value)
+    if unit and not rendered.lower().endswith(f" {unit.lower()}"):
+        rendered = f"{rendered} {unit}"
+    if str(record.get("value_kind") or "").strip().lower() == "duration":
+        alias = _format_duration_alias(value, unit)
+        if alias:
+            rendered = f"{rendered} ({alias})"
+    return rendered
+
+
+def _format_source_time_evidence(item: dict[str, Any]) -> str:
+    """Render source/world time, explicitly distinguishing missing time from belief time."""
+    if "temporal_facts" not in item:
+        return ""
+    temporal_facts = item.get("temporal_facts")
+    if not isinstance(temporal_facts, list) or not temporal_facts:
+        return "source time: unknown"
+
+    lines = ["source-time evidence (when the fact was true):"]
+    for temporal_fact in temporal_facts:
+        if not isinstance(temporal_fact, dict):
+            continue
+        fact = str(temporal_fact.get("fact") or "").strip()
+        if not fact:
+            # Graphiti can leave timestamp-only bookkeeping relationships on an
+            # entity. They do not identify a fact and therefore cannot provide
+            # useful source-time evidence to the answer model.
+            continue
+        valid_at = str(temporal_fact.get("valid_at") or "").strip()
+        invalid_at = str(temporal_fact.get("invalid_at") or "").strip()
+        if valid_at and invalid_at:
+            happened = f"{valid_at} through {invalid_at}"
+        else:
+            happened = valid_at or "unknown"
+        role = str(temporal_fact.get("temporal_role") or "").strip().replace("_", " ")
+        role_label = f" | belief: {role}" if role else ""
+        lines.append(f"- {happened} | {fact}{role_label}")
+    if len(lines) == 1:
+        return "source time: unknown"
+    return "\n".join(lines)
+
+
+def _recall_item_text(item: dict[str, Any]) -> str:
+    """Return the best human-readable text from one Menhir recall result."""
+    name = item.get("name") if isinstance(item.get("name"), str) else ""
+    body = next(
+        (
+            item[key]
+            for key in ("content", "text", "summary", "fact")
+            if isinstance(item.get(key), str) and item[key].strip()
+        ),
+        "",
+    )
+    if name and body and name.strip() != body.strip():
+        text = f"{name.strip()}: {body.strip()}"
+    else:
+        text = body.strip() or name.strip()
+    source_time = _format_source_time_evidence(item)
+    if text and source_time:
+        return f"{text}\n{source_time}"
+    return text or source_time
+
+
+def _format_authority_record(record: dict[str, Any]) -> str:
+    """Render structured scalar authority as compact, provenance-rich LLM context."""
+    kind = str(record.get("kind") or "").strip().lower()
+    status = str(record.get("status") or "").strip().lower()
+    founded = record.get("has_foundation") is not False
+    if kind == "current" and status == "leads" and founded:
+        lines = [
+            "[AUTHORITATIVE CURRENT MEMORY]",
+            "status: leads; prefer this value over conflicting related memories.",
+        ]
+    else:
+        label = " | ".join(part for part in (kind, status) if part) or "unclassified"
+        lines = ["[STRUCTURED MEMORY VERDICT]", f"status: {label}"]
+
+    subject = str(record.get("subject") or "").strip()
+    attribute = str(record.get("attribute") or "value").strip().replace("_", " ")
+    scope = str(record.get("scope") or "").strip().replace("_", " ")
+    value = _format_authority_value(record)
+    fact_name = f"{attribute} ({scope})" if scope else attribute
+    subject_prefix = f"{subject} — " if subject else ""
+    lines.append(f"current fact: {subject_prefix}{fact_name} = {value}")
+
+    valid_at = str(record.get("valid_at") or "").strip()
+    if valid_at:
+        lines.append(f"valid at: {valid_at}")
+
+    contributors = record.get("contributors")
+    if isinstance(contributors, list):
+        support: list[str] = []
+        for contributor in contributors:
+            if not isinstance(contributor, dict):
+                continue
+            quote = str(contributor.get("stated_span") or "").strip()
+            operation = str(contributor.get("operation") or "").strip().lower()
+            source_time = str(contributor.get("valid_at") or "").strip()
+            parts = [part for part in (operation, f'"{quote}"' if quote else "", source_time) if part]
+            if parts:
+                support.append(" | ".join(parts))
+        if support:
+            lines.append("provenance:")
+            lines.extend(f"- {item}" for item in support)
+    return "\n".join(lines)
 
 
 class StubMenhirClient:
@@ -254,11 +391,15 @@ class HttpMenhirClient:
         self, group_id: str, query: str, limit: int = 10
     ) -> list[str]:
         """
-        POST a query to the recall endpoint and extract snippets.
+        POST a query to the recall endpoint and build LLM-facing snippets.
 
         Tolerant of response shape: accepts top-level list or dict with
         "results"/"memories"/"snippets" key. Each element may be a string or
-        dict with "text"/"content"/"summary" key.
+        dict with "text"/"content"/"summary" key. When Menhir returns a
+        structured ``authority_layer``, current scalar authority is emitted first
+        with its source time and supporting quote. Other results are labeled as
+        related/non-authoritative or superseded context so a flat text prompt does
+        not erase Menhir's conflict-resolution semantics.
         """
         url = self._base_url.rstrip("/") + self._recall_path
         # include_session=True: benchmark memories are freshly ingested and live at
@@ -270,6 +411,9 @@ class HttpMenhirClient:
             "limit": limit,
             "namespace": group_id,
             "include_session": True,
+            # Historical source-time evidence is metadata on the already-selected memories.
+            # It is required for changed/previous/later questions and does not add stale candidates.
+            "include_invalidated": True,
         }
         response = self._client.post(url, json=payload, headers=self._headers)
         response.raise_for_status()
@@ -285,33 +429,51 @@ class HttpMenhirClient:
                     items = data[key]
                     break
 
-        # Extract snippet strings from items. menhir's RecallResponse items carry
-        # both "name" (entity name / fact) and an optional "content" (which is often
-        # None), so prefer content but fall back to name/fact and skip empty values
-        # -- otherwise recalled memory silently collapses to an empty context.
+        authority_records: list[dict[str, Any]] = []
+        if isinstance(data, dict):
+            raw_authority = data.get("authority_layer")
+            if isinstance(raw_authority, dict):
+                authority_records = [raw_authority]
+            elif isinstance(raw_authority, list):
+                authority_records = [record for record in raw_authority if isinstance(record, dict)]
+
+        authority_view_ids = {
+            str(record["view_uuid"])
+            for record in authority_records
+            if record.get("view_uuid")
+        }
         snippets: list[str] = []
+        for record in authority_records:
+            rendered = _format_authority_record(record)
+            if rendered:
+                snippets.append(rendered)
+
         for item in items:
             if isinstance(item, str):
                 if item.strip():
-                    snippets.append(item)
+                    if authority_records:
+                        snippets.append(f"[RELATED MEMORY | non-authoritative] {item.strip()}")
+                    else:
+                        snippets.append(item)
             elif isinstance(item, dict):
-                name = item.get("name") if isinstance(item.get("name"), str) else ""
-                body = next(
-                    (
-                        item[k]
-                        for k in ("content", "text", "summary", "fact")
-                        if isinstance(item.get(k), str) and item[k].strip()
-                    ),
-                    "",
-                )
-                if name and body and name.strip() != body.strip():
-                    snippets.append(f"{name.strip()}: {body.strip()}")
-                elif body.strip():
-                    snippets.append(body.strip())
-                elif name.strip():
-                    snippets.append(name.strip())
+                if authority_records and str(item.get("uuid") or "") in authority_view_ids:
+                    continue
+                text = _recall_item_text(item)
+                if not text:
+                    continue
+                if authority_records:
+                    memory_type = str(item.get("memory_type") or "memory").strip().lower()
+                    if item.get("is_superseded_view") is True:
+                        prefix = f"[SUPERSEDED {memory_type} MEMORY | historical only]"
+                    elif item.get("is_scalar_authority") is True:
+                        prefix = f"[CURRENT {memory_type} MEMORY | authoritative]"
+                    else:
+                        prefix = f"[RELATED {memory_type} MEMORY | non-authoritative]"
+                    snippets.append(f"{prefix} {text}")
+                else:
+                    snippets.append(text)
 
-        return snippets
+        return snippets[:limit]
 
     def recall_raw(self, group_id: str, query: str, limit: int = 10) -> dict[str, Any]:
         """Return the unmodified HTTP recall response for benchmark assertions."""

@@ -195,6 +195,34 @@ def test_stub_menhir_client_recall_preserves_insertion_order_for_ties():
     assert out == ["user: alpha", "assistant: beta", "user: alpha"]
 
 
+def test_longmemeval_answer_prompt_explains_authority_precedence():
+    from archolith_bench.harness.longmemeval import LongMemEvalMemoryAdapter
+
+    memory_context = (
+        "[AUTHORITATIVE CURRENT MEMORY]\n"
+        "current fact: user — stars needed (gold level) = 120\n"
+        "[RELATED semantic MEMORY | non-authoritative] user needs 125 stars."
+    )
+
+    messages = LongMemEvalMemoryAdapter().build_messages(
+        memory_context,
+        "How many stars do I need to reach gold?",
+    )
+
+    assert "canonical current value" in messages[0]["content"]
+    assert "Safe veto policy" in messages[0]["content"]
+    assert "subject, attribute, scope, unit, or time" in messages[0]["content"]
+    assert "veto the conflicting set and say you don't know" in messages[0]["content"]
+    assert "Never veto a matching, supported authoritative record" in messages[0]["content"]
+    assert "compare those source times" in messages[0]["content"]
+    assert "never infer chronology from retrieval/list order" in messages[0]["content"]
+    assert "'superseded belief' label means the fact is historical" in messages[0]["content"]
+    assert "If source time is unknown, do not invent an ordering" in messages[0]["content"]
+    assert "outside knowledge suggests something else" in messages[0]["content"]
+    assert "falling back to a conflicting stale value" in messages[0]["content"]
+    assert messages[1]["content"].index("= 120") < messages[1]["content"].index("125 stars")
+
+
 def test_assert_not_production_guards():
     from archolith_bench.harness import assert_not_production
     assert_not_production("http://localhost:7999")  # ok

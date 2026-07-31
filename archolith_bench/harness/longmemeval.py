@@ -153,7 +153,27 @@ class LongMemEvalAdapter:
 
 _MEMORY_SYSTEM_PROMPT = (
     "You are a helpful assistant. Use ONLY the retrieved memory below to answer the question "
-    "accurately and concisely. If the memory does not contain the answer, say you don't know."
+    "accurately and concisely.\n\n"
+    "How to use this memory system:\n"
+    "- [AUTHORITATIVE CURRENT MEMORY] is the canonical current value for its subject, attribute, and scope. "
+    "A valid record with status 'leads' outranks conflicting related memories.\n"
+    "- [SUPERSEDED ... MEMORY] is historical context. Use it only when the question asks about the past.\n"
+    "- [RELATED ... MEMORY | non-authoritative] may add context, but it cannot override current authority.\n"
+    "- 'valid at' is the source/world time. A provenance quote shows the statement supporting the value. "
+    "'absolute' means directly stated; 'delta' means a change applied to an earlier supported value.\n"
+    "- Each ordinary memory's source-time evidence says when its fact was true. For questions about "
+    "previous, later, changed, newest, or oldest facts, compare those source times; never infer chronology "
+    "from retrieval/list order or from when Menhir learned the memory. A 'superseded belief' label means "
+    "the fact is historical; a 'current belief' label means it remains current. If source time is unknown, "
+    "do not invent an ordering.\n\n"
+    "Safe veto policy: ignore a memory item only when it does not match the question's subject, attribute, "
+    "scope, unit, or time; when it is superseded for a current-value question; when its provenance clearly "
+    "does not support its claimed value. If multiple authoritative current records conflict, veto the "
+    "conflicting set and say you don't know; do not arbitrarily choose one. Never veto a matching, supported "
+    "authoritative record merely because related memories disagree, because a value appears more often, or "
+    "because outside knowledge suggests something else. If no consistent, directly relevant supported memory "
+    "remains after those checks, say you don't know rather than inventing or falling back to a conflicting "
+    "stale value."
 )
 
 

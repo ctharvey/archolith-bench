@@ -7,7 +7,14 @@ import sqlite3
 from types import SimpleNamespace
 
 from archolith_bench.dashboard import IngestSnapshot, RunSnapshot
-from archolith_bench.scalar_viewer import ScalarTaskReader, scoring_rows, task_catalog
+from archolith_bench.scalar_viewer import (
+    ScalarTaskReader,
+    annotate_assertion_fold_outcomes,
+    build_memory_inventory,
+    catalog_with_graph_availability,
+    scoring_rows,
+    task_catalog,
+)
 
 
 class _Driver:
@@ -26,16 +33,6 @@ class _Driver:
                 "occurred_at": "2023-11-30T20:25:00Z",
                 "recorded_at": "2026-07-29T13:00:00Z",
                 "founds": ["assert-25"],
-            }]
-        elif "TypedAssertion" in query:
-            rows = [{
-                "id": "assert-25",
-                "source_key": "source-25",
-                "evidence_id": "turn-25",
-                "subject": "user",
-                "attribute": "postcard_count",
-                "value": "25",
-                "unit": "",
             }]
         elif 'view_kind: "scalar_state"' in query:
             rows = [{
@@ -68,9 +65,21 @@ class _Driver:
                      "valid_at": "2023-11-30T00:00:00+00:00",
                      "stated_span": "25 postcards since I started"},
                 ]),
+                "contributor_ids": ["assert-25"],
                 "valid_at": "2023-11-30T00:00:00+00:00",
                 "created_at": "2026-07-29T13:00:00Z",
                 "current": True,
+            }]
+        elif "TypedAssertion" in query:
+            rows = [{
+                "id": "assert-25",
+                "source_key": "source-25",
+                "evidence_id": "turn-25",
+                "subject": "user",
+                "attribute": "postcard_count",
+                "value": "25",
+                "unit": "",
+                "operation": "absolute",
             }]
         else:
             rows = [{"subject": "user", "object": "postcards", "fact": "User collects postcards."}]
@@ -164,7 +173,22 @@ def test_reader_correlates_vote_receipt_to_graph_assertions(tmp_path):
     assert data["evidence"][0]["occurred_at"] == "2023-11-30T20:25:00Z"
     assert data["evidence"][0]["recorded_at"] == "2026-07-29T13:00:00Z"
     assert data["assertions"][0]["value"] == "25"
+    assert data["assertions"][0]["fold_outcome"] == {
+        "state": {
+            "status": "current",
+            "reason": "contributes to the current scalar_state view",
+        },
+        "history": {
+            "status": "recorded",
+            "reason": "recorded in the current scalar_history view",
+        },
+    }
     assert data["views"][0]["current"] is True
+    assert [(row["memory_type"], row["view_kind"], row["derivation"]) for row in data["memory_inventory"]] == [
+        ("view", "scalar_state", "absolute"),
+        ("view", "scalar_history", "delta"),
+        ("content", None, None),
+    ]
     # scalar_history View is returned alongside scalar_state
     assert len(data["history_views"]) == 1
     hv = data["history_views"][0]
@@ -237,6 +261,127 @@ def test_task_catalog_and_scoring_rows():
         "recalled": "postcard count = 25",
         "gold": "25",
     }]
+
+
+def test_catalog_keeps_manifest_tasks_that_are_not_yet_visible_in_graph():
+    tasks = [
+        {"namespace": "lme-ready", "question": "Ready?"},
+        {"namespace": "lme-pending", "question": "Pending?"},
+    ]
+
+    catalog = catalog_with_graph_availability(tasks, {"lme-ready"})
+
+    assert [task["namespace"] for task in catalog] == ["lme-ready", "lme-pending"]
+    assert [task["graph_available"] for task in catalog] == [True, False]
+
+
+def test_memory_inventory_distinguishes_content_and_view_derivation():
+    assertions = [
+        {"id": "a-abs", "operation": "absolute"},
+        {"id": "a-delta", "operation": "delta"},
+    ]
+    views = [
+        {
+            "id": "view-absolute",
+            "subject": "user",
+            "attribute": "bike_count",
+            "display": "3",
+            "current": True,
+            "contributor_ids": ["a-abs"],
+        },
+        {
+            "id": "view-mixed",
+            "subject": "user",
+            "attribute": "postcard_count",
+            "display": "25",
+            "current": True,
+            "contributor_ids": ["a-abs", "a-delta"],
+        },
+    ]
+    history_views = [{
+        "id": "history-delta",
+        "subject": "user",
+        "attribute": "postcard_count",
+        "current": True,
+        "op_counts": {"delta": 2},
+    }]
+    facts = [{
+        "subject": "user",
+        "relation": "OWNS",
+        "object": "road bike",
+        "fact": "User owns a road bike.",
+        "episode_ids": ["episode-1"],
+    }]
+
+    inventory = build_memory_inventory(assertions, views, history_views, facts)
+
+    assert [row["memory_type"] for row in inventory] == ["view", "view", "view", "content"]
+    assert [row["derivation"] for row in inventory] == ["absolute", "mixed", "delta", None]
+    assert inventory[-1]["content"] == "User owns a road bike."
+
+
+def test_assertion_fold_outcomes_distinguish_current_pending_and_state_abstention():
+    assertions = [
+        {
+            "id": "a-current",
+            "subject_uuid": "user-1",
+            "attribute": "followers",
+            "scope": "",
+            "value_kind": "count",
+            "unit": "",
+            "binding_pending": False,
+            "superseded": False,
+        },
+        {
+            "id": "a-pending",
+            "subject_uuid": "unbound:a-pending",
+            "attribute": "shoe_count",
+            "scope": "",
+            "value_kind": "count",
+            "unit": "",
+            "binding_pending": True,
+            "superseded": False,
+        },
+        {
+            "id": "a-delta",
+            "subject_uuid": "user-1",
+            "attribute": "postcards",
+            "scope": "collection",
+            "value_kind": "count",
+            "unit": "",
+            "binding_pending": False,
+            "superseded": False,
+        },
+    ]
+    views = [{"current": True, "contributor_ids": ["a-current"]}]
+    history_views = [{
+        "current": True,
+        "contributor_ids": ["a-current", "a-delta"],
+        "entries": [],
+    }]
+    audit = [{
+        "event": "fold",
+        "state": "abstain",
+        "details": {
+            "subject_uuid": "user-1",
+            "slot": ["user-1", "postcards", "collection", "count", ""],
+            "reason": "no_anchor",
+        },
+    }]
+
+    annotated = annotate_assertion_fold_outcomes(assertions, views, history_views, audit)
+
+    assert annotated[0]["fold_outcome"]["state"]["status"] == "current"
+    assert annotated[0]["fold_outcome"]["history"]["status"] == "recorded"
+    assert annotated[1]["fold_outcome"] == {
+        "state": {"status": "not_folded", "reason": "subject binding is pending"},
+        "history": {"status": "not_folded", "reason": "subject binding is pending"},
+    }
+    assert annotated[2]["fold_outcome"]["state"] == {
+        "status": "abstained",
+        "reason": "no_anchor",
+    }
+    assert annotated[2]["fold_outcome"]["history"]["status"] == "recorded"
 
 
 class _DeltaOnlyDriver(_Driver):

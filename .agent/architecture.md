@@ -30,9 +30,13 @@ The benchmark is a **CLI tool**, not a service. It runs offline, sending control
 | Linting | ruff |
 | Testing | pytest |
 
-### Dashboard scalar explorer
+### Dashboard scalar explorer (transitional — being replaced)
 
 `archolith_bench/dashboard.py` owns the local HTTP surface and manifest/checkpoint allowlist.
+**The standalone `:8200` dashboard is transitional.** Menhir Recall Lab (`/explorer/recall-lab/bench-runs/`)
+is the canonical owner for benchmark task inspection. Keep the `:8200` dashboard as a temporary fallback
+until the Menhir explorer covers all scalar viewer detail (evidence, assertions, views, memory inventory,
+derivation classification).
 `archolith_bench/scalar_viewer.py` owns the read-only provenance model. Its Neo4j path keeps the
 four scalar measurement boundaries separate (`TurnEvidence` → gate → `TypedAssertion` → View),
 while the optional SQLite path reads the behavior-neutral consolidation receipt. Audit selection
@@ -45,12 +49,25 @@ The scalar explorer shows `scalar_state` and `scalar_history` Views side by side
 render advisory entry tables (source time / operation / value / stated span) with a delta-only
 warning; when `scalar_state` abstains, the answer section shows the abstention reason alongside the
 advisory history with the latest delta value. `ScalarTaskReader.read()` returns `history_views`
-with parsed JSON payload and op_counts.
+with parsed JSON payload and op_counts. Each returned assertion also carries separate state/history
+fold outcomes derived from View contributor provenance, binding state, and the correlated
+consolidation receipt. The assertion stage therefore distinguishes current contributors,
+history-only assertions, safe fold abstentions, expiries, pending bindings, and write failures.
+Blocked assertion cards resolve the assertion's `evidence_id` (falling back to its `FOUNDS` edge)
+to show the complete original `TurnEvidence` quote beside the shorter extracted span.
 
 The browser calls `/api/scalar-tasks` for manifest-scoped choices and
 `/api/scalar-task?namespace=...` for one snapshot. Bolt credentials and the telemetry path remain
 inside the dashboard process. The page refresh loop replaces only benchmark progress, so an open
-scalar walkthrough and its selected stage are not reset every five seconds.
+scalar walkthrough and its selected stage are not reset every five seconds. The same refresh tick
+updates the task catalog in place as manifest rows arrive. Every manifested task remains selectable;
+namespaces whose graph evidence is temporarily unavailable are labeled instead of being hidden.
+Each task also has a stable `/tasks/<namespace>` URL. Its memory-map stage distinguishes ordinary
+relationship-fact `CONTENT` from rebuildable `scalar_state`/`scalar_history` `VIEW` records. View
+provenance is further labeled `absolute`, `delta`, or `mixed` from contributing assertion operations;
+source evidence and `TypedAssertion` rows remain separate pipeline artifacts rather than being
+misrepresented as recall memories. `/tasks/` is the searchable task directory: it joins every
+completed manifest task to its available checkpoint scores, assertion/View counts, and detail URL.
 
 ## Data Flow
 

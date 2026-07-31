@@ -6,6 +6,7 @@ import json
 
 from archolith_bench.dashboard import (
     _parse_checkpoint_name,
+    _task_path,
     read_ingest_manifest,
     read_checkpoint,
     render,
@@ -34,6 +35,12 @@ def test_parse_checkpoint_name_handles_hyphenated_benchmark():
     assert b == "longmemeval-menhir"
     assert v == "oracle"
     assert m == "deepseek-v4-flash"
+
+
+def test_task_path_normalizes_and_encodes_benchmark_item_ids():
+    assert _task_path("42ec0761") == "/tasks/lme-42ec0761"
+    assert _task_path("lme-42ec0761") == "/tasks/lme-42ec0761"
+    assert _task_path("task with spaces") == "/tasks/lme-task%20with%20spaces"
 
 
 def test_read_checkpoint_aggregates_and_computes_lift(tmp_path):
@@ -139,6 +146,9 @@ def test_render_html_is_valid_autorefreshing_page(tmp_path):
     assert "longmemeval-menhir" in html
     assert "menhir UP" in html
     assert "memory lift" in html
+    assert "item ↗ task" in html
+    assert "href='/tasks/lme-q1'" in html
+    assert "Open task page" in html
 
 
 def test_render_html_handles_no_runs_and_no_menhir():
@@ -164,3 +174,101 @@ def test_render_html_adds_scalar_viewer_only_when_enabled():
     assert "/api/scalar-task?namespace=" in viewer
     assert '"source " + when(t.occurred_at) : "source time unavailable"' in viewer
     assert "ingested ${when(t.recorded_at)}" in viewer
+    assert 'picker.addEventListener("change", loadTask)' in viewer
+    assert 'window.addEventListener("dashboard:refresh"' in viewer
+    assert "graph unavailable" in viewer
+    assert "scalar graph evidence is not available yet" in viewer
+    assert "fold_outcome" in viewer
+    assert "could not be folded" in viewer
+    assert "ORIGINAL SOURCE TURN" in viewer
+    assert "sourceTurnFor" in viewer
+    assert "Original source turn unavailable in this graph" in viewer
+    assert "Gate rejections remain in stage 2" in viewer
+    assert 'id="scalar-open"' in viewer
+    assert '"/tasks/" + encodeURIComponent(namespace)' in viewer
+    assert "Memory map" in viewer
+    assert "Task memory inventory" in viewer
+    assert "DELTA-DERIVED" in viewer
+    assert "ABSOLUTE" in viewer
+    assert "ordinary relationship fact" in viewer
+    assert '<a href="/tasks/">all tasks</a>' in viewer
+
+
+def test_scalar_task_detail_page_uses_stable_task_url():
+    viewer = render_html(
+        [],
+        None,
+        total_items=None,
+        scalar_viewer_enabled=True,
+        scalar_default_namespace="lme-42ec0761",
+        scalar_detail_page=True,
+    )
+
+    assert "const detailPage = true;" in viewer
+    assert 'history.replaceState(null, "", taskPath)' in viewer
+    assert 'const preferred = "lme-42ec0761"' in viewer
+
+
+def test_render_html_task_directory_lists_and_filters_every_task():
+    html = render_html(
+        [],
+        None,
+        total_items=2,
+        task_directory=[
+            {
+                "namespace": "lme-one",
+                "question_id": "one",
+                "question": "Where is the first item?",
+                "answer": "Shelf",
+                "question_type": "knowledge-update",
+                "turns": 5,
+                "typed_assertions": 2,
+                "scalar_views": 1,
+                "graph_available": True,
+                "scoring": [
+                    {"arm": "menhir_recall", "correct": True},
+                    {"arm": "no_memory", "correct": False},
+                ],
+            },
+            {
+                "namespace": "lme-two",
+                "question_id": "two",
+                "question": "How many second items?",
+                "answer": "2",
+                "question_type": "single-session-user",
+                "turns": 4,
+                "typed_assertions": 1,
+                "scalar_views": 0,
+                "graph_available": False,
+                "scoring": [],
+            },
+        ],
+    )
+
+    assert "All tasks <span>2</span>" in html
+    assert "href='/tasks/lme-one'" in html
+    assert "href='/tasks/lme-two'" in html
+    assert "Where is the first item?" in html
+    assert "memory &#10003;" in html
+    assert "no memory &#10007;" in html
+    assert "memory pending" in html
+    assert "graph ready" in html
+    assert "graph missing" in html
+    assert "window.filterTaskDirectory" in html
+    assert "taskSearch" in html and "taskScore" in html
+
+
+def test_scalar_viewer_connects_only_versions_of_the_same_view():
+    viewer = render_html(
+        [],
+        None,
+        total_items=None,
+        scalar_viewer_enabled=True,
+    )
+
+    assert "function scalarViewLaneKey(view)" in viewer
+    assert "const stateLanes = new Map();" in viewer
+    assert "stateLanes.get(key).push(view);" in viewer
+    assert "i < lane.length - 1" in viewer
+    assert "i < views.length - 1" not in viewer
+    assert '<div class="view-lanes">${cards' in viewer

@@ -13,6 +13,7 @@ import json
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import quote
 
 # Known full-dataset item counts (per arm) so progress shows a % without a network
 # load. Override with --total-items when running a subset.
@@ -279,6 +280,13 @@ def _slug_id(*parts: str) -> str:
     return "d_" + "".join(c if c.isalnum() else "_" for c in raw)[:80]
 
 
+def _task_path(task_id: object) -> str:
+    """Stable dashboard path for a benchmark item or graph namespace."""
+    raw = str(task_id)
+    namespace = raw if raw.startswith("lme-") else f"lme-{raw}"
+    return f"/tasks/{quote(namespace, safe='')}"
+
+
 def _feed_rows_html(s: RunSnapshot, items_n: int) -> str:
     """Newest-first per-item feed (turn-by-turn) for one run."""
     if not items_n or not s.items:
@@ -295,6 +303,11 @@ def _feed_rows_html(s: RunSnapshot, items_n: int) -> str:
         q = it.get("question", "")
         recalled = it.get("recalled", "")
         gold = it.get("gold", "")
+        task_path = _task_path(it["task_id"])
+        task_link = (
+            f"<a class='task-link' href='{_esc(task_path)}' "
+            f"title='Open task page'>{_esc(it['task_id'][:24])}<span aria-hidden='true'> ↗</span></a>"
+        )
         # If we captured question/retrieval (newer runs), make the answer cell expandable
         # to show question -> retrieved memory -> gold -> response. Older runs (no capture)
         # just show the answer text.
@@ -328,11 +341,11 @@ def _feed_rows_html(s: RunSnapshot, items_n: int) -> str:
             ans_cell = f"<span title='{_esc(full)}'>{_esc(full)}</span>"
         cells += (
             f"<tr><td class='muted'>{tstr}</td><td class='{cls}'>{mark}</td><td>{_esc(it['arm'])}</td>"
-            f"<td class='muted'>{_esc(it['task_id'][:24])}</td>"
+            f"<td class='muted'>{task_link}</td>"
             f"<td class='ans'>{ans_cell}</td></tr>"
         )
     return (
-        "<table class='feed'><thead><tr><th>time</th><th></th><th>arm</th><th>item</th>"
+        "<table class='feed'><thead><tr><th>time</th><th></th><th>arm</th><th>item ↗ task</th>"
         "<th>question &middot; click to expand retrieval &rarr; gold &rarr; response</th>"
         "</tr></thead><tbody>" + cells + "</tbody></table>"
     )
@@ -373,7 +386,90 @@ def _ingest_rows_html(ingests: list[IngestSnapshot], total_items: int | None) ->
     return "".join(rows)
 
 
-def _scalar_viewer_shell(default_namespace: str | None) -> str:
+def _task_directory_html(tasks: list[dict]) -> str:
+    """Searchable index of every completed manifest task and its score state."""
+    rows: list[str] = []
+    status_counts = {"correct": 0, "incorrect": 0, "unscored": 0}
+    for task in tasks:
+        scores = {
+            str(score.get("arm") or ""): score
+            for score in task.get("scoring") or []
+        }
+        memory_score = scores.get("menhir_recall")
+        baseline_score = scores.get("no_memory")
+        if memory_score is None:
+            score_status = "unscored"
+        else:
+            score_status = "correct" if memory_score.get("correct") else "incorrect"
+        status_counts[score_status] += 1
+
+        def score_badge(label: str, score: dict | None) -> str:
+            if score is None:
+                return f"<span class='score-pill pending-score'>{label} pending</span>"
+            if score.get("correct"):
+                return f"<span class='score-pill score-correct'>{label} &#10003;</span>"
+            return f"<span class='score-pill score-incorrect'>{label} &#10007;</span>"
+
+        namespace = str(task.get("namespace") or "")
+        question_id = str(task.get("question_id") or namespace)
+        question = str(task.get("question") or namespace)
+        question_type = str(task.get("question_type") or "task")
+        search_text = " ".join((
+            namespace,
+            question_id,
+            question,
+            question_type,
+            str(task.get("answer") or ""),
+        )).lower()
+        graph_available = task.get("graph_available")
+        graph_badge = ""
+        if graph_available is True:
+            graph_badge = "<span class='directory-chip graph-ready'>graph ready</span>"
+        elif graph_available is False:
+            graph_badge = "<span class='directory-chip graph-missing'>graph missing</span>"
+        rows.append(
+            f"<article class='task-directory-row' data-task-row data-score='{score_status}' "
+            f"data-search='{_esc(search_text)}'>"
+            f"<div class='directory-id'><a href='{_esc(_task_path(namespace))}'>{_esc(question_id)} ↗</a>"
+            f"<span>{_esc(namespace)}</span></div>"
+            f"<div class='directory-question'><span>{_esc(question_type)}</span>"
+            f"<h3><a href='{_esc(_task_path(namespace))}'>{_esc(question)}</a></h3>"
+            f"<div class='directory-counts'><span>{int(task.get('turns') or 0)} turns</span>"
+            f"<span>{int(task.get('typed_assertions') or 0)} assertions</span>"
+            f"<span>{int(task.get('scalar_views') or 0)} scalar views</span>{graph_badge}</div></div>"
+            f"<div class='directory-scores'>{score_badge('memory', memory_score)}"
+            f"{score_badge('no memory', baseline_score)}</div></article>"
+        )
+    total = len(tasks)
+    return (
+        "<section class='task-directory'>"
+        "<div class='directory-top'><div><a class='back-link' href='/'>← run dashboard</a>"
+        f"<h2>All tasks <span>{total}</span></h2>"
+        "<p class='muted'>Open any task to inspect its evidence, assertions, Views, content memory, "
+        "derivation, and answer path.</p></div>"
+        "<div class='directory-summary'>"
+        f"<span class='score-correct'>{status_counts['correct']} correct</span>"
+        f"<span class='score-incorrect'>{status_counts['incorrect']} incorrect</span>"
+        f"<span class='pending-score'>{status_counts['unscored']} unscored</span></div></div>"
+        "<div class='directory-controls'>"
+        "<label>find a task<input id='task-search' type='search' placeholder='question, ID, type, or answer' "
+        "oninput='window.filterTaskDirectory()'></label>"
+        "<label>memory score<select id='task-score-filter' onchange='window.filterTaskDirectory()'>"
+        "<option value='all'>all</option><option value='correct'>correct</option>"
+        "<option value='incorrect'>incorrect</option><option value='unscored'>unscored</option>"
+        "</select></label>"
+        f"<span id='task-visible-count'>{total} of {total} tasks</span></div>"
+        f"<div id='task-list' class='task-directory-list'>{''.join(rows)}</div>"
+        "<p id='task-directory-empty' class='empty' hidden>No tasks match this search.</p>"
+        "</section>"
+    )
+
+
+def _scalar_viewer_shell(
+    default_namespace: str | None,
+    *,
+    detail_page: bool = False,
+) -> str:
     """Interactive shell; task data is loaded on demand from read-only JSON routes."""
     default_json = (
         json.dumps(default_namespace or "")
@@ -381,6 +477,7 @@ def _scalar_viewer_shell(default_namespace: str | None) -> str:
         .replace(">", "\\u003e")
         .replace("&", "\\u0026")
     )
+    detail_json = "true" if detail_page else "false"
     return """
 <section id="scalar-viewer" class="viewer">
   <div class="viewer-head">
@@ -391,9 +488,11 @@ def _scalar_viewer_shell(default_namespace: str | None) -> str:
       k-sample vote, durable assertions, deterministic fold, and benchmark answer.</p>
     </div>
     <div class="viewer-picker">
-      <label for="scalar-task">completed task</label>
+      <label for="scalar-task">completed task <span id="scalar-task-count"></span></label>
       <select id="scalar-task"></select>
       <button id="scalar-load" type="button">inspect task</button>
+      <div class="task-links"><a href="/tasks/">all tasks</a>
+      <a id="scalar-open" href="/tasks/">open task page ↗</a></div>
     </div>
   </div>
   <div id="scalar-status" class="muted">Loading completed tasks…</div>
@@ -402,22 +501,40 @@ def _scalar_viewer_shell(default_namespace: str | None) -> str:
 <script>
 (() => {
   const preferred = __DEFAULT_NAMESPACE__;
-  const state = {data: null, stage: 0, onlyFounded: false};
+  const detailPage = __DETAIL_PAGE__;
+  const state = {data: null, stage: 0, onlyFounded: false, catalogFingerprint: ""};
   const stageMeta = [
     ["1", "Evidence", "preserved source turns"],
     ["2", "2-of-3 gate", "stochastic extraction vote"],
     ["3", "Assertions", "durable typed events"],
     ["4", "Scalar view", "deterministic fold"],
-    ["5", "Answer path", "recall and scoring"],
+    ["5", "Memory map", "view, derivation, or content"],
+    ["6", "Answer path", "recall and scoring"],
   ];
   const h = value => String(value == null ? "" : value)
     .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
   const when = value => value ? h(String(value).replace("T", " ").replace("Z", " UTC")) : "—";
   const list = value => Array.isArray(value) ? value : [];
+  const foldLabels = {
+    current: "CURRENT VIEW",
+    historical: "HISTORICAL VIEW",
+    recorded: "RECORDED",
+    abstained: "ABSTAINED",
+    expired: "EXPIRED",
+    not_folded: "NOT FOLDED",
+    not_materialized: "NO VIEW",
+    superseded: "SUPERSEDED",
+    write_failed: "WRITE FAILED",
+  };
+  const foldProblemStatuses = new Set([
+    "abstained", "expired", "not_folded", "not_materialized", "write_failed",
+  ]);
   const status = document.getElementById("scalar-status");
   const body = document.getElementById("scalar-body");
   const picker = document.getElementById("scalar-task");
+  const taskCount = document.getElementById("scalar-task-count");
+  const openTask = document.getElementById("scalar-open");
 
   function currentViews() {
     return list(state.data && state.data.views).filter(v => v.current);
@@ -427,14 +544,21 @@ def _scalar_viewer_shell(default_namespace: str | None) -> str:
     const d = state.data || {};
     const gates = list(d.audit).filter(x => x.event === "gate");
     const scores = list(d.scoring);
+    const assertions = list(d.assertions);
+    const foldProblems = assertions.filter(a => {
+      const outcome = a.fold_outcome || {};
+      return [outcome.state, outcome.history].some(x => x && foldProblemStatuses.has(x.status));
+    }).length;
     const histCount = list(d.history_views).filter(v => v.current).length;
     const viewLabel = currentViews().length + " state"
       + (histCount ? ", " + histCount + " history" : "");
     return [
       list(d.evidence).filter(x => list(x.founds).length).length + "/" + list(d.evidence).length,
       gates.length,
-      list(d.assertions).length,
+      assertions.length + (foldProblems ? " · " + foldProblems + " blocked" : ""),
       viewLabel,
+      list(d.memory_inventory).filter(x => x.memory_type === "view").length + " views · "
+        + list(d.memory_inventory).filter(x => x.memory_type === "content").length + " content",
       scores.length ? scores.length + " scored" : "pending",
     ];
   }
@@ -512,36 +636,91 @@ def _scalar_viewer_shell(default_namespace: str | None) -> str:
   }
 
   function renderAssertions(d) {
-    const cards = list(d.assertions).map((a, i) =>
-      `<article class="assertion">
+    const evidence = list(d.evidence);
+    const evidenceById = new Map(evidence.map(turn => [String(turn.id || ""), turn]));
+    const sourceTurnFor = assertion => {
+      const direct = evidenceById.get(String(assertion.evidence_id || ""));
+      if (direct) return direct;
+      return evidence.find(turn =>
+        list(turn.founds).some(assertionId => String(assertionId) === String(assertion.id))) || null;
+    };
+    const badge = (projection, outcome) => {
+      const value = outcome || {};
+      const foldStatus = String(value.status || "unknown").replace(/[^a-z_]/g, "");
+      const label = foldLabels[foldStatus] || "UNKNOWN";
+      return `<span class="fold-badge ${foldStatus}" title="${h(value.reason || "")}">
+        <b>${h(projection)}</b>${h(label)}</span>`;
+    };
+    const cards = list(d.assertions).map((a, i) => {
+      const outcome = a.fold_outcome || {};
+      const projections = [["state", outcome.state], ["history", outcome.history]];
+      const problems = projections.filter(([, value]) =>
+        value && foldProblemStatuses.has(value.status));
+      const reasons = problems.map(([projection, value]) =>
+        `<b>${h(projection)}</b>: ${h(String(value.reason || value.status).replaceAll("_", " "))}`
+      ).join(" · ");
+      const sourceTurn = sourceTurnFor(a);
+      const sourceQuote = problems.length
+        ? sourceTurn
+          ? `<div class="assertion-source">
+              <div class="assertion-source-meta"><b>ORIGINAL SOURCE TURN</b>
+                <span>${h(sourceTurn.role)} · source ${when(sourceTurn.occurred_at)}</span></div>
+              <blockquote>“${h(sourceTurn.text)}”</blockquote>
+            </div>`
+          : `<div class="assertion-source unavailable">Original source turn unavailable in this graph.</div>`
+        : "";
+      return `<article class="assertion ${problems.length ? "fold-blocked" : ""}">
         <div class="assertion-num">${i + 1}</div><div>
           <div class="assertion-value"><b>${h(a.subject)}</b><span>→</span>
             <b>${h(a.attribute)}</b><span>=</span><strong>${h(a.value)}${a.unit ? " " + h(a.unit) : ""}</strong></div>
-          <blockquote>“${h(a.stated_span)}”</blockquote>
+          <div class="extracted-span"><span>EXTRACTED SPAN</span><blockquote>“${h(a.stated_span)}”</blockquote></div>
           <div class="chips"><span>${h(a.value_kind)}</span><span>${h(a.operation)}</span>
             <span>${h(a.evidence_tier)} evidence</span><span>${a.binding_pending ? "binding pending" : "subject bound"}</span></div>
+          <div class="fold-outcomes">${projections.map(([projection, value]) =>
+            badge(projection, value)).join("")}</div>
+          ${reasons ? `<div class="fold-reasons">${reasons}</div>` : ""}
+          ${sourceQuote}
           <div class="muted">world time ${when(a.valid_at)} · learned ${when(a.learned_at)}</div>
         </div>
-      </article>`
-    ).join("");
+      </article>`;
+    }).join("");
     return `<div class="stage-panel"><div class="stage-intro"><div><h3>Durable event log</h3>
       <p>A winning interpretation becomes an immutable <code>TypedAssertion</code>. It records
-      subject, slot, typed value, world time, source quote, and binding state.</p></div></div>
+      subject, slot, typed value, world time, source quote, and binding state. Projection badges
+      show whether each assertion reached current state, advisory history, safely abstained, or
+      could not be folded. Gate rejections remain in stage 2 because no assertion was created.</p></div></div>
       <div class="assertions">${cards || '<p class="empty">No TypedAssertions were emitted.</p>'}</div></div>`;
   }
 
+  function scalarViewLaneKey(view) {
+    return String(view.view_key || JSON.stringify([
+      view.subject_uuid,
+      view.attribute,
+      view.scope,
+      view.value_kind,
+      view.unit,
+    ]));
+  }
+
   function renderViews(d) {
-    const views = list(d.views);
-    const cards = views.map((v, i) =>
-      `<article class="view-card ${v.current ? "current" : "history"}">
-        <div class="view-state">${v.current ? "CURRENT" : "SUPERSEDED"}</div>
-        <div class="view-value">${h(v.display || v.value)}${v.unit ? " " + h(v.unit) : ""}</div>
-        <div><b>${h(v.subject)}</b> · ${h(v.attribute)}${v.scope ? " · " + h(v.scope) : ""}</div>
-        <p>${h(v.summary)}</p>
-        <div class="chips"><span>${h(v.value_kind)}</span><span>${h(v.effective_tier)} effective tier</span>
-          <span>${list(v.contributor_ids).length} contributor</span></div>
-        <div class="muted">valid ${when(v.valid_at)}</div>
-      </article>${i < views.length - 1 ? '<div class="supersede">→ later world time →</div>' : ""}`
+    const stateLanes = new Map();
+    list(d.views).forEach(view => {
+      const key = scalarViewLaneKey(view);
+      if (!stateLanes.has(key)) stateLanes.set(key, []);
+      stateLanes.get(key).push(view);
+    });
+    const cards = Array.from(stateLanes.values()).map(lane =>
+      `<div class="views view-lane">${lane.map((v, i) =>
+        `<article class="view-card ${v.current ? "current" : "history"}">
+          <div class="view-state">${v.current ? "CURRENT" : "SUPERSEDED"}</div>
+          <div class="view-value">${h(v.display || v.value)}${v.unit ? " " + h(v.unit) : ""}</div>
+          <div><b>${h(v.subject)}</b> · ${h(v.attribute)}${v.scope ? " · " + h(v.scope) : ""}</div>
+          <p>${h(v.summary)}</p>
+          <div class="chips"><span>${h(v.value_kind)}</span><span>${h(v.effective_tier)} effective tier</span>
+            <span>${list(v.contributor_ids).length} contributor</span></div>
+          <div class="muted">valid ${when(v.valid_at)}</div>
+        </article>${i < lane.length - 1 ? '<div class="supersede">→ later world time →</div>' : ""}`
+      ).join("")}</div>`
     ).join("");
     // scalar_history Views: advisory, ordered delta/assertion history per slot.
     const hvs = list(d.history_views).filter(v => v.current);
@@ -572,9 +751,54 @@ def _scalar_viewer_shell(default_namespace: str | None) -> str:
     return `<div class="stage-panel"><div class="stage-intro"><div><h3>Deterministic projection</h3>
       <p>The fold replays assertions by slot and world time. Views are rebuildable projections:
       old values remain visible for provenance, while exactly one value is current.</p></div></div>
-      <div class="views">${cards || '<p class="empty">No scalar_state view materialized.</p>'}</div>
+      <div class="view-lanes">${cards || '<p class="empty">No scalar_state view materialized.</p>'}</div>
       ${noAbstain}
       ${hCards ? '<h4>Advisory history</h4><div class="views">' + hCards + '</div>' : ""}</div>`;
+  }
+
+  function renderMemoryMap(d) {
+    const inventory = list(d.memory_inventory);
+    const views = inventory.filter(item => item.memory_type === "view");
+    const content = inventory.filter(item => item.memory_type === "content");
+    const viewCards = views.map(item => {
+      const derivation = item.derivation === "delta"
+        ? "DELTA-DERIVED"
+        : item.derivation === "absolute"
+          ? "ABSOLUTE"
+          : item.derivation === "mixed"
+            ? "MIXED DERIVATION"
+            : "DERIVATION UNKNOWN";
+      const kind = item.view_kind === "scalar_history" ? "HISTORY VIEW" : "STATE VIEW";
+      return `<article class="memory-card view-memory">
+        <div class="memory-labels"><span class="memory-kind view">VIEW</span>
+          <span>${h(kind)}</span><span class="derivation ${h(item.derivation)}">${h(derivation)}</span></div>
+        <h4>${h(item.subject)} · ${h(item.attribute)}${item.scope ? " · " + h(item.scope) : ""}</h4>
+        ${item.value ? `<div class="memory-value">${h(item.value)}</div>` : ""}
+        <p>${h(item.content)}</p>
+        <div class="muted">${item.current ? "current rebuildable projection" : "superseded projection"}
+          · operations ${list(item.operations).map(h).join(", ") || "unavailable"}</div>
+      </article>`;
+    }).join("");
+    const contentCards = content.map(item =>
+      `<article class="memory-card content-memory">
+        <div class="memory-labels"><span class="memory-kind content">CONTENT</span>
+          <span>ordinary graph fact</span></div>
+        <h4>${h(item.subject)} → ${h(item.object)}</h4>
+        <p>${h(item.content)}</p>
+        <div class="muted">${h(item.relation)} · ${list(item.episode_ids).length} source episode(s)</div>
+      </article>`
+    ).join("");
+    return `<div class="stage-panel"><div class="stage-intro"><div><h3>Task memory inventory</h3>
+      <p><b>VIEW</b> means a rebuildable scalar projection derived from durable assertions.
+      Its derivation badge says whether the contributing assertions were absolute observations,
+      deltas, or a mix. <b>CONTENT</b> means an ordinary relationship fact extracted from the
+      conversation; it is not part of the scalar fold.</p></div></div>
+      <div class="memory-summary"><span><b>${views.length}</b> Views</span>
+        <span><b>${content.length}</b> content facts</span></div>
+      <h4>Derived Views</h4><div class="memory-grid">${viewCards ||
+        '<p class="empty">No scalar Views materialized for this task.</p>'}</div>
+      <h4>Content memory</h4><div class="memory-grid">${contentCards ||
+        '<p class="empty">No ordinary relationship facts are available.</p>'}</div></div>`;
   }
 
   function renderAnswer(d) {
@@ -611,7 +835,7 @@ def _scalar_viewer_shell(default_namespace: str | None) -> str:
     const d = state.data;
     if (!d) return;
     const task = d.task || {};
-    const panels = [renderEvidence, renderGate, renderAssertions, renderViews, renderAnswer];
+    const panels = [renderEvidence, renderGate, renderAssertions, renderViews, renderMemoryMap, renderAnswer];
     body.innerHTML = `<div class="task-hero"><div><span>${h(task.question_type || "task")}</span>
       <h3>${h(task.question || d.namespace)}</h3></div><div class="task-id">${h(d.namespace)}</div></div>
       ${renderNav()}${panels[state.stage](d)}
@@ -634,39 +858,71 @@ def _scalar_viewer_shell(default_namespace: str | None) -> str:
       const response = await fetch("/api/scalar-task?namespace=" + encodeURIComponent(namespace), {cache: "no-store"});
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "viewer request failed");
+      const taskPath = "/tasks/" + encodeURIComponent(namespace);
+      openTask.href = taskPath;
+      if (detailPage) history.replaceState(null, "", taskPath);
       state.data = data;
       state.stage = 0;
-      status.textContent = "Loaded from Neo4j" + (data.audit_pass_id ? " + vote receipt" : "");
+      status.textContent = data.graph_warning || (list(data.evidence).length
+        ? "Loaded from Neo4j" + (data.audit_pass_id ? " + vote receipt" : "")
+        : "Manifest task loaded; scalar graph evidence is not available yet.");
       render();
+      if (detailPage && !location.hash) {
+        document.getElementById("scalar-viewer").scrollIntoView({block: "start"});
+      }
     } catch (error) {
       status.textContent = "Could not load task: " + error.message;
     }
   }
 
-  async function init() {
+  async function refreshTaskCatalog(initial = false) {
     try {
       const response = await fetch("/api/scalar-tasks", {cache: "no-store"});
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "task catalog failed");
-      picker.replaceChildren(...data.tasks.map(task => {
-        const option = document.createElement("option");
-        option.value = task.namespace;
-        option.textContent = task.question_id + " · " + (task.question || task.namespace);
-        return option;
-      }));
-      const wanted = preferred || data.default_namespace;
+      const tasks = list(data.tasks);
+      const selected = picker.value;
+      const fingerprint = JSON.stringify(tasks.map(task => [
+        task.namespace,
+        task.question,
+        task.graph_available,
+      ]));
+      if (fingerprint !== state.catalogFingerprint) {
+        picker.replaceChildren(...tasks.map(task => {
+          const option = document.createElement("option");
+          option.value = task.namespace;
+          option.textContent = task.question_id + " · " + (task.question || task.namespace)
+            + (task.graph_available === false ? " · graph unavailable" : "");
+          return option;
+        }));
+        state.catalogFingerprint = fingerprint;
+      }
+      taskCount.textContent = "(" + tasks.length + ")";
+      const wanted = initial ? (preferred || data.default_namespace) : selected;
       if (wanted && data.tasks.some(task => task.namespace === wanted)) picker.value = wanted;
-      document.getElementById("scalar-load").addEventListener("click", loadTask);
-      if (picker.value) await loadTask();
-      else status.textContent = "No completed manifest tasks are available.";
+      if (initial) {
+        if (picker.value) await loadTask();
+        else status.textContent = "No completed manifest tasks are available.";
+      } else if (!state.data && picker.value) {
+        await loadTask();
+      }
     } catch (error) {
-      status.textContent = "Scalar viewer unavailable: " + error.message;
+      if (initial || !state.data) {
+        status.textContent = "Scalar viewer unavailable: " + error.message;
+      }
     }
+  }
+
+  async function init() {
+    document.getElementById("scalar-load").addEventListener("click", loadTask);
+    picker.addEventListener("change", loadTask);
+    window.addEventListener("dashboard:refresh", () => refreshTaskCatalog(false));
+    await refreshTaskCatalog(true);
   }
   init();
 })();
 </script>
-""".replace("__DEFAULT_NAMESPACE__", default_json)
+""".replace("__DEFAULT_NAMESPACE__", default_json).replace("__DETAIL_PAGE__", detail_json)
 
 
 def render_html(
@@ -679,6 +935,8 @@ def render_html(
     ingests: list[IngestSnapshot] | None = None,
     scalar_viewer_enabled: bool = False,
     scalar_default_namespace: str | None = None,
+    scalar_detail_page: bool = False,
+    task_directory: list[dict] | None = None,
 ) -> str:
     """Self-contained auto-refreshing HTML page for the same data as render()."""
     rows: list[str] = []
@@ -718,6 +976,8 @@ def render_html(
         )
     ingest_rows = _ingest_rows_html(ingests or [], total_items)
     body = ingest_rows + "".join(rows)
+    if task_directory is not None:
+        body = _task_directory_html(task_directory)
     if not body:
         body = "<p class='muted'>No ingest manifest or scoring checkpoints yet.</p>"
 
@@ -753,6 +1013,8 @@ def render_html(
  table.feed td.ans{{white-space:normal;overflow-wrap:anywhere;color:#c9d1d9;max-width:0;width:99%}}
  table.feed td:nth-child(1),table.feed td:nth-child(2),table.feed td:nth-child(3),table.feed td:nth-child(4){{white-space:nowrap}}
  td.ans details summary{{cursor:pointer;color:#c9d1d9}}
+ a.task-link{{color:#58a6ff;text-decoration:none;font-weight:600}}
+ a.task-link:hover,a.task-link:focus{{text-decoration:underline}}
  td.ans details[open] summary{{color:#58a6ff;margin-bottom:6px}}
  .blk{{margin:5px 0 5px 10px;border-left:2px solid #30363d;padding-left:10px}}
  .lbl{{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#8b949e}}
@@ -772,6 +1034,29 @@ def render_html(
  select,button{{font:inherit;color:#c9d1d9;background:#161b22;border:1px solid #30363d;border-radius:6px;padding:7px 9px}}
  button{{cursor:pointer}} button:hover:not(:disabled){{border-color:#58a6ff;background:#1b2636}}
  button:disabled{{cursor:default;opacity:.4}} .viewer-picker select{{min-width:280px;max-width:420px}}
+ .task-links{{grid-column:1/-1;display:flex;justify-content:space-between;gap:12px;font-size:11px}}
+ .task-links a{{color:#58a6ff;text-decoration:none}} .task-links a:hover{{text-decoration:underline}}
+ .task-directory{{max-width:1100px;margin-top:18px}} .directory-top{{display:flex;justify-content:space-between;
+   gap:20px;align-items:end;border-bottom:1px solid #30363d;padding-bottom:14px}}
+ .directory-top h2{{font-size:24px;margin:5px 0 2px}} .directory-top h2 span{{color:#8b949e;font-size:15px}}
+ .back-link,.directory-id a,.directory-question a{{color:#58a6ff;text-decoration:none}}
+ .back-link:hover,.directory-id a:hover,.directory-question a:hover{{text-decoration:underline}}
+ .directory-summary{{display:flex;gap:8px;flex-wrap:wrap}} .directory-summary span,.score-pill{{border:1px solid #30363d;
+   border-radius:12px;padding:3px 8px;font-size:10px;white-space:nowrap}}
+ .score-correct{{color:#3fb950}} .score-incorrect{{color:#f85149}} .pending-score{{color:#8b949e}}
+ .directory-controls{{display:flex;gap:12px;align-items:end;margin:16px 0}}
+ .directory-controls label{{display:grid;gap:4px;color:#8b949e;font-size:10px;text-transform:uppercase}}
+ .directory-controls input{{font:inherit;color:#c9d1d9;background:#161b22;border:1px solid #30363d;
+   border-radius:6px;padding:8px 10px;min-width:360px}} .directory-controls>span{{margin-left:auto;color:#8b949e}}
+ .task-directory-list{{display:grid;gap:8px}} .task-directory-row{{display:grid;grid-template-columns:130px 1fr auto;
+   gap:14px;align-items:center;border:1px solid #30363d;border-radius:8px;padding:12px 14px;background:#0d1117}}
+ .task-directory-row:hover{{border-color:#484f58;background:#101722}} .directory-id a{{font-weight:bold}}
+ .directory-id span,.directory-question>span{{display:block;color:#8b949e;font-size:9px;text-transform:uppercase;
+   letter-spacing:.07em;margin-top:3px}} .directory-question h3{{font:600 14px/1.45 ui-sans-serif,system-ui;margin:3px 0}}
+ .directory-question h3 a{{color:#e6edf3}} .directory-counts{{display:flex;gap:6px;flex-wrap:wrap}}
+ .directory-counts span,.directory-chip{{color:#8b949e;border:1px solid #30363d;border-radius:10px;padding:1px 6px;font-size:9px}}
+ .directory-chip.graph-ready{{color:#3fb950;border-color:#2ea04366}} .directory-chip.graph-missing{{color:#e3b341;border-color:#d2992266}}
+ .directory-scores{{display:grid;gap:5px;justify-items:end}}
  #scalar-status{{margin:14px 0 8px}} .task-hero{{display:flex;justify-content:space-between;gap:20px;
    align-items:start;padding:14px;border:1px solid #30363d;border-radius:8px;background:#0d1117}}
  .task-hero span,.answer-question>span,.gold span,.answer-source span{{display:block;color:#8b949e;
@@ -801,24 +1086,52 @@ def render_html(
  .vote-row>div:first-child{{display:flex;justify-content:space-between;gap:12px}} .vote-bar{{height:5px;background:#21262d;border-radius:3px;overflow:hidden}}
  .vote-bar i{{display:block;height:100%;background:#58a6ff}} .warning,.pending{{border:1px solid #d2992266;background:#2d220d;
    color:#e3b341;border-radius:6px;padding:10px}} .assertions{{display:grid;gap:9px}}
- .assertion{{display:grid;grid-template-columns:34px 1fr;gap:8px;border:1px solid #30363d;border-radius:8px;padding:12px;background:#0d1117}}
- .assertion-num{{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#1f6feb;color:white}}
- .assertion-value{{display:flex;gap:8px;align-items:center;flex-wrap:wrap}} .assertion-value strong{{color:#79c0ff;font-size:16px}}
- blockquote{{margin:7px 0;color:#e6edf3;font:italic 14px/1.5 ui-serif,Georgia}} .chips{{display:flex;gap:5px;flex-wrap:wrap;margin:7px 0}}
- .chips span{{font-size:10px;padding:2px 6px;border:1px solid #30363d;border-radius:10px;color:#8b949e}}
- .views{{display:flex;align-items:stretch;overflow-x:auto;padding-bottom:6px}} .view-card{{min-width:240px;flex:1;border:1px solid #30363d;
+  .assertion{{display:grid;grid-template-columns:34px 1fr;gap:8px;border:1px solid #30363d;border-radius:8px;padding:12px;background:#0d1117}}
+  .assertion.fold-blocked{{border-left:4px solid #d29922}}
+  .assertion-num{{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#1f6feb;color:white}}
+  .assertion-value{{display:flex;gap:8px;align-items:center;flex-wrap:wrap}} .assertion-value strong{{color:#79c0ff;font-size:16px}}
+  blockquote{{margin:7px 0;color:#e6edf3;font:italic 14px/1.5 ui-serif,Georgia}}
+  .extracted-span>span,.assertion-source-meta b{{font-size:9px;letter-spacing:.08em;color:#8b949e}}
+  .assertion-source{{margin:9px 0;padding:9px 11px;border:1px solid #d2992266;border-radius:6px;background:#2d220d}}
+  .assertion-source.unavailable{{color:#8b949e;font-size:11px}}
+  .assertion-source-meta{{display:flex;gap:10px;justify-content:space-between;color:#8b949e;font-size:10px}}
+  .assertion-source blockquote{{margin-bottom:0;color:#fff8c5}}
+  .chips{{display:flex;gap:5px;flex-wrap:wrap;margin:7px 0}}
+  .chips span{{font-size:10px;padding:2px 6px;border:1px solid #30363d;border-radius:10px;color:#8b949e}}
+  .fold-outcomes{{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 5px}}
+  .fold-badge{{display:inline-flex;gap:6px;border:1px solid #30363d;border-radius:5px;padding:3px 7px;
+    color:#8b949e;font-size:10px}} .fold-badge b{{color:#e6edf3;text-transform:uppercase}}
+  .fold-badge.current,.fold-badge.recorded{{color:#3fb950;border-color:#2ea04366;background:#0e1b15}}
+  .fold-badge.abstained,.fold-badge.expired,.fold-badge.not_folded,.fold-badge.not_materialized,
+  .fold-badge.write_failed{{color:#e3b341;border-color:#d2992266;background:#2d220d}}
+  .fold-reasons{{color:#e3b341;font-size:11px;margin-bottom:7px}}
+  .view-lanes{{display:grid;gap:10px}} .views{{display:flex;align-items:stretch;overflow-x:auto;padding-bottom:6px}}
+  .view-card{{min-width:240px;flex:1;border:1px solid #30363d;
    border-top:4px solid #6e7681;border-radius:8px;padding:14px;background:#0d1117}} .view-card.current{{border-top-color:#3fb950;background:#0e1b15}}
  .view-state{{color:#8b949e;font-size:10px;letter-spacing:.1em}} .current .view-state{{color:#3fb950}}
  .view-value{{font-size:34px;color:#79c0ff;font-weight:bold;margin:4px 0}} .view-card p{{color:#8b949e}}
  .supersede{{display:grid;place-items:center;min-width:135px;color:#d29922;text-align:center}}
+ .memory-summary{{display:flex;gap:10px;margin:12px 0}} .memory-summary span{{border:1px solid #30363d;
+   border-radius:7px;padding:7px 10px;color:#8b949e}} .memory-summary b{{color:#e6edf3}}
+ .memory-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:9px;margin-bottom:18px}}
+ .memory-card{{border:1px solid #30363d;border-radius:8px;padding:12px;background:#0d1117}}
+ .memory-card.view-memory{{border-left:4px solid #58a6ff}} .memory-card.content-memory{{border-left:4px solid #8b949e}}
+ .memory-card h4{{margin:8px 0 4px}} .memory-card p{{color:#adbac7;margin:5px 0 9px}}
+ .memory-labels{{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:#8b949e;font-size:9px;letter-spacing:.07em}}
+ .memory-labels span{{border:1px solid #30363d;border-radius:10px;padding:2px 6px}}
+ .memory-kind.view{{color:#79c0ff;border-color:#1f6feb88}} .memory-kind.content{{color:#c9d1d9}}
+ .derivation.absolute{{color:#3fb950;border-color:#2ea04366}} .derivation.delta{{color:#d2a8ff;border-color:#8957e566}}
+ .derivation.mixed{{color:#e3b341;border-color:#d2992266}} .memory-value{{font-size:20px;color:#79c0ff;font-weight:bold}}
  .answer-grid{{display:grid;grid-template-columns:1fr 1fr;gap:16px}} .answer-question{{border:1px solid #30363d;border-radius:8px;padding:16px;background:#0d1117}}
  .answer-question h3{{font:600 19px/1.5 ui-sans-serif,system-ui;margin:6px 0 16px}} .gold{{border-top:1px solid #30363d;padding-top:10px}}
  .gold b{{font-size:22px;color:#3fb950}} .answer-source{{border:1px solid #2ea04366;border-radius:7px;padding:10px;margin:6px 0;background:#0e1b15}}
  .answer-source b{{display:block;color:#79c0ff;margin-top:3px}} .score-wrap{{grid-column:1/-1}} .score{{border:1px solid #30363d;border-radius:7px;padding:10px}}
  .score.okbox{{border-left:4px solid #3fb950}} .score.nobox{{border-left:4px solid #f85149}} .score pre{{white-space:pre-wrap}}
  .empty{{color:#8b949e;font-style:italic}} .stage-controls{{display:flex;justify-content:space-between;align-items:center;margin-top:12px}}
- @media (max-width:800px){{.viewer-head,.stage-intro{{display:block}}.viewer-picker{{margin-top:12px;min-width:0}}
-   .stage-arrow{{display:none}}.answer-grid{{grid-template-columns:1fr}}.viewer-picker select{{min-width:0}}}}
+ @media (max-width:800px){{.viewer-head,.stage-intro,.directory-top{{display:block}}.viewer-picker{{margin-top:12px;min-width:0}}
+   .stage-arrow{{display:none}}.answer-grid{{grid-template-columns:1fr}}.viewer-picker select{{min-width:0}}
+   .directory-controls{{align-items:stretch;flex-direction:column}}.directory-controls input{{min-width:0;width:100%;box-sizing:border-box}}
+   .directory-controls>span{{margin-left:0}}.task-directory-row{{grid-template-columns:1fr}}.directory-scores{{display:flex;justify-items:start}}}}
  footer{{color:#8b949e;margin-top:18px;max-width:900px}}
 </style></head><body>
 <h1>archolith-bench &mdash; memory benchmark</h1>
@@ -827,10 +1140,28 @@ def render_html(
 <div style="margin:10px 0">{mh}</div>
 {body}
 </div>
-{_scalar_viewer_shell(scalar_default_namespace) if scalar_viewer_enabled else ""}
+{_scalar_viewer_shell(scalar_default_namespace, detail_page=scalar_detail_page) if scalar_viewer_enabled else ""}
 <footer>Token columns are ANSWER-model only; menhir ingestion (OpenAI extraction+embedding)
 spend is not tracked by the bench. Progress is by item-count across arms.</footer>
 <script>
+window.filterTaskDirectory = function() {{
+  const search = document.getElementById('task-search');
+  const filter = document.getElementById('task-score-filter');
+  const list = document.getElementById('task-list');
+  if (!search || !filter || !list) return;
+  const query = search.value.trim().toLowerCase();
+  const score = filter.value;
+  const rows = Array.from(list.querySelectorAll('[data-task-row]'));
+  let visible = 0;
+  rows.forEach(row => {{
+    const show = (!query || row.dataset.search.includes(query))
+      && (score === 'all' || row.dataset.score === score);
+    row.hidden = !show;
+    if (show) visible += 1;
+  }});
+  document.getElementById('task-visible-count').textContent = visible + ' of ' + rows.length + ' tasks';
+  document.getElementById('task-directory-empty').hidden = visible !== 0;
+}};
 // In-place refresh: fetch the page, swap only #content, and preserve which <details>
 // are open plus the scroll position -- so expanding a question is NOT reset every tick.
 const RS = {refresh_s} * 1000;
@@ -847,13 +1178,21 @@ async function tick() {{
     document.querySelectorAll('.keepscroll[id]').forEach(el => {{
       if (el.scrollTop > 0) innerScroll[el.id] = el.scrollTop;
     }});
+    const taskSearch = document.getElementById('task-search')?.value || '';
+    const taskScore = document.getElementById('task-score-filter')?.value || 'all';
     const sy = window.scrollY;
     document.getElementById('content').replaceWith(fresh);
     fresh.querySelectorAll('details[id]').forEach(d => {{ d.open = openIds.has(d.id); }});
     fresh.querySelectorAll('.keepscroll[id]').forEach(el => {{
       if (innerScroll[el.id] != null) el.scrollTop = innerScroll[el.id];
     }});
+    const freshTaskSearch = document.getElementById('task-search');
+    const freshTaskScore = document.getElementById('task-score-filter');
+    if (freshTaskSearch) freshTaskSearch.value = taskSearch;
+    if (freshTaskScore) freshTaskScore.value = taskScore;
+    window.filterTaskDirectory();
     window.scrollTo(0, sy);
+    window.dispatchEvent(new Event('dashboard:refresh'));
   }} catch (e) {{ /* transient fetch error; try again next tick */ }}
 }}
 setInterval(tick, RS);
@@ -876,9 +1215,9 @@ def serve_dashboard(
 ) -> None:
     """Serve the dashboard as an auto-refreshing web page until interrupted."""
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-    from urllib.parse import parse_qs, urlparse
+    from urllib.parse import parse_qs, unquote, urlparse
 
-    from .scalar_viewer import scoring_rows, task_catalog
+    from .scalar_viewer import catalog_with_graph_availability, scoring_rows, task_catalog
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *a):  # silence access logs
@@ -905,16 +1244,61 @@ def serve_dashboard(
             snaps = scan_runs(results_dir, active_within_s=active_within_s)
             ingests = scan_ingests(results_dir, active_within_s=active_within_s)
             catalog = task_catalog(ingests)
-            if route.path == "/api/scalar-tasks":
-                graph_warning = None
+            if route.path.rstrip("/") == "/tasks":
+                available = None
                 if scalar_reader is not None:
                     try:
                         available = scalar_reader.available_namespaces()
-                        catalog = [
-                            item for item in catalog if item["namespace"] in available
-                        ]
+                    except Exception:  # noqa: BLE001 - directory remains useful while graph is offline
+                        pass
+                directory = [
+                    {
+                        **task,
+                        "scoring": scoring_rows(snaps, task["question_id"]),
+                    }
+                    for task in catalog_with_graph_availability(catalog, available)
+                ]
+                menhir = probe_menhir(menhir_url) if menhir_url else None
+                page = render_html(
+                    snaps,
+                    menhir,
+                    total_items=total_items,
+                    refresh_s=refresh_s,
+                    items_n=items_n,
+                    ingests=ingests,
+                    task_directory=directory,
+                )
+                self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
+                return
+            if route.path.startswith("/tasks/"):
+                namespace = unquote(route.path.removeprefix("/tasks/")).strip("/")
+                task = next((item for item in catalog if item["namespace"] == namespace), None)
+                if task is None:
+                    self._json(404, {"error": "Unknown or incomplete manifest namespace."})
+                    return
+                menhir = probe_menhir(menhir_url) if menhir_url else None
+                page = render_html(
+                    snaps,
+                    menhir,
+                    total_items=total_items,
+                    refresh_s=refresh_s,
+                    items_n=items_n,
+                    ingests=ingests,
+                    scalar_viewer_enabled=True,
+                    scalar_default_namespace=namespace,
+                    scalar_detail_page=True,
+                )
+                self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
+                return
+            if route.path == "/api/scalar-tasks":
+                graph_warning = None
+                available = None
+                if scalar_reader is not None:
+                    try:
+                        available = scalar_reader.available_namespaces()
                     except Exception as exc:  # noqa: BLE001 - catalog remains useful if graph is down
-                        graph_warning = f"Could not filter tasks against the scalar graph: {exc}"
+                        graph_warning = f"Could not annotate tasks against the scalar graph: {exc}"
+                catalog = catalog_with_graph_availability(catalog, available)
                 default = scalar_default_namespace
                 namespaces = {item["namespace"] for item in catalog}
                 if default not in namespaces:
@@ -927,19 +1311,42 @@ def serve_dashboard(
                 })
                 return
             if route.path == "/api/scalar-task":
-                if scalar_reader is None:
-                    self._json(503, {"error": "The dashboard was not started with scalar graph access."})
-                    return
                 namespace = (parse_qs(route.query).get("namespace") or [""])[0]
                 task = next((item for item in catalog if item["namespace"] == namespace), None)
                 if task is None:
                     self._json(404, {"error": "Unknown or incomplete manifest namespace."})
                     return
-                try:
-                    payload = scalar_reader.read(namespace)
-                except Exception as exc:  # noqa: BLE001 - read-only explorer must return a useful error
-                    self._json(502, {"error": f"Could not read the scalar graph: {exc}"})
-                    return
+                if scalar_reader is None:
+                    payload = {
+                        "namespace": namespace,
+                        "evidence": [],
+                        "assertions": [],
+                        "views": [],
+                        "history_views": [],
+                        "facts": [],
+                        "memory_inventory": [],
+                        "audit_pass_id": None,
+                        "audit": [],
+                        "audit_warning": None,
+                        "graph_warning": "Scalar graph access is not configured for this dashboard.",
+                    }
+                else:
+                    try:
+                        payload = scalar_reader.read(namespace)
+                    except Exception as exc:  # noqa: BLE001 - explorer keeps manifest/scoring usable
+                        payload = {
+                            "namespace": namespace,
+                            "evidence": [],
+                            "assertions": [],
+                            "views": [],
+                            "history_views": [],
+                            "facts": [],
+                            "memory_inventory": [],
+                            "audit_pass_id": None,
+                            "audit": [],
+                            "audit_warning": None,
+                            "graph_warning": f"Scalar graph is unavailable: {exc}",
+                        }
                 payload["task"] = task
                 payload["scoring"] = scoring_rows(snaps, task["question_id"])
                 self._json(200, payload)
@@ -955,7 +1362,7 @@ def serve_dashboard(
                 refresh_s=refresh_s,
                 items_n=items_n,
                 ingests=ingests,
-                scalar_viewer_enabled=scalar_reader is not None,
+                scalar_viewer_enabled=bool(catalog),
                 scalar_default_namespace=scalar_default_namespace,
             )
             data = page.encode("utf-8")

@@ -208,6 +208,21 @@ Each phase entry records the state it inherited and the settings it truly ran un
 A phase is closed only on the success path, so a killed run leaves its phase `started`; the next
 attempt's `begin` marks it `interrupted`. That is a fact worth seeing, not an error.
 
+## Menhir Recall Lab integration
+
+Both `build_graph.sh` and `run_knowledge_update_buildout.sh` now export
+`MENHIR_BENCH_RESULTS_ROOT` and `MENHIR_BENCH_ACTIVE_RUN_ID` so the Menhir Recall Lab
+(`/explorer/recall-lab/bench-runs/`) can discover the run's artifacts and (for the active
+run) display live graph projections alongside manifest and checkpoint data.
+
+- `MENHIR_BENCH_RESULTS_ROOT` — set to `$BENCH_DIR/results` so the catalog discovers all runs.
+- `MENHIR_BENCH_ACTIVE_RUN_ID` — derived as `$(basename "$LME_RESULTS_DIR")`, which is the
+  subdirectory name under `results/` (e.g. `lme-ingest` for the persistent graph, or the
+  `RUN_ID` for a KU buildout).
+
+The recall Menhir subprocess in `run_knowledge_update_buildout.sh` also receives these vars
+so live graph queries work during the recall/QA scoring phase.
+
 ## Configuration Reference
 
 All hardcoded values are centralized in `config.sh` and environment-overridable:
@@ -434,6 +449,14 @@ If recall returns 0 results (or `build_context` returns an empty brief) on a gra
 - Cross-platform portability (scripts assume Git Bash on Windows + Docker Desktop)
 - Menhir preset configuration (currently hardcoded `knowledge`; should be launcher-driven)
 - `top_k` configurability in the harness (partially done via `LME_RECALL_LIMIT` env knob)
+
+## Standalone dashboard status
+
+The `:8200` standalone dashboard (`archolith_bench/dashboard.py`) that displays checkpoint
+progress and scalar task details is **transitional**. Menhir Recall Lab (`/explorer/recall-lab/bench-runs/`)
+is the canonical owner for benchmark task inspection. The standalone dashboard is retained
+as a temporary fallback until the Menhir explorer covers all scalar viewer detail. Do not
+add new features to the standalone dashboard; extend the Menhir explorer instead.
 
 ## See Also
 

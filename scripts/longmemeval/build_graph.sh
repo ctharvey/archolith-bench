@@ -215,6 +215,14 @@ export MENHIR_INGEST_CONCURRENCY="${LME_INGEST_CONCURRENCY}"
 # exact run. The dashboard's ScalarTaskReader reads from this path.
 export MENHIR_MCP_TELEMETRY_DB="${LME_RESULTS_DIR}/mcp_telemetry.db"
 log "telemetry DB: ${MENHIR_MCP_TELEMETRY_DB}"
+# Bench-run explorer: point at the results root and identify this run so
+# the Menhir Recall Lab can display artifact manifests and (when running
+# against the same graph) live scalar projections.
+export MENHIR_BENCH_RESULTS_ROOT="${BENCH_DIR}/results"
+# Derive active run ID from the results directory name (basename of
+# LME_RESULTS_DIR). For the persistent LME graph this is "lme-ingest";
+# for KU buildouts it is the RUN_ID.
+export MENHIR_BENCH_ACTIVE_RUN_ID="$(basename "$LME_RESULTS_DIR")"
 export OTEL_SDK_DISABLED=true LANGFUSE_TRACING_ENABLED=false LANGFUSE_PUBLIC_KEY="" LANGFUSE_SECRET_KEY="" LANGFUSE_HOST=""
 export MENHIR_OPERATOR_KEY="" MENHIR_AGENT_KEY="" MENHIR_READONLY_KEY="" MENHIR_API_KEY=""
 export NEO4J_URI="bolt://localhost:${LME_BOLT}" NEO4J_USER="neo4j" NEO4J_PASSWORD="${LME_NEO4J_PW}" NEO4J_DATABASE="neo4j"

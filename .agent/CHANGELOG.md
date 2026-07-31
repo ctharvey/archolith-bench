@@ -1,5 +1,13 @@
 # archolith-bench Changelog
 
+## 2026-07-30 - Menhir Recall Lab benchmark explorer contract
+- Launch scripts (`build_graph.sh`, `run_knowledge_update_buildout.sh`) now export
+  `MENHIR_BENCH_RESULTS_ROOT` and `MENHIR_BENCH_ACTIVE_RUN_ID` so the Menhir Recall Lab
+  can discover benchmark run artifacts and display live graph projections for the active run.
+- The standalone `:8200` dashboard remains a temporary transitional explorer. Menhir Recall
+  Lab (`/explorer/recall-lab/bench-runs/`) is the canonical owner.
+- Contract: `bench-inspection/v1`.
+
 ## 2026-07-29 - LongMemEval source time reaches scalar evidence
 
 The persistent LME ingester now sends each parsed `haystack_dates` session timestamp to both the

@@ -1,5 +1,24 @@
 # archolith-bench Changelog
 
+## 2026-08-05 - Offline deterministic typed-scalar shadow measurement
+
+Added `scripts/measure_deterministic_scalar_shadow.py` and its package module. The instrument
+validates Menhir frozen scalar captures, loads the real Menhir proposal/gate/extractor/canonical
+comparator from an explicit checkout, reruns Menhir's pure deterministic extractor over frozen
+episode text, and replays captured LLM proposals through the real gate/comparator. It emits
+machine-readable plus Markdown reports entirely offline, with no new LLM, network, Neo4j, Docker,
+or service calls. It reports canonical exact/aligned one-to-one agreement, per-class attribution
+with an unclassified router-miss bucket, explicit denominators, conservative namespace-batch call
+savings, and null token/cost savings when captures do not contain measured token/cost fields.
+
+The optional v1 label sidecar is generic and capture-local, with a required exact set of unique
+canonical capture hashes. Its rows are human-labeled known-negative targets, so the report exposes
+`known_negative_target_hit_rate` fields rather than an overall/population false-positive or
+false-current rate; categories without targets are `not_measured` with nulls, and this does not
+satisfy the plan's population precision/confidence-interval gate. Menhir's cross-repo
+`.agent/scripts-index.md` still needs the Bench script row; the Menhir repository was intentionally
+not edited here.
+
 ## 2026-07-30 - Menhir Recall Lab benchmark explorer contract
 - Launch scripts (`build_graph.sh`, `run_knowledge_update_buildout.sh`) now export
   `MENHIR_BENCH_RESULTS_ROOT` and `MENHIR_BENCH_ACTIVE_RUN_ID` so the Menhir Recall Lab

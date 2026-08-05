@@ -2,6 +2,31 @@
 
 No database. All state is in-memory dataclasses, JSON files on disk, and checkpoint files.
 
+## Offline deterministic scalar shadow report
+
+`archolith_bench.deterministic_scalar_shadow` measures Menhir's frozen typed-scalar proposals over
+the exact episode content captured by `scripts/freeze_scalar_samples.py`. The report is read-only
+and machine-generated: it reruns Menhir's pure deterministic extractor on that frozen episode text
+and replays the captured LLM proposals through Menhir's real gate/comparator. It makes no new LLM,
+network, Neo4j, Docker, or service calls.
+
+| Field | Meaning |
+|-------|---------|
+| `provenance` | capture paths/hashes/settings, sidecar path/hash/capture bindings, report schema, generation time, Menhir commit/dirty state, extractor/template versions |
+| `effective_gate_settings` | explicit threshold, span-alignment, reconciliation, and canonical-self settings used for this report |
+| `aggregate` / `namespaces` | episode eligibility, deterministic proposals, committed LLM claims, canonical exact/aligned one-to-one agreement, router misses, class/reason counts, and ratios with denominators |
+| `call_savings` | baseline k calls and conservative future calls saved at the namespace-batch boundary; partial namespaces save zero |
+| `measurements` | token/cost savings, `null` unless measured fields support such a claim |
+
+The optional label sidecar is versioned (`schema_version: 1`) and capture-local. Its required
+`capture_sha256` is a non-empty list of unique canonical lowercase SHA-256 strings whose set exactly
+matches all measured captures. Each `false_positive` or `false_current` row is a human-labeled
+known-negative target, not a reviewed sample of all admissions. The report uses stable
+`known_negative_target_hit_rate` semantics with `hit_count`, `labeled_negative_targets`, and
+`hit_rate`; this is not an overall/population false-positive or false-current rate and does not
+satisfy the plan's population precision/confidence-interval gate. A category without labeled
+negative targets is `not_measured` with null numeric fields.
+
 ## Persistent LongMemEval Regression Fixture
 
 `fixtures/longmemeval/menhir_suburbs_extraction_regression.json` is a one-item LongMemEval-compatible

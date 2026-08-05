@@ -26,6 +26,14 @@ or remove a script here.
 Before writing a new analysis script, check it there first. Two sessions in a row re-derived results
 an existing instrument already produced.
 
+The durable offline typed-scalar instrument is
+`scripts/measure_deterministic_scalar_shadow.py`. It consumes only JSON captures from Menhir's
+`scripts/freeze_scalar_samples.py`, loads the real Menhir proposal/gate/extractor/comparator from an
+explicit checkout, reruns the pure deterministic extractor over frozen episode text, and replays
+captured LLM proposals through the real gate/comparator. It makes no new LLM, network, Neo4j, Docker,
+or service calls. Menhir's cross-repo `.agent/scripts-index.md` still needs the new Bench row; that
+Menhir file is intentionally not edited in this worktree.
+
 ## menhir ScalarStateView instruments (live here, documented in menhir)
 
 `scripts/scalar_state_coverage.py` and its siblings (`run_scalar_state_e2e.sh`,
@@ -52,6 +60,20 @@ archolith-bench proxy --all --arms direct,proxy_only  # run against live proxy
 archolith-bench industry --launch-only                # generate launch benchmark coverage matrix
 archolith-bench menhir bootstrap-hygiene --offline   # deterministic startup hygiene gate
 ```
+
+Offline deterministic scalar shadow measurement:
+```bash
+python scripts/measure_deterministic_scalar_shadow.py frozen.json \
+  --menhir-root C:\path\to\projects\archolith\menhir \
+  --json-out report.json --markdown-out report.md
+```
+The command defaults to exactly the candidate 2/3 threshold with span alignment enabled. Reconciliation
+and canonical-self switches are opt-in and are recorded as effective report settings. A namespace
+with any fallback episode retains its entire k-call batch in the conservative savings calculation.
+The optional v1 sidecar is capture-bound by a required exact set of unique canonical SHA-256 hashes.
+Its `false_positive` and `false_current` rows are human-labeled known-negative targets; the report
+uses target-hit fields, never an overall/population false-positive or false-current rate, and does
+not claim the plan's population precision/confidence-interval gate.
 
 ### Progress on long runs
 Long bench loops (R1/facet ladders, live recall) print a live heartbeat via

@@ -177,6 +177,20 @@ Produces a four-way comparison table showing additive contributions of each laye
 
 ## Key Components
 
+### Offline deterministic scalar shadow instrument
+
+`archolith_bench/deterministic_scalar_shadow.py` is a dependency-light, offline adapter around the
+reviewer-approved Menhir deterministic-first typed-scalar plan. The thin
+`scripts/measure_deterministic_scalar_shadow.py` wrapper validates one or more frozen captures,
+reconstructs Menhir's real `TypedScalarProposal` objects, gates samples with explicit effective
+settings, reruns the pure deterministic extractor over the captured episode strings, replays the
+captured LLM proposals through Menhir's real gate, and invokes Menhir's canonical shadow comparator
+for exact/aligned one-to-one agreement. It refuses truncated or malformed captures and reports
+namespace-batch call savings conservatively: one fallback episode keeps all k calls for that
+namespace. It makes no new LLM, HTTP/network, Neo4j, Docker, or service call. Its optional sidecar
+reports only human-labeled known-negative target hits, not an overall/population false-positive or
+false-current rate or the plan's population precision/confidence-interval gate.
+
 ### CLI (`cli.py`)
 
 Argparse-based entry point. Six suite/reporting subcommands: `proxy`, `filter`, `stack`, `audit`, `industry`, `report`. Handles argument validation, proxy health checks, arm name resolution, benchmark coverage filtering, and dispatches to suite runners.

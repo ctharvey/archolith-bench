@@ -51,6 +51,30 @@ export LME_DASHBOARD_TELEMETRY_DB=/path/to/mcp_telemetry.db
 archolith-bench dashboard --results-dir results/run --serve --scalar-task lme-01493427
 ```
 
+### Offline deterministic scalar shadow measurement
+
+Use the durable Bench-side instrument to compare Menhir's pure deterministic extractor with
+committed decisions replayed from `scripts/freeze_scalar_samples.py` captures. It imports Menhir's
+real proposal dataclass, gate, extractor, and canonical comparator, reruns Menhir's pure
+deterministic extractor on the frozen episode text, and replays the captured LLM proposals through
+Menhir's real gate/comparator. It makes no new LLM, network, Neo4j, Docker, or service calls.
+
+```bash
+python scripts/measure_deterministic_scalar_shadow.py frozen.json \
+  --menhir-root C:\path\to\projects\archolith\menhir \
+  --json-out report.json --markdown-out report.md
+```
+
+The default gate policy is exactly 2/3 with `align_spans` enabled; reconciliation and
+`canonical_self` are explicit opt-in switches. A versioned, generic label sidecar is optional.
+Every sidecar must carry a non-empty, unique, canonical lowercase `capture_sha256` list matching
+the measured captures exactly. Each `false_positive` or `false_current` row is a human-labeled
+known-negative target, so its report is a `known_negative_target_hit_rate` with
+`hit_count` / `labeled_negative_targets` / `hit_rate`—not an overall or population false-positive
+or false-current rate and not the plan's population precision/confidence-interval gate. Categories
+with no labeled targets remain not measured with null values. Token/dollar savings remain unclaimed
+unless measured fields exist in the capture.
+
 ### Harness: official benchmarks as direct-vs-proxy A/B
 
 Archolith is middleware, not a model, so a harness adapter never claims a standalone

@@ -6,7 +6,11 @@ Added the non-LME `fixtures/deterministic_scalar_heldout_v1.json` fixture with s
 fully-covered and fallback/adversarial namespaces, stable UUID/content rows, and a one-off payment
 negative control. The paired Menhir freezer now supports this pre-registered static input and the
 offline report remains the only consumer of the resulting capture. Six `k=3` calls are explicitly
-smoke evidence only, not a promotion or population gate; no LME fixture or task text is used.
+smoke evidence only, not a promotion or population gate; no LME fixture or task text is used. The
+first smoke completed with zero truncations but rejected deterministic bypass readiness: only one
+of three fully-covered claims aligned with the LLM baseline and two were router misses from the
+unresolved free-text attribute identity contract. See
+`.agent/benchmark-notes/deterministic-scalar-heldout-smoke-2026-08-05.md`.
 
 ## 2026-08-05 - Offline historical scalar spend attribution
 

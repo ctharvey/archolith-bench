@@ -24,8 +24,11 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
 
-REPORT_SCHEMA_VERSION = 1
+REPORT_SCHEMA_VERSION = 2
 LABEL_SCHEMA_VERSION = 1
+MENHIR_SHADOW_SCHEMA_VERSION = 2
+MENHIR_COMPOSITIONAL_SCHEMA_VERSION = 1
+COMPOSITIONAL_PROMOTION_STATUS = "not_evaluable"
 DEFAULT_THRESHOLD = 2 / 3
 DEFAULT_ALIGN_SPANS = True
 UNCLASSIFIED_BUCKET = "unclassified_or_ambiguous"
@@ -100,6 +103,9 @@ class MenhirApi:
     matched_indices: Callable[..., set[int]]
     exact_match: Callable[..., bool]
     aligned_match: Callable[..., bool]
+    validate_value: Callable[[str, str, Any], None]
+    normalize_when: Callable[[dict[str, Any]], tuple[bool, str | None]]
+    ground_span: Callable[[str, str], tuple[int, int] | None]
 
 
 def _error(context: str, message: str) -> CaptureError:
@@ -157,8 +163,12 @@ def _validate_settings(raw: Any, context: str) -> dict[str, Any]:
         raise _error(context, "settings.model must be a non-blank string")
     if not _is_int(settings["k"]) or settings["k"] <= 0:
         raise _error(context, "settings.k must be a positive integer")
-    if not _is_number(settings["temp"]) or not math.isfinite(float(settings["temp"])):
-        raise _error(context, "settings.temp must be numeric")
+    if (
+        not _is_number(settings["temp"])
+        or not math.isfinite(float(settings["temp"]))
+        or float(settings["temp"]) < 0
+    ):
+        raise _error(context, "settings.temp must be a non-negative finite number")
     if not _is_int(settings["max_tokens"]) or settings["max_tokens"] <= 0:
         raise _error(context, "settings.max_tokens must be a positive integer")
     for key in ("truncated_completions", "llm_calls"):
@@ -189,6 +199,9 @@ def _validate_proposal(
     sample_index: int,
     proposal_index: int,
     episodes_by_uuid: Mapping[str, FrozenEpisode],
+    validate_value: Callable[[str, str, Any], None],
+    normalize_when: Callable[[dict[str, Any]], tuple[bool, str | None]],
+    ground_span: Callable[[str, str], tuple[int, int] | None],
 ) -> dict[str, Any]:
     context = f"namespace {namespace!r}, sample {sample_index}, proposal {proposal_index}"
     if not isinstance(raw, dict):
@@ -217,8 +230,9 @@ def _validate_proposal(
     for field_name in ("subject_text", "attribute", "operation", "stated_span", "value_kind"):
         if not raw[field_name].strip():
             raise _error(context, f"{field_name} must not be blank")
-    if raw["when"] is not None and not isinstance(raw["when"], str):
-        raise _error(context, "when must be a string or null")
+    when_ok, normalized_when = normalize_when(raw)
+    if not when_ok or normalized_when != raw["when"]:
+        raise _error(context, "when must be null or Menhir's canonical normalized ISO timestamp")
     if not _is_int(raw["span_start"]) or not _is_int(raw["span_end"]):
         raise _error(context, "span_start and span_end must be integers")
     if raw["span_start"] < 0 or raw["span_end"] <= raw["span_start"]:
@@ -229,6 +243,10 @@ def _validate_proposal(
         raise _error(context, "value must not be null")
     if not _is_finite_json_value(raw["value"]):
         raise _error(context, "value must be a finite JSON scalar or range")
+    try:
+        validate_value(raw["value_kind"], raw["operation"], raw["value"])
+    except ValueError as exc:
+        raise _error(context, f"value fails Menhir kind/operation validation: {exc}") from exc
 
     episode_uuid = raw["episode_uuid"].strip()
     if not episode_uuid:
@@ -253,6 +271,11 @@ def _validate_proposal(
             context,
             f"stated_span does not equal episode content[{start}:{end}] for {episode_uuid!r}",
         )
+    if ground_span(episode.content, raw["stated_span"]) != (start, end):
+        raise _error(
+            context,
+            "stated_span must have Menhir's unique case-insensitive grounding at the serialized offsets",
+        )
 
     try:
         proposal = proposal_type(**raw)
@@ -266,7 +289,7 @@ def _validate_proposal(
     return dict(raw)
 
 
-def _load_capture(path: Path, proposal_type: type) -> LoadedCapture:
+def _load_capture(path: Path, api: MenhirApi) -> LoadedCapture:
     resolved = path.expanduser().resolve()
     context = f"capture {resolved}"
     if not resolved.is_file():
@@ -281,7 +304,7 @@ def _load_capture(path: Path, proposal_type: type) -> LoadedCapture:
     if not isinstance(namespaces_raw, dict) or not namespaces_raw:
         raise _error(context, "top-level 'namespaces' must be a non-empty object")
 
-    field_names = _proposal_field_names(proposal_type)
+    field_names = _proposal_field_names(api.proposal_type)
     namespace_rows: list[LoadedNamespace] = []
     expected_calls = 0
     capture_hash = _sha256(resolved)
@@ -336,12 +359,15 @@ def _load_capture(path: Path, proposal_type: type) -> LoadedCapture:
             validated_sample = tuple(
                 _validate_proposal(
                     raw_proposal,
-                    proposal_type=proposal_type,
+                    proposal_type=api.proposal_type,
                     field_names=field_names,
                     namespace=namespace,
                     sample_index=sample_index,
                     proposal_index=proposal_index,
                     episodes_by_uuid=episodes_by_uuid,
+                    validate_value=api.validate_value,
+                    normalize_when=api.normalize_when,
+                    ground_span=api.ground_span,
                 )
                 for proposal_index, raw_proposal in enumerate(raw_sample)
             )
@@ -453,9 +479,10 @@ def load_menhir_api(menhir_root: str | Path) -> MenhirApi:
         sys.path.insert(0, source_root)
     try:
         rules = importlib.import_module("menhir.services.typed_scalar_rules")
+        typed_assertion = importlib.import_module("menhir.domain.typed_assertion")
         deterministic = importlib.import_module("menhir.services.deterministic_scalar_extractor")
         service = importlib.import_module("menhir.services.typed_scalar_service")
-        loaded_modules = (rules, deterministic, service)
+        loaded_modules = (rules, typed_assertion, deterministic, service)
         _validate_menhir_import_identity(root, loaded_modules)
         return MenhirApi(
             proposal_type=rules.TypedScalarProposal,
@@ -465,6 +492,9 @@ def load_menhir_api(menhir_root: str | Path) -> MenhirApi:
             matched_indices=service._matched_llm_indices,
             exact_match=service._exact_shadow_match,
             aligned_match=service._aligned_shadow_match,
+            validate_value=typed_assertion.validate_value,
+            normalize_when=rules._normalize_when,
+            ground_span=rules._ground_span,
         )
     except (ImportError, AttributeError) as exc:
         raise CaptureError(
@@ -743,6 +773,74 @@ def _empty_label_metrics() -> dict[str, Any]:
     }
 
 
+def _validated_compositional_section(
+    comparison: Mapping[str, Any], namespace: str
+) -> dict[str, Any]:
+    context = f"namespace {namespace!r}: Menhir comparator"
+    if comparison.get("schema_version") != MENHIR_SHADOW_SCHEMA_VERSION:
+        raise _error(
+            context,
+            f"schema_version must be {MENHIR_SHADOW_SCHEMA_VERSION}",
+        )
+    compositional = comparison.get("compositional")
+    if not isinstance(compositional, dict):
+        raise _error(context, "compositional must be an object")
+    if compositional.get("schema_version") != MENHIR_COMPOSITIONAL_SCHEMA_VERSION:
+        raise _error(
+            context,
+            f"compositional.schema_version must be {MENHIR_COMPOSITIONAL_SCHEMA_VERSION}",
+        )
+    if compositional.get("evaluation_status") != "ok":
+        raise _error(context, "compositional.evaluation_status must be 'ok'")
+    if compositional.get("promotion_status") != COMPOSITIONAL_PROMOTION_STATUS:
+        raise _error(
+            context,
+            f"compositional.promotion_status must be {COMPOSITIONAL_PROMOTION_STATUS!r}",
+        )
+    if not isinstance(compositional.get("composer_version"), str) or not compositional[
+        "composer_version"
+    ].strip():
+        raise _error(context, "compositional.composer_version must be a non-blank string")
+
+    for field in (
+        "deterministic_composed",
+        "llm_composed",
+        "deterministic_unresolved",
+        "llm_unresolved",
+    ):
+        value = compositional.get(field)
+        if not _is_int(value) or value < 0:
+            raise _error(context, f"compositional.{field} must be a non-negative integer")
+    for field in (
+        "deterministic_unresolved_reason_counts",
+        "llm_unresolved_reason_counts",
+        "status_counts",
+    ):
+        if not isinstance(compositional.get(field), dict):
+            raise _error(context, f"compositional.{field} must be an object")
+
+    diagnostic = compositional.get("diagnostic_vs_llm")
+    if not isinstance(diagnostic, dict):
+        raise _error(context, "compositional.diagnostic_vs_llm must be an object")
+    for field in (
+        "comparison_pairs",
+        "compositional_exact_agreements",
+        "compositional_aligned_agreements",
+        "compositional_unresolved_pairs",
+        "identity_disagreements",
+        "unjoinable_deterministic_claims",
+        "unjoinable_llm_claims",
+        "diagnostic_llm_router_misses",
+    ):
+        value = diagnostic.get(field)
+        if not _is_int(value) or value < 0:
+            raise _error(
+                context,
+                f"compositional.diagnostic_vs_llm.{field} must be a non-negative integer",
+            )
+    return compositional
+
+
 def _namespace_report(
     namespace: LoadedNamespace,
     *,
@@ -783,7 +881,9 @@ def _namespace_report(
         deterministic,
         committed_llm,
         canonical_self=canonical_self,
+        source_by_episode={episode.uuid: episode.content for episode in namespace.episodes},
     )
+    compositional = _validated_compositional_section(comparison, namespace.name)
     expected_counts = {
         "episodes_total": len(deterministic.episode_receipts),
         "episodes_fully_eligible": len(deterministic.fully_eligible_episode_uuids),
@@ -865,6 +965,7 @@ def _namespace_report(
             ),
         },
         "per_class_agreement": attribution,
+        "compositional": compositional,
         "labels": labels_report,
         "call_savings": {
             "boundary": "namespace_batch",
@@ -878,6 +979,57 @@ def _namespace_report(
             "canonical_schema_version": comparison.get("schema_version"),
             "extractor_version": comparison.get("extractor_version"),
             "template_version": comparison.get("template_version"),
+            "compositional_schema_version": compositional.get("schema_version"),
+            "composer_version": compositional.get("composer_version"),
+        },
+    }
+
+
+def _aggregate_compositional(namespace_reports: list[dict[str, Any]]) -> dict[str, Any]:
+    rows = [report["compositional"] for report in namespace_reports]
+    diagnostic_fields = (
+        "comparison_pairs",
+        "compositional_exact_agreements",
+        "compositional_aligned_agreements",
+        "compositional_unresolved_pairs",
+        "identity_disagreements",
+        "unjoinable_deterministic_claims",
+        "unjoinable_llm_claims",
+        "diagnostic_llm_router_misses",
+    )
+    diagnostic = {
+        field: sum(int(row["diagnostic_vs_llm"][field]) for row in rows)
+        for field in diagnostic_fields
+    }
+    det_reasons: Counter[str] = Counter()
+    llm_reasons: Counter[str] = Counter()
+    statuses: Counter[str] = Counter()
+    for row in rows:
+        det_reasons.update(row["deterministic_unresolved_reason_counts"])
+        llm_reasons.update(row["llm_unresolved_reason_counts"])
+        statuses.update(row["status_counts"])
+    comparison_pairs = diagnostic["comparison_pairs"]
+    return {
+        "schema_versions": sorted({int(row["schema_version"]) for row in rows}),
+        "composer_versions": sorted({str(row["composer_version"]) for row in rows}),
+        "promotion_status": COMPOSITIONAL_PROMOTION_STATUS,
+        "deterministic_composed": sum(int(row["deterministic_composed"]) for row in rows),
+        "llm_composed": sum(int(row["llm_composed"]) for row in rows),
+        "deterministic_unresolved": sum(int(row["deterministic_unresolved"]) for row in rows),
+        "llm_unresolved": sum(int(row["llm_unresolved"]) for row in rows),
+        "deterministic_unresolved_reason_counts": _counter_dict(det_reasons),
+        "llm_unresolved_reason_counts": _counter_dict(llm_reasons),
+        "status_counts": _counter_dict(statuses),
+        "diagnostic_vs_llm": {
+            **diagnostic,
+            "exact_ratio": _ratio(
+                diagnostic["compositional_exact_agreements"], comparison_pairs),
+            "aligned_ratio": _ratio(
+                diagnostic["compositional_aligned_agreements"], comparison_pairs),
+            "unresolved_ratio": _ratio(
+                diagnostic["compositional_unresolved_pairs"], comparison_pairs),
+            "identity_disagreement_ratio": _ratio(
+                diagnostic["identity_disagreements"], comparison_pairs),
         },
     }
 
@@ -975,6 +1127,7 @@ def _aggregate_reports(namespace_reports: list[dict[str, Any]]) -> dict[str, Any
             for bucket, values in sorted(per_class.items())
         },
         "labels": {label: aggregate_label(label) for label in sorted(_LABEL_VALUES)},
+        "compositional": _aggregate_compositional(namespace_reports),
         "call_savings": {
             "boundary": "namespace_batch",
             "k_sample_batch_covers_all_namespace_episodes": True,
@@ -1015,7 +1168,7 @@ def analyze_captures(
 
     root = resolve_menhir_root(menhir_root)
     loaded_api = api or load_menhir_api(root)
-    captures = tuple(_load_capture(path, loaded_api.proposal_type) for path in resolved_paths)
+    captures = tuple(_load_capture(path, loaded_api) for path in resolved_paths)
     _validate_capture_sampling_policy(captures)
     namespaces = [namespace for capture in captures for namespace in capture.namespaces]
     namespace_names = [namespace.name for namespace in namespaces]
@@ -1117,6 +1270,7 @@ def _format_ratio(record: Mapping[str, Any]) -> str:
 def render_markdown(report: Mapping[str, Any]) -> str:
     """Render a concise, deterministic Markdown summary from the machine report."""
     aggregate = report["aggregate"]
+    compositional = aggregate["compositional"]["diagnostic_vs_llm"]
     lines = [
         "# Deterministic scalar shadow measurement",
         "",
@@ -1151,6 +1305,13 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         f"{aggregate['agreement']['aligned_one_to_one']['denominator']} "
         f"({_format_ratio(aggregate['agreement']['aligned_one_to_one'])}) |",
         f"| Router-missed committed LLM claims | {aggregate['router_missed_committed_llm_claims']} |",
+        f"| Compositional exact / compared pairs | "
+        f"{compositional['compositional_exact_agreements']} / {compositional['comparison_pairs']} |",
+        f"| Compositional aligned / compared pairs | "
+        f"{compositional['compositional_aligned_agreements']} / {compositional['comparison_pairs']} |",
+        f"| Compositional unresolved / identity disagreement | "
+        f"{compositional['compositional_unresolved_pairs']} / "
+        f"{compositional['identity_disagreements']} |",
         f"| Baseline / conservative future calls | {aggregate['call_savings']['baseline_scalar_llm_calls']} / "
         f"{aggregate['call_savings']['conservative_future_scalar_llm_calls']} "
         f"(saved {aggregate['call_savings']['conservative_future_calls_saved']}) |",

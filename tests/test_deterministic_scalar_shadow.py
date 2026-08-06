@@ -102,6 +102,15 @@ def test_happy_path_uses_real_menhir_gate_and_extractor(tmp_path, api):
     assert namespace["committed_llm_claims"] == 1
     assert namespace["agreement"]["exact_one_to_one"]["numerator"] == 1
     assert namespace["agreement"]["aligned_one_to_one"]["numerator"] == 1
+    assert namespace["compositional"]["deterministic_composed"] == 1
+    assert namespace["compositional"]["llm_composed"] == 1
+    assert namespace["comparison_detail"]["canonical_schema_version"] == 2
+    assert namespace["comparison_detail"]["compositional_schema_version"] == 1
+    assert namespace["comparison_detail"]["composer_version"] == "structural-v1"
+    assert namespace["compositional"]["diagnostic_vs_llm"][
+        "compositional_exact_agreements"] == 1
+    assert report["aggregate"]["compositional"]["deterministic_composed"] == 1
+    assert report["aggregate"]["compositional"]["promotion_status"] == "not_evaluable"
     assert namespace["call_savings"]["conservative_future_calls_saved"] == 3
     assert report["measurements"]["token_savings"] is None
 
@@ -181,6 +190,65 @@ def test_contaminated_or_malformed_captures_fail_closed(tmp_path, api, mutator, 
     path = tmp_path / "bad.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(CaptureError, match=message):
+        analyze_captures([path], menhir_root=_menhir_root())
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (
+            lambda payload: payload["namespaces"]["ns"]["samples"][0][0].update(
+                {"value": [1, 2, 3]}),
+            "value fails Menhir kind/operation validation",
+        ),
+        (
+            lambda payload: payload["namespaces"]["ns"]["samples"][0][0].update(
+                {"when": "not-a-time"}),
+            "canonical normalized ISO timestamp",
+        ),
+        (
+            lambda payload: payload["settings"].update({"temp": -0.1}),
+            "settings.temp must be a non-negative finite number",
+        ),
+    ],
+)
+def test_capture_uses_menhir_value_time_and_sampling_validation(
+    tmp_path, api, mutate, message,
+):
+    namespace = _namespace(api, "ep-contract", "I have 3 coins.")
+    payload = {
+        "settings": {
+            "model": "synthetic",
+            "k": 3,
+            "temp": 0.7,
+            "max_tokens": 2048,
+            "truncated_completions": 0,
+            "llm_calls": 3,
+        },
+        "namespaces": {"ns": namespace},
+    }
+    mutate(payload)
+    path = tmp_path / "invalid-contract.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(CaptureError, match=message):
+        analyze_captures([path], menhir_root=_menhir_root())
+
+
+def test_capture_requires_unique_menhir_grounding(tmp_path, api):
+    original = {"uuid": "ep-duplicate-span", "content": "I have 3 coins."}
+    proposal = _proposal_dict(api, original)
+    duplicate_episode = {
+        "uuid": original["uuid"],
+        "content": "I have 3 coins. I have 3 coins.",
+    }
+    namespace = {
+        "episodes": [duplicate_episode],
+        "samples": [[proposal], [proposal], [proposal]],
+    }
+    path = _capture(tmp_path, api, {"ns": namespace})
+
+    with pytest.raises(CaptureError, match="unique case-insensitive grounding"):
         analyze_captures([path], menhir_root=_menhir_root())
 
 
@@ -384,8 +452,9 @@ def test_output_ordering_and_json_markdown_rendering(tmp_path, api):
     json_path = tmp_path / "out" / "report.json"
     markdown_path = tmp_path / "out" / "report.md"
     write_reports(report, json_path, markdown_path)
-    assert json.loads(json_path.read_text(encoding="utf-8"))["report_schema_version"] == 1
+    assert json.loads(json_path.read_text(encoding="utf-8"))["report_schema_version"] == 2
     assert markdown_path.read_text(encoding="utf-8").startswith("# Deterministic scalar shadow measurement")
+    assert "Compositional aligned / compared pairs" in markdown_path.read_text(encoding="utf-8")
 
 
 def test_default_gate_settings_are_candidate_policy():

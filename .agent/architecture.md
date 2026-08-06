@@ -191,6 +191,13 @@ namespace. It makes no new LLM, HTTP/network, Neo4j, Docker, or service call. It
 reports only human-labeled known-negative target hits, not an overall/population false-positive or
 false-current rate or the plan's population precision/confidence-interval gate.
 
+For Menhir shadow schema v2, the analyzer forwards the validated unique episode UUID-to-content map
+so structural sidecars are actually evaluable, then preserves compositional diagnostics under a
+separate report section. Raw exact/aligned metrics remain the legacy comparison lane. Capture rows
+are revalidated with Menhir's own kind/value/operation, canonical-time, and unique-grounding
+contracts before either lane runs. Compositional LLM agreement is diagnostic only and reports
+`promotion_status=not_evaluable` until the independent labeled panel exists.
+
 ### CLI (`cli.py`)
 
 Argparse-based entry point. Six suite/reporting subcommands: `proxy`, `filter`, `stack`, `audit`, `industry`, `report`. Handles argument validation, proxy health checks, arm name resolution, benchmark coverage filtering, and dispatches to suite runners.

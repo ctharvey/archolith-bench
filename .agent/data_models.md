@@ -10,11 +10,15 @@ and machine-generated: it reruns Menhir's pure deterministic extractor on that f
 and replays the captured LLM proposals through Menhir's real gate/comparator. It makes no new LLM,
 network, Neo4j, Docker, or service calls.
 
+Report schema v2 adds the compositional section while retaining the legacy raw agreement lane.
+Consumers must reject unknown report versions rather than silently interpreting a changed shape.
+
 | Field | Meaning |
 |-------|---------|
 | `provenance` | capture paths/hashes/settings, sidecar path/hash/capture bindings, report schema, generation time, Menhir commit/dirty state, extractor/template versions |
 | `effective_gate_settings` | explicit threshold, span-alignment, reconciliation, and canonical-self settings used for this report |
 | `aggregate` / `namespaces` | episode eligibility, deterministic proposals, committed LLM claims, canonical exact/aligned one-to-one agreement, router misses, class/reason counts, and ratios with denominators |
+| `compositional` | Menhir schema-v2 structural sidecar counts and hash-only diagnostic-vs-LLM matches; always `promotion_status=not_evaluable` in this descriptive capture report |
 | `call_savings` | baseline k calls and conservative future calls saved at the namespace-batch boundary; partial namespaces save zero |
 | `measurements` | token/cost savings, `null` unless measured fields support such a claim |
 

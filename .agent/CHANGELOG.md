@@ -1,5 +1,18 @@
 # archolith-bench Changelog
 
+## 2026-08-05 - Consume compositional scalar shadow schema v2
+
+The offline scalar analyzer now emits report schema v2, supplies each validated episode's source
+text to Menhir's schema-v2 comparator, and reports compositional exact/aligned, unresolved, identity-disagreement,
+unjoinable, and diagnostic LLM-router-miss metrics separately from the unchanged raw agreement
+lane. Promotion remains explicitly `not_evaluable`; this descriptive integration is not the
+independent semantic panel.
+
+Capture validation now calls Menhir's real kind/value/operation, optional-time, and unique-span
+grounding contracts. Malformed values, noncanonical timestamps, duplicate quotes, and negative
+sampling temperatures fail closed before gating or comparison. No LLM, network, Neo4j, Docker, or
+service call was added.
+
 ## 2026-08-05 - Versioned typed-scalar held-out smoke contract
 
 Added the non-LME `fixtures/deterministic_scalar_heldout_v1.json` fixture with separate

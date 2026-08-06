@@ -65,6 +65,15 @@ python scripts/measure_deterministic_scalar_shadow.py frozen.json \
   --json-out report.json --markdown-out report.md
 ```
 
+The first held-out smoke input is the versioned non-LME fixture
+`fixtures/deterministic_scalar_heldout_v1.json`. Menhir's freezer accepts it with
+`--episodes-json` before any graph connection is made; it contains separate fully-covered and
+fallback/adversarial namespaces, exact stable UUID/content rows, and only a one-off payment as a
+negative control for categorical event-history scope. Freeze it with `-k 3` for exactly six calls
+(`2 namespaces × 3 samples`), then run this offline instrument. Those six calls are smoke evidence
+only, not a promotion or population gate; do not substitute an LME fixture or tune rules to LME
+task text.
+
 The default gate policy is exactly 2/3 with `align_spans` enabled; reconciliation and
 `canonical_self` are explicit opt-in switches. A versioned, generic label sidecar is optional.
 Every sidecar must carry a non-empty, unique, canonical lowercase `capture_sha256` list matching

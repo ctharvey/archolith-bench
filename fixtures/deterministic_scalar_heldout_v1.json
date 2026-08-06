@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "fixture_id": "deterministic_scalar_heldout_v1",
+  "non_lme": true,
+  "namespaces": {
+    "heldout-v1-fully-covered": {
+      "purpose": "fully_covered",
+      "episodes": [
+        {
+          "uuid": "9d0f6b4e-0b3a-4f86-9f0f-000000000001",
+          "content": "[2026-01-01] I have 37 coins."
+        },
+        {
+          "uuid": "9d0f6b4e-0b3a-4f86-9f0f-000000000002",
+          "content": "[2026-01-02] My savings balance is $500."
+        },
+        {
+          "uuid": "9d0f6b4e-0b3a-4f86-9f0f-000000000003",
+          "content": "[2026-01-03] I wake up at 7:30."
+        }
+      ]
+    },
+    "heldout-v1-fallback-adversarial": {
+      "purpose": "fallback_adversarial",
+      "episodes": [
+        {
+          "uuid": "9d0f6b4e-0b3a-4f86-9f0f-000000000101",
+          "content": "[2026-01-01] My car is red."
+        },
+        {
+          "uuid": "9d0f6b4e-0b3a-4f86-9f0f-000000000102",
+          "content": "[2026-01-02] I have finished reading Dune."
+        },
+        {
+          "uuid": "9d0f6b4e-0b3a-4f86-9f0f-000000000103",
+          "content": "[2026-01-03] My day off is Wednesday."
+        },
+        {
+          "uuid": "9d0f6b4e-0b3a-4f86-9f0f-000000000104",
+          "content": "[2026-01-04] I paid $250 for my headphones."
+        }
+      ]
+    }
+  }
+}

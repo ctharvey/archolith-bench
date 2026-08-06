@@ -1,5 +1,13 @@
 # archolith-bench Changelog
 
+## 2026-08-05 - Versioned typed-scalar held-out smoke contract
+
+Added the non-LME `fixtures/deterministic_scalar_heldout_v1.json` fixture with separate
+fully-covered and fallback/adversarial namespaces, stable UUID/content rows, and a one-off payment
+negative control. The paired Menhir freezer now supports this pre-registered static input and the
+offline report remains the only consumer of the resulting capture. Six `k=3` calls are explicitly
+smoke evidence only, not a promotion or population gate; no LME fixture or task text is used.
+
 ## 2026-08-05 - Offline historical scalar spend attribution
 
 Added `scripts/measure_scalar_spend_attribution.py` and its package module. The read-only,

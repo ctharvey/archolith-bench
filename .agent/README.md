@@ -31,8 +31,10 @@ The durable offline typed-scalar instrument is
 `scripts/freeze_scalar_samples.py`, loads the real Menhir proposal/gate/extractor/comparator from an
 explicit checkout, reruns the pure deterministic extractor over frozen episode text, and replays
 captured LLM proposals through the real gate/comparator. It makes no new LLM, network, Neo4j, Docker,
-or service calls. Menhir's cross-repo `.agent/scripts-index.md` still needs the new Bench row; that
-Menhir file is intentionally not edited in this worktree.
+or service calls. The first held-out input is the versioned non-LME
+`fixtures/deterministic_scalar_heldout_v1.json`; its six `2 namespaces × k=3` calls are smoke
+evidence only, not a promotion or population gate. The paired Menhir workflow owns the exact
+capture/report commands.
 
 ## menhir ScalarStateView instruments (live here, documented in menhir)
 

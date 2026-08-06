@@ -18,6 +18,11 @@ network, Neo4j, Docker, or service calls.
 | `call_savings` | baseline k calls and conservative future calls saved at the namespace-batch boundary; partial namespaces save zero |
 | `measurements` | token/cost savings, `null` unless measured fields support such a claim |
 
+Menhir static freezes may also carry an optional top-level `input` object identifying the source
+mode, fixture schema version, fixture ID, and resolved input path. The pre-registered
+`deterministic_scalar_heldout_v1` input is typed-scalar-only and non-LME; its six-call smoke result
+is not a promotion or population gate.
+
 The optional label sidecar is versioned (`schema_version: 1`) and capture-local. Its required
 `capture_sha256` is a non-empty list of unique canonical lowercase SHA-256 strings whose set exactly
 matches all measured captures. Each `false_positive` or `false_current` row is a human-labeled

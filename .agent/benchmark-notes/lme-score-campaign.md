@@ -71,22 +71,29 @@ answer is a lookup, not a fuzzy count. Rationale, failure-mode census, and the f
 **`menhir-frontier/.agent/plans/aggregation-as-consolidation.md`**. (Research docs incoming will
 steer specifics.)
 
-## TODO: attribute scalar LLM spend before another full ingest
+## Measurement checkpoint: scalar spend attribution (2026-08-05)
 
-Before approving another expensive LongMemEval ingest, produce a 78-task attribution report that
-separates scalar extraction cost from answer lift. At minimum, report:
+The historical offline instrument now accounts for the observed scalar calls, artifacts, recall
+payload signatures, and explicit recall answer costs for
+`scalar-duration-completeness-candidate-v2-20260730`: 78 namespaces, 234 manifest scalar calls,
+185 typed assertions, 172 scalar states written, 132 scalar state Views, 133 history Views, 132
+user-founded Views, 8 paid namespaces with zero assertions, and 9 with zero state/history Views.
+It also counts 11,669 completed Graphiti ingest chat calls, which are from a different stage and
+are not token- or dollar-comparable to scalar calls.
 
-- scalar LLM calls and estimated cost per namespace;
-- typed assertions and scalar state/history Views produced per call;
-- namespaces that paid for scalar inference but produced no scalar artifact;
-- answer paths that actually consumed scalar authority/history;
-- failures corrected by scalar structure versus temporal/provenance-rich content alone; and
-- cost per benchmark answer corrected by scalar processing.
+This run is descriptive evidence only. It is noncanonical, resumed across 4 attempts, mixes
+Menhir and Bench commits, contains 3 interrupted phases, and had a dirty Bench tree on attempt 4.
+Full canonical acceptance is not evaluated. See
+[scalar-spend-attribution-2026-08-05.md](scalar-spend-attribution-2026-08-05.md) for the exact
+recall totals, hashes, negative control, and limitations.
 
-Use `lme-6071bd76` as the first negative-control regression: its namespace recorded three LLM calls
-and produced zero scalar assertions/Views, while source-time/current-vs-superseded recall metadata
-changed the answer from incorrect to correct without reingestion. Evaluate a staged gate
-(deterministic scalar-candidate detection, deterministic parsing for clear absolutes, two samples
-first, third only on disagreement) against the current always-3-call 2/3 policy. Do not optimize for
-raw scalar coverage; require measurable answer lift, grounded provenance, and lower cost per useful
-View.
+The `lme-6071bd76` historical negative control remains limited to 3 scalar calls, zero scalar
+assertions/states/Views/history Views/user-founded Views, incorrect historical arms, and no
+scalar signature. Later rerun claims are not imported. Scalar tokens/dollars are unpersisted,
+there is no scalar-disabled-memory counterfactual, and scalar-corrected answers and cost per
+scalar-corrected answer remain `null`/`not_measured`. No valid real frozen scalar capture exists,
+so deterministic-vs-frozen-LLM agreement remains unrun.
+
+Do not approve another full ingest from this checkpoint alone. The next evidence is a fresh
+approved frozen capture for held-out agreement/router gates plus scalar-disabled recall
+counterfactual/instrumentation; neither is run here.

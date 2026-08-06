@@ -196,7 +196,23 @@ so structural sidecars are actually evaluable, then preserves compositional diag
 separate report section. Raw exact/aligned metrics remain the legacy comparison lane. Capture rows
 are revalidated with Menhir's own kind/value/operation, canonical-time, and unique-grounding
 contracts before either lane runs. Compositional LLM agreement is diagnostic only and reports
-`promotion_status=not_evaluable` until the independent labeled panel exists.
+`promotion_status=not_evaluable`; the LLM-diagnostic lane never becomes promotion evidence. The
+independent labeled panel below is the separate semantic-quality lane.
+
+### Offline compositional scalar semantic panel
+
+`archolith_bench/compositional_scalar_panel.py` and its thin script wrapper evaluate the real Menhir
+deterministic extractor plus structural composer without any LLM capture. The versioned fixture owns
+independently authored expected identities and abstention reasons, bound to a canonical source hash
+and unique exact span hashes. Bench validates the artifact with Menhir's grounding, type, time, and
+identity-normalization contracts before scoring.
+
+Positive labels are joined one-to-one by exact episode/span locator and compared across every
+canonical identity dimension. Negative labels distinguish exact-join composer abstention from
+extractor omission; the former supports strict reason scoring, while both contribute to an explicit
+system non-admission metric. Ambiguity and unjoinable cases never receive semantic credit. Wilson
+lower bounds and every ratio use explicit denominators and null `not_measured` records at zero. The
+bounded fixture cannot promote the feature and never uses LLM agreement as gold.
 
 ### CLI (`cli.py`)
 

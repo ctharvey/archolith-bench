@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "panel_id": "compositional-scalar-generic-v1",
+  "non_lme": true,
+  "split_policy": "whole_group_holdout",
+  "source_sha256": "e0316bee092e6a84df931853a389a29d88a453bec3668847b366de1f81f1fac3",
+  "episodes": [
+    {"namespace": "compositional-generic-v1", "uuid": "generic-quantity-01", "content": "I have 12 books."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-quantity-02", "content": "I have 8 records."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-quantity-03", "content": "I have 5 plants."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-quantity-04", "content": "I used to have 12 books."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-quantity-05", "content": "Maybe I have 12 books."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-quantity-06", "content": "I have 12 books and 4 cats."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-balance-01", "content": "My savings balance is $500."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-balance-02", "content": "My checking balance is 725 dollars."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-balance-03", "content": "I have $640 in my savings account."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-balance-04", "content": "Could my savings balance be $500?"},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-balance-05", "content": "My savings balance might be $500."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-balance-06", "content": "Yesterday my savings balance was $500."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-measurement-01", "content": "I weigh 70 kg."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-measurement-02", "content": "My weight is 68 kilograms."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-measurement-03", "content": "I am 180 centimeters tall."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-measurement-04", "content": "I used to weigh 70 kg."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-measurement-05", "content": "I would weigh 70 kg if I trained."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-measurement-06", "content": "I weigh about 70 kg."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-schedule-01", "content": "I wake up at 7:30."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-schedule-02", "content": "My wake time is 06:45."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-schedule-03", "content": "My bedtime is 10:15 PM."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-schedule-04", "content": "I used to wake up at 7:30."},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-schedule-05", "content": "Do I wake up at 7:30?"},
+    {"namespace": "compositional-generic-v1", "uuid": "generic-schedule-06", "content": "I might wake up at 7:30."}
+  ],
+  "cases": [
+    {
+      "case_id": "case-quantity-01", "namespace": "compositional-generic-v1", "episode_uuid": "generic-quantity-01",
+      "span_start": 0, "span_end": 15, "span_sha256": "6754cf813be7b83b5fbd064de04d12eb3ae55541302173d815b43ff719a8a85f",
+      "kind": "positive", "group_id": "quantity-family", "perturbation_id": "count-books", "split": "holdout", "relation_group": "quantity",
+      "expected": {"subject": "user", "relation_type": "quantity", "target": "books", "scope": "", "value_kind": "count", "value": 12, "unit": "", "operation": "absolute", "effective_time": null}
+    },
+    {
+      "case_id": "case-quantity-02", "namespace": "compositional-generic-v1", "episode_uuid": "generic-quantity-02",
+      "span_start": 0, "span_end": 16, "span_sha256": "b10648eebba7ab1138888cfa9dc78fe39c880aaa6486306f9d14a4b009f1c20b",
+      "kind": "positive", "group_id": "quantity-family", "perturbation_id": "count-records", "split": "holdout", "relation_group": "quantity",
+      "expected": {"subject": "user", "relation_type": "quantity", "target": "records", "scope": "", "value_kind": "count", "value": 8, "unit": "", "operation": "absolute", "effective_time": null}
+    },
+    {
+      "case_id": "case-quantity-03", "namespace": "compositional-generic-v1", "episode_uuid": "generic-quantity-03",
+      "span_start": 0, "span_end": 15, "span_sha256": "c0e09f1a215a82cda83cc55fab7223aeb19ec4bb8e63991434cea52dfab42db2",
+      "kind": "positive", "group_id": "quantity-family", "perturbation_id": "count-plants", "split": "holdout", "relation_group": "quantity",
+      "expected": {"subject": "user", "relation_type": "quantity", "target": "plants", "scope": "", "value_kind": "count", "value": 5, "unit": "", "operation": "absolute", "effective_time": null}
+    },
+    {
+      "case_id": "case-quantity-04", "namespace": "compositional-generic-v1", "episode_uuid": "generic-quantity-04",
+      "span_start": 0, "span_end": 23, "span_sha256": "42810fe6c735d749d198920ccdeb3f266b9643d1bb10cb76d15520122a8092c9",
+      "kind": "negative", "group_id": "quantity-family", "perturbation_id": "past-expire", "split": "holdout", "relation_group": "quantity",
+      "expected": {"status": "abstain", "allowed_reason_codes": ["struct.operation_unsupported"], "risk_family": "past_only"}
+    },
+    {
+      "case_id": "case-quantity-05", "namespace": "compositional-generic-v1", "episode_uuid": "generic-quantity-05",
+      "span_start": 6, "span_end": 21, "span_sha256": "6754cf813be7b83b5fbd064de04d12eb3ae55541302173d815b43ff719a8a85f",
+      "kind": "negative", "group_id": "quantity-family", "perturbation_id": "modal-prefix", "split": "holdout", "relation_group": "quantity",
+      "expected": {"status": "abstain", "allowed_reason_codes": ["struct.unsafe_modal"], "risk_family": "modal"}
+    },
+    {
+      "case_id": "case-quantity-06", "namespace": "compositional-generic-v1", "episode_uuid": "generic-quantity-06",
+      "span_start": 0, "span_end": 15, "span_sha256": "6754cf813be7b83b5fbd064de04d12eb3ae55541302173d815b43ff719a8a85f",
+      "kind": "negative", "group_id": "quantity-family", "perturbation_id": "multi-value-list", "split": "holdout", "relation_group": "quantity",
+      "expected": {"status": "abstain", "allowed_reason_codes": ["struct.unsafe_list"], "risk_family": "list"}
+    },
+    {
+      "case_id": "case-balance-01", "namespace": "compositional-generic-v1", "episode_uuid": "generic-balance-01",
+      "span_start": 0, "span_end": 26, "span_sha256": "0fce4624070b36f1a20d5cc36e56db586a24f482450ae6e20ff7a6ad9e61b932",
+      "kind": "positive", "group_id": "balance-family", "perturbation_id": "currency-symbol", "split": "holdout", "relation_group": "balance",
+      "expected": {"subject": "user", "relation_type": "balance", "target": "savings", "scope": "", "value_kind": "money", "value": 500, "unit": "usd", "operation": "absolute", "effective_time": null}
+    },
+    {
+      "case_id": "case-balance-02", "namespace": "compositional-generic-v1", "episode_uuid": "generic-balance-02",
+      "span_start": 0, "span_end": 34, "span_sha256": "723c78176b379c96297a6b8d682d01d835c1fd51c06c355e9afcabd6205bc442",
+      "kind": "positive", "group_id": "balance-family", "perturbation_id": "currency-word", "split": "holdout", "relation_group": "balance",
+      "expected": {"subject": "user", "relation_type": "balance", "target": "checking", "scope": "", "value_kind": "money", "value": 725, "unit": "usd", "operation": "absolute", "effective_time": null}
+    },
+    {
+      "case_id": "case-balance-03", "namespace": "compositional-generic-v1", "episode_uuid": "generic-balance-03",
+      "span_start": 0, "span_end": 33, "span_sha256": "36059981d336bf4ed6a1ae83f6f47aaf4bf9d8baab9180f8b44228264845a988",
+      "kind": "positive", "group_id": "balance-family", "perturbation_id": "account-form", "split": "holdout", "relation_group": "balance",
+      "expected": {"subject": "user", "relation_type": "balance", "target": "savings", "scope": "", "value_kind": "money", "value": 640, "unit": "usd", "operation": "absolute", "effective_time": null}
+    },
+    {
+      "case_id": "case-balance-04", "namespace": "compositional-generic-v1", "episode_uuid": "generic-balance-04",
+      "span_start": 0, "span_end": 32, "span_sha256": "fa6588d85da5ddeb625377d6ce81d85edb25e6eb6bf4b08ea648279b77723d9f",
+      "kind": "negative", "group_id": "balance-family", "perturbation_id": "question-form", "split": "holdout", "relation_group": "balance",
+      "expected": {"status": "abstain", "allowed_reason_codes": ["struct.unsafe_question"], "risk_family": "question"}
+    },
+    {
+      "case_id": "case-balance-05", "namespace": "compositional-generic-v1", "episode_uuid": "generic-balance-05",
+      "span_start": 0, "span_end": 32, "span_sha256": "c6b535340188ff4162b6b6d591eb03efdc4381bacea1707b1d9baee6f6af1af2",
+      "kind": "negative", "group_id": "balance-family", "perturbation_id": "modal-form", "split": "holdout", "relation_group": "balance",
+      "expected": {"status": "abstain", "allowed_reason_codes": ["struct.unsafe_modal"], "risk_family": "modal"}
+    },
+    {
+      "case_id": "case-balance-06", "namespace": "compositional-generic-v1", "episode_uuid": "generic-balance-06",
+      "span_start": 0, "span_end": 37, "span_sha256": "318f3dc8a69dd075d90dceb79515d1964ab0054ac71d72505b1b03d3a47d6760",
+      "kind": "negative", "group_id": "balance-family", "perturbation_id": "past-only-form", "split": "holdout", "relation_group": "balance",
+      "expected": {"status": "abstain", "allowed_reason_codes": ["struct.unsafe_past_only"], "risk_family": "past_only"}
+    },
+    {
+      "case_id": "case-measurement-01", "namespace": "compositional-generic-v1", "episode_uuid": "generic-measurement-01",
+      "span_start": 0, "span_end": 13, "span_sha256": "0dcfba56099dfc7d7df0d49bedbf0b9f5828183c46727fcd313e9cafc5a40e6e",
+      "kind": "positive", "group_id": "measurement-family", "perturbation_id": "weight-kg", "split": "holdout", "relation_group": "measurement",
+      "expected": {"subject": "user", "relation_type": "measurement", "target": "weigh", "scope": "", "value_kind": "measurement", "value": 70, "unit": "kg", "operation": "absolute", "effective_time": null}
+    },
+    {
+      "case_id": "case-measurement-02", "namespace": "compositional-generic-v1", "episode_uuid": "generic-measurement-02",
+      "span_start": 0, "span_end": 25, "span_sha256": "6fbaab5493e2c40ef19bb34b0bd8a5a79a77098a4d701968d70ccf42d508575a",
+      "kind": "positive", "group_id": "measurement-family", "perturbation_id": "weight-kilograms", "split": "holdout", "relation_group": "measurement",
+      "expected": {"subject": "user", "relation_type": "measurement", "target": "weight", "scope": "", "value_kind": "measurement", "value": 68, "unit": "kg", "operation": "absolute", "effective_time": null}
+    },
+    {
+      "case_id": "case-measurement-03", "namespace": "compositional-generic-v1", "episode_uuid": "generic-measurement-03",
+      "span_start": 0, "span_end": 25, "span_sha256": "5b3d82ff788a5f6e87ad69649a1b5ba27ceeef7ab2be1cb2bdce4a23831fb950",
+      "kind": "positive", "group_id": "measurement-family", "perturbation_id": "height-centimeters", "split": "holdout", "relation_group": "measurement",
+      "expected": {"subject": "user", "relation_type": "measurement", "target": "tall", "scope": "", "value_kind": "measurement", "value": 180, "unit": "cm", "operation": "absolute", "effective_time": null}
+    },
+    {
+      "case_id": "case-measurement-04", "namespace": "compositional-generic-v1", "episode_uuid": "generic-measurement-04",
+      "span_start": 0, "span_end": 21, "span_sha256": "da5f0c8a9f0648fe83f28e8bc42293e96f3e4e87a4670f72a9b51795c38eda40",
+      "kind": "negative", "group_id": "measurement-family", "perturbation_id": "past-expire", "split": "holdout", "relation_group": "measurement",
+      "expected": {"status": "abstain", "allowed_reason_codes": ["struct.operation_unsupported"], "risk_family": "past_only"}
+    },
+    {
+      "case_id": "case-measurement-05", "namespace": "compositional-generic-v1", "episode_uuid": "generic-measurement-05",
+      "span_start": 0, "span_end": 32, "span_sha256": "cfb13685b0acf0e4359f66f56d5fe1b1b97f611d132cc3b8e14247dffc99940a",
+      "kind": "negative", "group_id": "measurement-family", "perturbation_id": "hypothetical-form", "split": "holdout", "relation_group": "measurement",
+      "expected": {"status": "abstain", "allowed_reason_codes": ["struct.unsafe_hypothetical"], "risk_family": "hypothetical"}
+    },
+    {
+      "case_id": "case-measurement-06", "namespace": "compositional-generic-v1", "episode_uuid": "generic-measurement-06",
+      "span_start": 0, "span_end": 19, "span_sha256": "19d63d478377a43c0e4445757fbb00e47a2ebbe5d49bb75fba21b7387b91ea63",
+      "kind": "negative", "group_id": "measurement-family", "perturbation_id": "hedged-value", "split": "holdout", "relation_group": "measurement",
+      "expected": {"status": "abstain", "allowed_reason_codes": ["struct.unsafe_hedge"], "risk_family": "hedge"}
+    },
+    {
+      "case_id": "case-schedule-01", "namespace": "compositional-generic-v1", "episode_uuid": "generic-schedule-01",
+      "span_start": 0, "span_end": 17, "span_sha256": "f784713380920e9925ce7fbde03d411277dd8f170bd4718e0d35417923a6096b",
+      "kind": "positive", "group_id": "schedule-family", "perturbation_id": "wake-self", "split": "holdout", "relation_group": "schedule_time",
+      "expected": {"subject": "user", "relation_type": "schedule_time", "target": "wake up", "scope": "", "value_kind": "clock_time", "value": "07:30", "unit": "", "operation": "absolute", "effective_time": null}
+    },
+    {
+      "case_id": "case-schedule-02", "namespace": "compositional-generic-v1", "episode_uuid": "generic-schedule-02",
+      "span_start": 0, "span_end": 21, "span_sha256": "16e8e9710f2108974fd56ee3b114ef5fe6dd5a28da9f2f14308cfde730cbeb32",
+      "kind": "positive", "group_id": "schedule-family", "perturbation_id": "wake-possessive", "split": "holdout", "relation_group": "schedule_time",
+      "expected": {"subject": "user", "relation_type": "schedule_time", "target": "wake time", "scope": "", "value_kind": "clock_time", "value": "06:45", "unit": "", "operation": "absolute", "effective_time": null}
+    },
+    {
+      "case_id": "case-schedule-03", "namespace": "compositional-generic-v1", "episode_uuid": "generic-schedule-03",
+      "span_start": 0, "span_end": 22, "span_sha256": "db22bb266eca1013a23a009d3d0ab3c42aecdba5b67e4a01060b61474f992811",
+      "kind": "positive", "group_id": "schedule-family", "perturbation_id": "bedtime-meridiem", "split": "holdout", "relation_group": "schedule_time",
+      "expected": {"subject": "user", "relation_type": "schedule_time", "target": "bedtime", "scope": "", "value_kind": "clock_time", "value": "22:15", "unit": "", "operation": "absolute", "effective_time": null}
+    },
+    {
+      "case_id": "case-schedule-04", "namespace": "compositional-generic-v1", "episode_uuid": "generic-schedule-04",
+      "span_start": 0, "span_end": 25, "span_sha256": "565449e1456413dd6184f71e133fa404e5a2078c70b14e3ffc1bf0d4a870bb7e",
+      "kind": "negative", "group_id": "schedule-family", "perturbation_id": "past-expire", "split": "holdout", "relation_group": "schedule_time",
+      "expected": {"status": "abstain", "allowed_reason_codes": ["struct.operation_unsupported"], "risk_family": "past_only"}
+    },
+    {
+      "case_id": "case-schedule-05", "namespace": "compositional-generic-v1", "episode_uuid": "generic-schedule-05",
+      "span_start": 3, "span_end": 20, "span_sha256": "f784713380920e9925ce7fbde03d411277dd8f170bd4718e0d35417923a6096b",
+      "kind": "negative", "group_id": "schedule-family", "perturbation_id": "question-form", "split": "holdout", "relation_group": "schedule_time",
+      "expected": {"status": "abstain", "allowed_reason_codes": ["struct.unsafe_question"], "risk_family": "question"}
+    },
+    {
+      "case_id": "case-schedule-06", "namespace": "compositional-generic-v1", "episode_uuid": "generic-schedule-06",
+      "span_start": 0, "span_end": 23, "span_sha256": "a6111e558d13b236994db56543e9de417f369d00827a21b077a9301c6c544a98",
+      "kind": "negative", "group_id": "schedule-family", "perturbation_id": "modal-form", "split": "holdout", "relation_group": "schedule_time",
+      "expected": {"status": "abstain", "allowed_reason_codes": ["struct.unsafe_modal"], "risk_family": "modal"}
+    }
+  ]
+}

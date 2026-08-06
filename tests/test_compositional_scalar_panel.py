@@ -14,7 +14,10 @@ from archolith_bench.compositional_scalar_panel import (
     analyze_panel,
     load_panel,
     load_panel_menhir_api,
+    main,
+    render_markdown,
     source_sha256,
+    write_reports,
 )
 
 
@@ -277,3 +280,68 @@ def test_population_minimums_are_fail_closed_by_default(tmp_path, api):
 
     with pytest.raises(PanelError, match="generic holdout minimums not met"):
         load_panel(path, api=api)
+
+
+def test_registered_generic_fixture_meets_contract_without_tuning_to_pass(api):
+    fixture = Path("fixtures/compositional_scalar_generic_v1.json").resolve()
+
+    report = analyze_panel(
+        fixture,
+        menhir_root=_menhir_root(),
+        generated_at="2026-08-05T00:00:00+00:00",
+        api=api,
+    )
+
+    positive = report["aggregate"]["positive"]
+    negative = report["aggregate"]["negative"]
+    assert report["population_requirements"]["met"] is True
+    assert positive["total"] == 12
+    assert positive["correct"] + positive["unresolved"] == 12
+    assert positive["wrong"] == 0
+    assert negative["total"] == 12
+    assert negative["correct_abstention"] + negative["unjoinable"] == 12
+    assert negative["false_admission"] == 0
+    assert negative["reason_mismatch"] == 0
+    assert set(report["aggregate"]["per_relation"]) == {
+        "balance",
+        "measurement",
+        "quantity",
+        "schedule_time",
+    }
+
+
+def test_report_render_and_output_collision_guards(tmp_path, api):
+    fixture = Path("fixtures/compositional_scalar_generic_v1.json").resolve()
+    report = analyze_panel(fixture, menhir_root=_menhir_root(), api=api)
+    markdown = render_markdown(report)
+
+    assert "Positive semantic coverage" in markdown
+    assert "I have 12 books" not in markdown
+    json_path = tmp_path / "report.json"
+    markdown_path = tmp_path / "report.md"
+    write_reports(report, json_path, markdown_path)
+    assert json.loads(json_path.read_text(encoding="utf-8"))["report_schema_version"] == 1
+    assert markdown_path.read_text(encoding="utf-8").startswith(
+        "# Compositional scalar semantic panel"
+    )
+    with pytest.raises(PanelError, match="different paths"):
+        write_reports(report, json_path, json_path)
+    with pytest.raises(PanelError, match="must not overwrite"):
+        write_reports(report, fixture, markdown_path)
+
+
+def test_cli_reports_invalid_menhir_root_without_traceback(tmp_path, capsys):
+    fixture = Path("fixtures/compositional_scalar_generic_v1.json").resolve()
+
+    exit_code = main([
+        str(fixture),
+        "--menhir-root",
+        str(tmp_path / "missing-menhir"),
+        "--json-out",
+        str(tmp_path / "report.json"),
+        "--markdown-out",
+        str(tmp_path / "report.md"),
+    ])
+
+    assert exit_code == 2
+    assert capsys.readouterr().err.startswith("error: ")

@@ -7,6 +7,7 @@ No network, model, database, Docker, or service call is made here.
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import importlib
 import json
@@ -18,9 +19,10 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 from archolith_bench.deterministic_scalar_shadow import (
+    CaptureError,
     _git_metadata,
     _validate_menhir_import_identity,
     resolve_menhir_root,
@@ -251,7 +253,10 @@ def source_sha256(episodes: list[dict[str, str]]) -> str:
 
 def load_panel_menhir_api(menhir_root: str | Path) -> PanelMenhirApi:
     """Load the selected checkout's real deterministic and structural scalar contracts."""
-    root = resolve_menhir_root(menhir_root)
+    try:
+        root = resolve_menhir_root(menhir_root)
+    except CaptureError as exc:
+        raise PanelError(str(exc)) from exc
     source_root = str(root / "src")
     if source_root not in sys.path:
         sys.path.insert(0, source_root)
@@ -803,7 +808,10 @@ def analyze_panel(
     enforce_population_requirements: bool = True,
     api: PanelMenhirApi | None = None,
 ) -> dict[str, Any]:
-    root = resolve_menhir_root(menhir_root)
+    try:
+        root = resolve_menhir_root(menhir_root)
+    except CaptureError as exc:
+        raise PanelError(str(exc)) from exc
     loaded_api = api or load_panel_menhir_api(root)
     panel = load_panel(
         panel_path,
@@ -812,6 +820,10 @@ def analyze_panel(
     )
     rows, aggregate = _score_cases(panel, loaded_api)
     requirements = _population_requirements(list(panel.cases))
+    try:
+        menhir_metadata = _git_metadata(root, expected_menhir_commit)
+    except CaptureError as exc:
+        raise PanelError(str(exc)) from exc
     return {
         "report_schema_version": REPORT_SCHEMA_VERSION,
         "generated_at": generated_at or datetime.now(timezone.utc).isoformat(),
@@ -821,7 +833,7 @@ def analyze_panel(
             "panel_file_sha256": panel.file_sha256,
             "source_sha256": panel.source_sha256,
             "panel_schema_version": PANEL_SCHEMA_VERSION,
-            "menhir": _git_metadata(root, expected_menhir_commit),
+            "menhir": menhir_metadata,
             "composer_version": loaded_api.composer_version,
             "llm_used": False,
         },
@@ -829,3 +841,128 @@ def analyze_panel(
         "aggregate": aggregate,
         "cases": rows,
     }
+
+
+def _format_ratio(record: Mapping[str, Any]) -> str:
+    ratio = record.get("ratio")
+    return "n/a" if ratio is None else f"{float(ratio):.1%}"
+
+
+def render_markdown(report: Mapping[str, Any]) -> str:
+    """Render a compact source-free summary of the machine report."""
+    aggregate = report["aggregate"]
+    positive = aggregate["positive"]
+    negative = aggregate["negative"]
+    provenance = report["provenance"]
+    lines = [
+        "# Compositional scalar semantic panel",
+        "",
+        f"Generated: {report['generated_at']}",
+        f"Panel: `{provenance['panel_id']}`",
+        f"Panel SHA-256: `{provenance['panel_file_sha256']}`",
+        f"Source SHA-256: `{provenance['source_sha256']}`",
+        f"Menhir: `{provenance['menhir'].get('commit') or 'unavailable'}` ",
+        f"Composer: `{provenance['composer_version']}`",
+        f"Promotion: `{aggregate['promotion_status']}`",
+        "",
+        "## Aggregate",
+        "",
+        "| Measure | Result |",
+        "|---|---:|",
+        f"| Positive semantic coverage | {positive['correct']} / {positive['total']} "
+        f"({_format_ratio(positive['coverage'])}) |",
+        f"| Positive exact join | {positive['exact_joined']} / {positive['total']} "
+        f"({_format_ratio(positive['exact_join_rate'])}) |",
+        f"| Positive semantic precision | {positive['correct']} / {positive['admissions']} "
+        f"({_format_ratio(positive['precision'])}) |",
+        f"| Positive wrong / unresolved / unjoinable | {positive['wrong']} / "
+        f"{positive['unresolved']} / {positive['unjoinable']} |",
+        f"| Negative strict composer abstention | {negative['correct_abstention']} / "
+        f"{negative['total']} ({_format_ratio(negative['correct_abstention_rate'])}) |",
+        f"| Negative system non-admission | {negative['system_non_admission']} / "
+        f"{negative['total']} ({_format_ratio(negative['system_non_admission_rate'])}) |",
+        f"| Negative false admission | {negative['false_admission']} / {negative['total']} "
+        f"({_format_ratio(negative['false_admission_rate'])}) |",
+        f"| Negative false current | {negative['false_current']} / {negative['total']} "
+        f"({_format_ratio(negative['false_current_rate'])}) |",
+        "",
+        "## Positive relation groups",
+        "",
+        "| Relation | Correct / total | Exact joined | Precision | Wilson lower 95 |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    for relation, values in sorted(aggregate["per_relation"].items()):
+        wilson = values["wilson_lower_95"]["lower"]
+        wilson_text = "n/a" if wilson is None else f"{float(wilson):.1%}"
+        lines.append(
+            f"| `{relation}` | {values['positive_correct']} / {values['positive_total']} | "
+            f"{values['positive_exact_joined']} | {_format_ratio(values['precision'])} | "
+            f"{wilson_text} |"
+        )
+    lines.extend([
+        "",
+        "## Interpretation",
+        "",
+        "- Labels are bound to exact source locators and are independent of LLM output.",
+        "- Strict negative abstention scores only exact-locator proposals that reach the composer; "
+        "extractor omissions remain unjoinable but count toward system non-admission.",
+        "- The bounded panel is descriptive. It cannot promote deterministic scalar identity and "
+        "does not replace a preregistered population gate.",
+    ])
+    return "\n".join(lines) + "\n"
+
+
+def write_reports(
+    report: Mapping[str, Any], json_path: str | Path, markdown_path: str | Path
+) -> None:
+    json_target = Path(json_path).expanduser().resolve()
+    markdown_target = Path(markdown_path).expanduser().resolve()
+    panel_target = Path(str(report["provenance"]["panel_path"])).resolve()
+    if json_target == markdown_target:
+        raise PanelError("JSON and Markdown outputs must be different paths")
+    if json_target == panel_target or markdown_target == panel_target:
+        raise PanelError("report output must not overwrite the source panel")
+    json_target.parent.mkdir(parents=True, exist_ok=True)
+    markdown_target.parent.mkdir(parents=True, exist_ok=True)
+    with json_target.open("w", encoding="utf-8") as handle:
+        json.dump(report, handle, indent=2, ensure_ascii=False, sort_keys=True)
+        handle.write("\n")
+    markdown_target.write_text(render_markdown(report), encoding="utf-8")
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Evaluate Menhir compositional scalar identity against a source-labeled panel."
+    )
+    parser.add_argument("panel", help="versioned non-LME semantic panel JSON")
+    parser.add_argument(
+        "--menhir-root",
+        help="Menhir source checkout (required unless one local sibling is unambiguous)",
+    )
+    parser.add_argument("--json-out", required=True, help="machine-readable report path")
+    parser.add_argument("--markdown-out", required=True, help="concise Markdown report path")
+    parser.add_argument(
+        "--expected-menhir-commit",
+        help="fail if Menhir HEAD differs from this explicit commit",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_arg_parser()
+    args = parser.parse_args(argv)
+    try:
+        report = analyze_panel(
+            args.panel,
+            menhir_root=args.menhir_root,
+            expected_menhir_commit=args.expected_menhir_commit,
+        )
+        write_reports(report, args.json_out, args.markdown_out)
+    except PanelError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -84,6 +84,26 @@ or false-current rate and not the plan's population precision/confidence-interva
 with no labeled targets remain not measured with null values. Token/dollar savings remain unclaimed
 unless measured fields exist in the capture.
 
+### Offline compositional scalar semantic panel
+
+Use the independent non-LME panel to evaluate the deterministic extractor plus structural composer
+against source-authored semantic labels. It does not consume an LLM capture and never treats LLM
+agreement as truth.
+
+```bash
+python scripts/measure_compositional_scalar_panel.py \
+  fixtures/compositional_scalar_generic_v1.json \
+  --menhir-root C:\path\to\projects\archolith\menhir \
+  --json-out panel-report.json --markdown-out panel-report.md
+```
+
+The v1 panel contains 12 positive and 12 negative holdout cases across four relation groups. Every
+label is bound to an exact unique source span and source hash; group/split leakage, duplicate
+locators, unknown reason codes, and noncanonical expected identities fail closed. Reports separate
+exact join coverage, correct/wrong/unresolved composition, strict composer abstention, extractor
+omission, system non-admission, and false-current risk. The bounded panel always remains
+`promotion_status=not_evaluable`; it is regression evidence, not a population acceptance gate.
+
 ### Offline historical scalar spend attribution
 
 Use the durable Bench-owned instrument to measure a completed LongMemEval-style run from its

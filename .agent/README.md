@@ -77,6 +77,18 @@ Its `false_positive` and `false_current` rows are human-labeled known-negative t
 uses target-hit fields, never an overall/population false-positive or false-current rate, and does
 not claim the plan's population precision/confidence-interval gate.
 
+Offline compositional scalar semantic panel:
+```bash
+python scripts/measure_compositional_scalar_panel.py \
+  fixtures/compositional_scalar_generic_v1.json \
+  --menhir-root C:\path\to\projects\archolith\menhir \
+  --json-out panel-report.json --markdown-out panel-report.md
+```
+This is the capture-independent, source-labeled lane. Its v1 generic holdout has 12 positive and 12
+negative cases, four relation groups, and at least three perturbations per group. It reports exact
+join and semantic quality separately and is permanently descriptive until a separately
+preregistered population gate exists.
+
 ### Progress on long runs
 Long bench loops (R1/facet ladders, live recall) print a live heartbeat via
 `archolith_bench/progress.py` — `ProgressReporter` / `track` / `run_ladder`. Progress goes

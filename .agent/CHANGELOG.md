@@ -1,5 +1,14 @@
 # archolith-bench Changelog
 
+## 2026-08-05 - Add independent compositional scalar semantic panel
+
+Added a strict non-LME panel and offline analyzer for source-authored compositional scalar labels.
+The 24-case generic holdout covers 12 positives, 12 negatives, four relation groups, and multiple
+perturbations without using LLM output as truth. Reports separate exact join, semantic correctness,
+composer abstention, extractor omission, system non-admission, false-current risk, and Wilson
+uncertainty. Promotion stays `not_evaluable` because this bounded regression panel is not a
+preregistered population gate.
+
 ## 2026-08-05 - Consume compositional scalar shadow schema v2
 
 The offline scalar analyzer now emits report schema v2, supplies each validated episode's source

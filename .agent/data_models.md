@@ -36,6 +36,20 @@ known-negative target, not a reviewed sample of all admissions. The report uses 
 satisfy the plan's population precision/confidence-interval gate. A category without labeled
 negative targets is `not_measured` with null numeric fields.
 
+## Compositional scalar semantic panel
+
+`fixtures/compositional_scalar_generic_v1.json` is a versioned, non-LME, capture-independent panel.
+Its top-level `source_sha256` binds the canonical episode list; the file hash in each report binds
+the labels too. Each case records a unique exact source locator/span hash, atomic group and
+perturbation IDs, split, relation group, and either a canonical positive identity tuple or a
+negative abstention contract with stable Menhir reason codes and a generic risk family.
+
+The report carries source-free per-case outcomes plus aggregate positive coverage/precision,
+identity mismatch dimensions, exact-join rates, status-bearing Wilson lower bounds, negative strict
+abstention, system non-admission, false-admission/current risk, and per-relation results. Its
+`promotion_status` is always `not_evaluable`; the 24-case panel is a regression instrument rather
+than a population gate.
+
 ## Historical scalar spend attribution report
 
 The offline `scalar-spend-attribution/v1` report is descriptive evidence for a completed

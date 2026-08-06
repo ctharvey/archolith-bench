@@ -73,6 +73,11 @@ steer specifics.)
 
 ## Measurement checkpoint: scalar spend attribution (2026-08-05)
 
+Scope correction: the `58/78` result below is the accounting source checkpoint, not the best
+scalar run. The best observed scalar development result is `70/78`, documented with the full run
+ladder in [scalar-lme-run-lineage-2026-08-05.md](scalar-lme-run-lineage-2026-08-05.md). Both are
+noncanonical development evidence, not acceptance scores.
+
 The historical offline instrument now accounts for the observed scalar calls, artifacts, recall
 payload signatures, and explicit recall answer costs for
 `scalar-duration-completeness-candidate-v2-20260730`: 78 namespaces, 234 manifest scalar calls,

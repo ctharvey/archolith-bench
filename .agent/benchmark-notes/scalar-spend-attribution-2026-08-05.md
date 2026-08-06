@@ -7,6 +7,11 @@ The offline historical instrument provides descriptive scalar-spend and recall e
 the run is noncanonical, and full canonical acceptance was not evaluated. It does not establish
 scalar causality, scalar token or dollar spend, or token/dollar equivalence between pipeline stages.
 
+Correction: the `58/78` recall result in this note is the source-attribution/accounting checkpoint,
+not the best scalar result. The best observed scalar development result is `70/78` in
+[scalar-lme-run-lineage-2026-08-05.md](scalar-lme-run-lineage-2026-08-05.md); keep `58/78` here
+for accounting only. Neither score is canonical acceptance evidence.
+
 ## Observed historical accounting
 
 | Measure | Observed value |

@@ -75,6 +75,28 @@ or false-current rate and not the plan's population precision/confidence-interva
 with no labeled targets remain not measured with null values. Token/dollar savings remain unclaimed
 unless measured fields exist in the capture.
 
+### Offline historical scalar spend attribution
+
+Use the durable Bench-owned instrument to measure a completed LongMemEval-style run from its
+manifest, provenance record, read-only SQLite telemetry, and recall checkpoint. It records artifact
+hashes, attempt/commit/dirty-state provenance, exact scalar and Graphiti call counts, per-arm
+persisted tokens/latency/cost, and conservative state/history presentation signatures. It makes no
+network, LLM, Neo4j, Docker, or input-artifact writes.
+
+```bash
+python scripts/measure_scalar_spend_attribution.py results/run \
+  --json-out results/run/scalar-spend-attribution.json \
+  --markdown-out results/run/scalar-spend-attribution.md \
+  --input-usd-per-million 2.5 --output-usd-per-million 10 \
+  --negative-control lme-6071bd76
+```
+
+The checkpoint is auto-discovered only when exactly one `.checkpoint_*.json`/`.jsonl` exists;
+otherwise pass `--checkpoint`. Costs cover only persisted answer-model tokens at explicitly supplied
+rates. Scalar spend, evaluator/judge spend, and scalar-caused corrections remain `not_measured`.
+Full canonical acceptance is not evaluated by this instrument; resumed or mixed-code runs are
+reported as descriptive evidence with observed canonicality concerns.
+
 ### Harness: official benchmarks as direct-vs-proxy A/B
 
 Archolith is middleware, not a model, so a harness adapter never claims a standalone

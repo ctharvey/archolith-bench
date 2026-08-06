@@ -1,5 +1,16 @@
 # archolith-bench Changelog
 
+## 2026-08-05 - Offline historical scalar spend attribution
+
+Added `scripts/measure_scalar_spend_attribution.py` and its package module. The read-only,
+fully offline instrument validates a run manifest, provenance record, recall checkpoint, and
+SQLite telemetry schema; records input hashes; separates manifest scalar calls from completed
+Graphiti ingest chat calls; joins per-task scalar artifacts with recall correctness and conservative
+state/history presentation signatures; and reports explicit Decimal-based answer costs only when
+input/output rates are supplied. Scalar spend, evaluator/judge usage, and scalar-caused corrections
+remain explicitly unmeasured. Full canonical acceptance is not evaluated; resumed, noncanonical,
+mixed-code, interrupted, and dirty attempt provenance is reported as descriptive evidence.
+
 ## 2026-08-05 - Offline deterministic typed-scalar shadow measurement
 
 Added `scripts/measure_deterministic_scalar_shadow.py` and its package module. The instrument

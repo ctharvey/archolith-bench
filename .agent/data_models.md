@@ -27,6 +27,25 @@ known-negative target, not a reviewed sample of all admissions. The report uses 
 satisfy the plan's population precision/confidence-interval gate. A category without labeled
 negative targets is `not_measured` with null numeric fields.
 
+## Historical scalar spend attribution report
+
+The offline `scalar-spend-attribution/v1` report is descriptive evidence for a completed
+historical run. Its explicit JSON and Markdown outputs are collision-preflighted against every
+input artifact and each other, then atomically published; manifest, provenance, checkpoint, and
+SQLite inputs remain read-only, with SQLite opened in read-only mode.
+
+| Top-level contract | Meaning |
+|--------------------|---------|
+| `input_artifacts` | Exact manifest, provenance, telemetry, and recall-checkpoint paths plus SHA-256 hashes |
+| `provenance` | Observed canonicality concerns, attempt/commit/dirty/interruption facts; full canonical acceptance is not evaluated |
+| `manifest` | Aggregate and per-namespace scalar calls, artifacts, failures/timeouts/consolidation, and the namespace/task join |
+| `telemetry` | Only completed `episode_task_events` Graphiti ingest chat events with parent task exactly `memory: graphiti add_episode`; includes model/endpoint distributions and a chronological timezone-aware first/last boundary |
+| `recall_checkpoint` | Per-arm row/call counts, correctness, measured input/output/total tokens, latency, model identity when available, and presentation-only state/history signatures |
+| `pricing` | Explicit input/output USD-per-million rates used for recall answer-cost arithmetic; current or inferred pricing is not used |
+| `attribution` | Scalar-caused corrections and cost per scalar-corrected answer are `null`/`not_measured` without a scalar-disabled counterfactual; unpersisted scalar or judge token/cost usage remains `null`/`not_measured` |
+| `negative_controls` | Explicit caller-selected task IDs with the same accounting and presentation checks; no benchmark-specific IDs are implied |
+| `limitations` | Noncanonical/descriptive status, stage-specific call-count comparisons, absent scalar economics, absent causal counterfactual, and other evidence gaps |
+
 ## Persistent LongMemEval Regression Fixture
 
 `fixtures/longmemeval/menhir_suburbs_extraction_regression.json` is a one-item LongMemEval-compatible

@@ -7,7 +7,7 @@ it does not reuse LongMemEval task IDs, answer text, or LLM proposals.
 ## Provenance
 
 - Menhir: `36fddd112bc45c3b8e401829e1bd72cab53dea7b` (clean)
-- Bench analyzer base: `95b2bf3f20b2307cc84d964ebc99711c95817564` plus the fixture/report chunk documented here
+- Bench fixture/analyzer artifact: `b2de4ee32f0b8db95d7861993f6989aee2440413`
 - Panel source SHA-256: `e0316bee092e6a84df931853a389a29d88a453bec3668847b366de1f81f1fac3`
 - Calls: no LLM, network, Neo4j, Docker, or Menhir service calls
 

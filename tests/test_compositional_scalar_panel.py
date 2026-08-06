@@ -229,6 +229,16 @@ def test_group_split_leakage_is_rejected(tmp_path, api):
         load_panel(path, api=api, enforce_population_requirements=False)
 
 
+def test_duplicate_source_span_is_rejected(tmp_path, api):
+    payload = _payload()
+    payload["episodes"][0]["content"] = "I have 12 books. I have 12 books."
+    payload["source_sha256"] = source_sha256(payload["episodes"])
+    path = _write(tmp_path, payload)
+
+    with pytest.raises(PanelError, match="unique Menhir grounding"):
+        load_panel(path, api=api, enforce_population_requirements=False)
+
+
 def test_negative_without_exact_candidate_is_unjoinable_not_abstention(tmp_path, api):
     payload = _payload()
     episode = payload["episodes"][1]

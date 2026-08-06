@@ -1,5 +1,13 @@
 # archolith-bench Changelog
 
+## 2026-08-06 - Record structural-v2 possessive measurement follow-up
+
+Updated the shadow integration's composer-version expectation to `structural-v2` and replayed the
+unchanged independent generic panel against Menhir's narrow possessive weight/height grammar. The
+panel improved from 11/12 to 12/12 correct positive identities with zero wrong/unresolved results;
+all 12 negative cases remain system non-admissions. The original 11/12 note remains historical,
+and the follow-up remains `promotion_status=not_evaluable` rather than a routing gate.
+
 ## 2026-08-05 - Add independent compositional scalar semantic panel
 
 Added a strict non-LME panel and offline analyzer for source-authored compositional scalar labels.

@@ -162,6 +162,18 @@ recall). This preserves vote receipts, lifecycle events, and scalar audit trails
 so the dashboard's `ScalarTaskReader` can display them and the acceptance validator can check for
 their presence.
 
+Current Menhir builds also persist `llm_usage_events`, one terminal row per instrumented
+provider-client call.
+The row contains run/episode provenance, model and endpoint, latency, the raw provider usage object,
+and exact input/output/total/cached/reasoning token fields when reported. Counts are not estimated:
+`missing_usage_calls` identifies completed calls whose provider omitted usage. The knowledge-update
+wrapper snapshots the ingest aggregate to `$LME_RESULTS_DIR/ingest_llm_usage.json` before recall,
+including model/endpoint breakdowns. Recall uses the same run-local telemetry DB. After the harness,
+the wrapper writes `$LME_RESULTS_DIR/run_llm_usage.json`, combining the final Menhir total with the
+harness checkpoint's answer-model and optional LLM-judge totals, with per-arm and per-operation
+breakdowns. Its `complete` flag is true only when both sources are present. Cost should be derived
+later from these immutable token counts and the price schedule being evaluated.
+
 ## Acceptance Validation
 
 `lme.sh validate [--expected N]` runs `lib/validate_run.py` against the current provenance file,

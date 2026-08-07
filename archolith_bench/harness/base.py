@@ -53,6 +53,9 @@ class TaskResult:
     question: str = ""
     recalled: str = ""
     gold: str = ""
+    scorer_input_tokens: int = 0
+    scorer_output_tokens: int = 0
+    scorer_raw_usage: dict = field(default_factory=dict)
 
 
 @dataclass

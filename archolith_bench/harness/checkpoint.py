@@ -71,6 +71,9 @@ class MemoryCheckpoint:
                         latency_ms=float(res.get("latency_ms") or 0.0),
                         correct=bool(res.get("correct")),
                         raw_usage=dict(res.get("raw_usage") or {}),
+                        scorer_input_tokens=int(res.get("scorer_input_tokens") or 0),
+                        scorer_output_tokens=int(res.get("scorer_output_tokens") or 0),
+                        scorer_raw_usage=dict(res.get("scorer_raw_usage") or {}),
                     )
                 except (json.JSONDecodeError, KeyError, TypeError, ValueError):
                     # Tolerate a torn final line from a hard kill; skip it.

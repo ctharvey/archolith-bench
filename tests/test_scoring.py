@@ -46,6 +46,7 @@ def test_llm_judge_scores_correct_and_incorrect():
     item = {"question": "What city?", "answer": "Denver", "question_type": "single-session-user"}
     assert judge(item, "I think it was Denver in March") is True
     assert judge(item, "It was Boston") is False
+    assert judge.last_usage == {"prompt_tokens": 10, "completion_tokens": 1}
     judge.close()
 
 

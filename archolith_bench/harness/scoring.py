@@ -79,10 +79,14 @@ class LLMJudgeScorer:
         self.send_fn = send_fn
         self._client = client or httpx.Client(timeout=60)
         self._own_client = client is None
+        self.last_usage: dict = {}
 
     def __call__(self, item: dict, response_text: str) -> bool:
         messages = _judge_messages(item, response_text)
-        text, _latency, _usage = self.send_fn(self._client, self.base_url, self.api_key, messages, self.model)
+        text, _latency, usage = self.send_fn(
+            self._client, self.base_url, self.api_key, messages, self.model
+        )
+        self.last_usage = dict(usage or {})
         return _parse_yes(text)
 
     def close(self) -> None:

@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""Write a stable aggregate of Menhir's provider-reported LLM usage telemetry."""
+
+from __future__ import annotations
+
+import argparse
+from datetime import datetime, timezone
+import json
+from pathlib import Path
+import sqlite3
+from typing import Any
+
+
+def _token_count(usage: dict[str, Any], *names: str) -> int | None:
+    for name in names:
+        value = usage.get(name)
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            return value
+    return None
+
+
+def summarize_harness_usage(
+    checkpoint_path: Path,
+    *,
+    require_judge_usage: bool = False,
+) -> dict[str, Any]:
+    """Aggregate successful answer and optional judge calls captured by the checkpoint."""
+
+    if not checkpoint_path.exists():
+        return {"available": False, "reason": "harness_checkpoint_missing"}
+
+    totals = {
+        "calls": 0,
+        "missing_usage_calls": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "cached_input_tokens": 0,
+        "reasoning_output_tokens": 0,
+    }
+    by_arm: dict[str, dict[str, int | str]] = {}
+    by_operation: dict[str, dict[str, int | str]] = {}
+
+    def add_usage(arm: str, operation: str, usage: dict[str, Any]) -> None:
+        input_tokens = _token_count(usage, "prompt_tokens", "input_tokens")
+        output_tokens = _token_count(usage, "completion_tokens", "output_tokens")
+        total_tokens = _token_count(usage, "total_tokens")
+        if total_tokens is None and input_tokens is not None and output_tokens is not None:
+            total_tokens = input_tokens + output_tokens
+        prompt_details = usage.get("prompt_tokens_details")
+        completion_details = usage.get("completion_tokens_details")
+        cached_tokens = _token_count(
+            prompt_details if isinstance(prompt_details, dict) else {}, "cached_tokens"
+        )
+        reasoning_tokens = _token_count(
+            completion_details if isinstance(completion_details, dict) else {},
+            "reasoning_tokens",
+        )
+
+        arm_totals = by_arm.setdefault(arm, _new_harness_group("arm", arm))
+        operation_totals = by_operation.setdefault(
+            operation, _new_harness_group("operation", operation)
+        )
+        for target in (totals, arm_totals, operation_totals):
+            target["calls"] += 1
+            if total_tokens is None:
+                target["missing_usage_calls"] += 1
+            target["input_tokens"] += input_tokens or 0
+            target["output_tokens"] += output_tokens or 0
+            target["total_tokens"] += total_tokens or 0
+            target["cached_input_tokens"] += cached_tokens or 0
+            target["reasoning_output_tokens"] += reasoning_tokens or 0
+
+    for line in checkpoint_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        arm = str(row.get("arm") or "unknown")
+        result = row.get("result") if isinstance(row.get("result"), dict) else {}
+        usage = result.get("raw_usage") if isinstance(result.get("raw_usage"), dict) else {}
+        add_usage(arm, "answer", usage)
+        scorer_usage = (
+            result.get("scorer_raw_usage")
+            if isinstance(result.get("scorer_raw_usage"), dict)
+            else {}
+        )
+        if scorer_usage:
+            add_usage(arm, "judge", scorer_usage)
+        elif require_judge_usage:
+            add_usage(arm, "judge", {})
+
+    return {
+        "available": True,
+        "checkpoint": str(checkpoint_path),
+        **totals,
+        "by_arm": sorted(by_arm.values(), key=lambda item: str(item["arm"])),
+        "by_operation": sorted(
+            by_operation.values(), key=lambda item: str(item["operation"])
+        ),
+    }
+
+
+def _new_harness_group(label: str, value: str) -> dict[str, int | str]:
+    return {
+        label: value,
+        "calls": 0,
+        "missing_usage_calls": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "cached_input_tokens": 0,
+        "reasoning_output_tokens": 0,
+    }
+
+
+def summarize_llm_usage(db_path: Path, *, run_id: str | None = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "schema_version": 1,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "source": "provider_reported",
+        "run_id": run_id,
+    }
+    if not db_path.exists():
+        return {**payload, "available": False, "reason": "telemetry_db_missing"}
+
+    uri = f"{db_path.resolve().as_uri()}?mode=ro"
+    with sqlite3.connect(uri, uri=True) as conn:
+        conn.row_factory = sqlite3.Row
+        table = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'llm_usage_events'"
+        ).fetchone()
+        if table is None:
+            return {**payload, "available": False, "reason": "llm_usage_events_missing"}
+        where = "WHERE run_id = ?" if run_id is not None else ""
+        params: tuple[Any, ...] = (run_id,) if run_id is not None else ()
+        totals = conn.execute(
+            f"""
+            SELECT COUNT(*) AS calls,
+                   SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_calls,
+                   SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed_calls,
+                   SUM(CASE WHEN status = 'completed' AND total_tokens IS NULL THEN 1 ELSE 0 END)
+                       AS missing_usage_calls,
+                   COALESCE(SUM(input_tokens), 0) AS input_tokens,
+                   COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                   COALESCE(SUM(total_tokens), 0) AS total_tokens,
+                   COALESCE(SUM(cached_input_tokens), 0) AS cached_input_tokens,
+                   COALESCE(SUM(reasoning_output_tokens), 0) AS reasoning_output_tokens
+            FROM llm_usage_events
+            {where}
+            """,
+            params,
+        ).fetchone()
+        by_model = conn.execute(
+            f"""
+            SELECT kind, model, endpoint, COUNT(*) AS calls,
+                   COALESCE(SUM(input_tokens), 0) AS input_tokens,
+                   COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                   COALESCE(SUM(total_tokens), 0) AS total_tokens,
+                   COALESCE(SUM(cached_input_tokens), 0) AS cached_input_tokens,
+                   COALESCE(SUM(reasoning_output_tokens), 0) AS reasoning_output_tokens
+            FROM llm_usage_events
+            {where}
+            GROUP BY kind, model, endpoint
+            ORDER BY total_tokens DESC, calls DESC
+            """,
+            params,
+        ).fetchall()
+
+    return {
+        **payload,
+        "available": True,
+        **dict(totals),
+        "by_model": [dict(row) for row in by_model],
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("telemetry_db", type=Path)
+    parser.add_argument("--run-id")
+    parser.add_argument("--harness-checkpoint", type=Path)
+    parser.add_argument("--require-judge-usage", action="store_true")
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+
+    menhir = summarize_llm_usage(args.telemetry_db, run_id=args.run_id)
+    if args.harness_checkpoint is None:
+        summary = menhir
+    else:
+        harness = summarize_harness_usage(
+            args.harness_checkpoint,
+            require_judge_usage=args.require_judge_usage,
+        )
+        combined = {
+            field: int(menhir.get(field, 0)) + int(harness.get(field, 0))
+            for field in (
+                "calls",
+                "missing_usage_calls",
+                "input_tokens",
+                "output_tokens",
+                "total_tokens",
+                "cached_input_tokens",
+                "reasoning_output_tokens",
+            )
+        }
+        summary = {
+            "schema_version": 1,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "source": "provider_reported",
+            "run_id": args.run_id,
+            "menhir": menhir,
+            "harness": harness,
+            "combined": combined,
+            "complete": (
+                bool(menhir.get("available"))
+                and bool(harness.get("available"))
+                and combined["missing_usage_calls"] == 0
+            ),
+        }
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(json.dumps(summary, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -459,6 +459,10 @@ def _run_memory_arm(
         text, latency_ms, usage = send_fn(chat_client, chat_base_url, api_key, messages, model)
         inp, out = _usage_tokens(usage)
         correct = score_fn(item, text) if score_fn is not None else adapter.score(item, text)
+        scorer_usage = (
+            dict(getattr(score_fn, "last_usage", {}) or {}) if score_fn is not None else {}
+        )
+        scorer_inp, scorer_out = _usage_tokens(scorer_usage)
         tr = TaskResult(
             task_id=task_id,
             response_text=text,
@@ -470,6 +474,9 @@ def _run_memory_arm(
             question=question,
             recalled=memory_context,
             gold=str(item.get("answer", "")),
+            scorer_input_tokens=scorer_inp,
+            scorer_output_tokens=scorer_out,
+            scorer_raw_usage=scorer_usage,
         )
         results.append(tr)
         turn_dicts.append({"input_tokens": inp, "output_tokens": out})

@@ -388,6 +388,11 @@ PY
   record_phase_end build-graph-checkpoint-continuation completed
 fi
 log "build complete"
+"${BENCH_PY}" "${SCRIPT_DIR}/lib/summarize_llm_usage.py" \
+  "${LME_RESULTS_DIR}/mcp_telemetry.db" \
+  --run-id "${RUN_ID}" \
+  --output "${LME_RESULTS_DIR}/ingest_llm_usage.json" >/dev/null
+log "ingest LLM usage: ${LME_RESULTS_DIR}/ingest_llm_usage.json"
 
 # ---- Phase 2: recall+QA scoring ----
 log "======== PHASE 2: RECALL+QA SCORING ========"
@@ -409,6 +414,7 @@ log "starting recall menhir on port ${RECALL_PORT}..."
     MENHIR_PERSONAL_MEMORY_RECALL_AUDIT_ENABLED="${LME_RECALL_AUDIT_ENABLED}" \
     MENHIR_BENCH_RESULTS_ROOT="${BENCH_DIR}/results" \
     MENHIR_BENCH_ACTIVE_RUN_ID="$(basename "$LME_RESULTS_DIR")" \
+    MENHIR_MCP_TELEMETRY_DB="${LME_RESULTS_DIR}/mcp_telemetry.db" \
     OTEL_SDK_DISABLED=true LANGFUSE_TRACING_ENABLED=false LANGFUSE_PUBLIC_KEY="" LANGFUSE_SECRET_KEY="" LANGFUSE_HOST="" \
     MENHIR_OPERATOR_KEY="" MENHIR_AGENT_KEY="" MENHIR_READONLY_KEY="" MENHIR_API_KEY="" \
     NEO4J_URI="bolt://localhost:${LME_BOLT}" NEO4J_USER=neo4j NEO4J_PASSWORD="${LME_NEO4J_PW}" NEO4J_DATABASE=neo4j \
@@ -458,6 +464,22 @@ record_phase_end recall-qa "$([ "${HARNESS_EXIT}" = "0" ] && echo completed || e
 
 kill "${MENHIR_PID}" 2>/dev/null || true
 MENHIR_PID=""
+HARNESS_CHECKPOINT="$(find "${RECALL_OUT}" -maxdepth 1 -type f -name '.checkpoint_*.jsonl' -print -quit)"
+if [ -n "${HARNESS_CHECKPOINT}" ]; then
+  JUDGE_USAGE_ARG=()
+  if [ "${LME_SCORER}" = "llm-judge" ]; then
+    JUDGE_USAGE_ARG=(--require-judge-usage)
+  fi
+  "${BENCH_PY}" "${SCRIPT_DIR}/lib/summarize_llm_usage.py" \
+    "${LME_RESULTS_DIR}/mcp_telemetry.db" \
+    --run-id "${RUN_ID}" \
+    --harness-checkpoint "${HARNESS_CHECKPOINT}" \
+    "${JUDGE_USAGE_ARG[@]}" \
+    --output "${LME_RESULTS_DIR}/run_llm_usage.json" >/dev/null
+  log "combined LLM usage: ${LME_RESULTS_DIR}/run_llm_usage.json"
+else
+  log "WARNING: no harness checkpoint found; run_llm_usage.json was not written"
+fi
 log "done. Results in ${LME_RESULTS_DIR}"
 if [ "${LME_KU_KEEP_NEO4J_UP}" = "1" ]; then
   log "Neo4j container ${LME_NEO4J_NAME} left up by request."

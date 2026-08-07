@@ -389,6 +389,17 @@ def test_run_memory_ab_checkpoint_resumes_and_skips_done(tmp_path):
         text = "Biscuit" if "Biscuit" in user else ("Denver" if "Denver" in user else "I don't know")
         return text, 1.0, {"prompt_tokens": max(1, len(user) // 4), "completion_tokens": 2}
 
+    class _Scorer:
+        last_usage: dict = {}
+
+        def __call__(self, item, response_text):
+            self.last_usage = {
+                "prompt_tokens": 7,
+                "completion_tokens": 1,
+                "total_tokens": 8,
+            }
+            return True
+
     ckpt_path = tmp_path / "ckpt.jsonl"
 
     first = run_memory_ab(
@@ -398,6 +409,7 @@ def test_run_memory_ab_checkpoint_resumes_and_skips_done(tmp_path):
         client=StubMenhirClient(),
         send_fn=send_fn,
         checkpoint=MemoryCheckpoint(ckpt_path),
+        score_fn=_Scorer(),
     )
     calls_after_first = calls["n"]
     assert calls_after_first > 0
@@ -411,6 +423,7 @@ def test_run_memory_ab_checkpoint_resumes_and_skips_done(tmp_path):
         client=StubMenhirClient(),
         send_fn=send_fn,
         checkpoint=MemoryCheckpoint(ckpt_path),
+        score_fn=_Scorer(),
     )
     assert calls["n"] == calls_after_first, "resume should not re-issue any answer calls"
     # Identical aggregates from the checkpoint as from the live run.
@@ -418,6 +431,9 @@ def test_run_memory_ab_checkpoint_resumes_and_skips_done(tmp_path):
         assert second.arms[arm].n == first.arms[arm].n
         assert second.arms[arm].score == first.arms[arm].score
         assert second.arms[arm].input_tokens == first.arms[arm].input_tokens
+        assert second.arms[arm].results[0].scorer_input_tokens == 7
+        assert second.arms[arm].results[0].scorer_output_tokens == 1
+        assert second.arms[arm].results[0].scorer_raw_usage["total_tokens"] == 8
 
 
 def test_run_memory_ab_no_memory_arm_receives_chat_client():

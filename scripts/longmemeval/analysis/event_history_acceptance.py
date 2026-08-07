@@ -82,6 +82,45 @@ def _normalize_answer(text: Any) -> str:
     return value.strip()
 
 
+LME_TIME_FORMAT = "%Y/%m/%d (%a) %H:%M"
+
+
+def normalize_reference_time(raw: str) -> str:
+    """Normalize a dataset ``reference_time`` to canonical UTC ISO-8601.
+
+    This is a generic dataset-adapter shim over the two timestamp layouts a source
+    fixture may carry:
+
+    * LongMemEval ``%Y/%m/%d (%a) %H:%M`` (e.g. ``2023/08/30 (Wed) 04:01``) as used
+      by knowledge-update ``haystack_dates``.
+    * an already-parseable ISO-8601 timestamp, preserved/normalized safely.
+
+    Unrecognized or blank values raise loudly so a missing or malformed time can never
+    silently become a ``no_valid_time`` build drop.
+
+    UTC is a dataset convention, not a measured property of the fixture: LongMemEval
+    carries no timezone, and ordering — not absolute wall-clock — is the property under
+    test. The UTC ``Z`` suffix is attached to give Menhir's event-history selectors a
+    comparable, monotonic basis.
+    """
+    if not isinstance(raw, str) or not raw.strip():
+        raise _error("reference_time", "must be a non-empty string")
+    value = raw.strip()
+    try:
+        parsed = datetime.strptime(value, LME_TIME_FORMAT)
+    except ValueError:
+        parsed = None
+    if parsed is not None:
+        return parsed.replace(tzinfo=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        raise _error("reference_time", f"unrecognized time format {value!r}")
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 def _load_key(menhir_root: Path) -> str:
     key = os.environ.get("OPENAI_API_KEY")
     if key:
@@ -197,6 +236,7 @@ def build_episodes_from_question(question: dict[str, Any], qid: str) -> tuple[Ex
                 f"question {qid}",
                 f"missing haystack_date for session {session_index}",
             )
+        reference_time = normalize_reference_time(reference_time)
         for turn_index, turn in enumerate(session):
             if not isinstance(turn, dict) or turn.get("role") != "user":
                 continue
@@ -522,6 +562,19 @@ def run_acceptance(
             "perceiver_version": fixture.get("perceiver_version"),
             "predicate": fixture.get("predicate"),
             "llm_used": True,
+            "reference_time_normalization": {
+                "adapter": "generic-dataset-adapter",
+                "accepted_formats": [
+                    "ISO-8601",
+                    "LongMemEval %Y/%m/%d (%a) %H:%M",
+                ],
+                "emitted_format": "canonical UTC YYYY-MM-DDTHH:MM:SSZ",
+                "utc_is_dataset_convention": True,
+                "note": (
+                    "fixture carries no timezone; ordering is the measured property, "
+                    "so UTC Z is attached to give event-history selectors a monotonic basis"
+                ),
+            },
         },
         "config": {
             "model": model,

@@ -20,6 +20,7 @@ from scripts.longmemeval.analysis.event_history_acceptance import (
     build_episodes_from_question,
     load_fixture,
     materialize_cases,
+    normalize_reference_time,
     run_acceptance,
     validate_source_identity,
 )
@@ -298,7 +299,32 @@ def test_build_episodes_uses_user_turns_only():
     assert len(episodes) == 1
     assert episodes[0].uuid == "abc-0-0"
     assert episodes[0].content == "I recently bought a zoom lens for my camera."
-    assert episodes[0].reference_time == "2023/03/11 (Sat) 22:01"
+    assert episodes[0].reference_time == "2023-03-11T22:01:00Z"
+
+
+def test_normalize_reference_time_lme_exact():
+    assert normalize_reference_time("2023/08/30 (Wed) 04:01") == "2023-08-30T04:01:00Z"
+    assert normalize_reference_time("2023/03/11 (Sat) 22:01") == "2023-03-11T22:01:00Z"
+
+
+def test_normalize_reference_time_iso():
+    assert normalize_reference_time("2026-01-10T00:00:00+00:00") == "2026-01-10T00:00:00Z"
+    assert normalize_reference_time("2026-01-10T00:00:00") == "2026-01-10T00:00:00Z"
+
+
+def test_normalize_reference_time_invalid_fails_loud():
+    with pytest.raises(Exception, match="reference_time"):
+        normalize_reference_time("")
+    with pytest.raises(Exception, match="reference_time"):
+        normalize_reference_time("not a time")
+    with pytest.raises(Exception, match="reference_time"):
+        normalize_reference_time("2023/13/40 (Xxx) 99:99")
+
+
+def test_materialized_episodes_hold_iso_time():
+    question = _source_item("lme-time")
+    episodes = build_episodes_from_question(question, "lme-time")
+    assert all("T" in episode.reference_time and episode.reference_time.endswith("Z") for episode in episodes)
 
 
 def test_run_acceptance_writes_report_and_aggregates_usage(tmp_path):

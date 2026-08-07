@@ -1,0 +1,1759 @@
+{
+  "aggregate": {
+    "failed_case_ids": [],
+    "failed_cases": 0,
+    "passed_cases": 5,
+    "safety_violations": [],
+    "total_cases": 5
+  },
+  "canonical": false,
+  "cases": [
+    {
+      "aggregate": {
+        "abstentions": 0,
+        "correct_votes": 3,
+        "domain_override": {
+          "applied": true,
+          "lane_domain": "camera lens"
+        },
+        "passed": true,
+        "required_votes": 2,
+        "routing": {
+          "applied_any_sample": true,
+          "derived_token": "lens",
+          "evaluated": true,
+          "noun_phrase": "camera lens",
+          "reason": null
+        },
+        "safety_control": false,
+        "safety_violation": false,
+        "total_samples": 3,
+        "wrong_unique_samples": []
+      },
+      "canonical": false,
+      "case_id": "41698283",
+      "generated_at": "2026-08-07T21:56:15.393404+00:00",
+      "learned_at": "2026-08-07T21:56:15.393404+00:00",
+      "llm_used": true,
+      "perceiver_version": "v1",
+      "persistence_used": false,
+      "production_authority_enabled": false,
+      "promotion_status": "not_evaluable",
+      "query_routing_measured": true,
+      "report_schema_version": 2,
+      "routing": {
+        "applied_any_sample": true,
+        "derived_token": "lens",
+        "evaluated": true,
+        "noun_phrase": "camera lens",
+        "reason": null
+      },
+      "samples": [
+        {
+          "build_receipts": [
+            {
+              "built": true,
+              "object_key": "50mm prime lens",
+              "quote": "I recently got a new 50mm prime lens",
+              "reason": null,
+              "time_basis": "episode_reference",
+              "when": "2023-03-11T22:01:00Z"
+            },
+            {
+              "built": true,
+              "object_key": "70-200mm zoom lens",
+              "quote": "I've been getting some great shots with my new 70-200mm zoom lens lately",
+              "reason": null,
+              "time_basis": "episode_reference",
+              "when": "2023-08-30T04:01:00Z"
+            },
+            {
+              "built": true,
+              "object_key": "remote flash triggers",
+              "quote": "I've been getting some great portrait shots with the remote flash triggers I got from that workshop",
+              "reason": null,
+              "time_basis": "episode_reference",
+              "when": "2023-08-30T04:01:00Z"
+            }
+          ],
+          "correct": true,
+          "drop_reasons": [],
+          "projection": {
+            "complete": true,
+            "error": null,
+            "result": {
+              "complete": true,
+              "domain": "camera lens",
+              "drawn": 2,
+              "entry_count": 2,
+              "excluded_invalid_time": 0,
+              "expected": 2,
+              "namespace": "lme-event-history",
+              "predicate": "acquired",
+              "reason": "rebuilt lane complete",
+              "retired": 0,
+              "retired_views": [],
+              "subject_uuid": "subject-41698283",
+              "view_key": "view-1",
+              "written": 1
+            },
+            "timeline_entries": [
+              {
+                "object_key": "50mm prime lens",
+                "quote": "I recently got a new 50mm prime lens",
+                "time_basis": "episode_reference",
+                "when": "2023-03-11T22:01:00Z"
+              },
+              {
+                "object_key": "70-200mm zoom lens",
+                "quote": "I've been getting some great shots with my new 70-200mm zoom lens lately",
+                "time_basis": "episode_reference",
+                "when": "2023-08-30T04:01:00Z"
+              }
+            ]
+          },
+          "proposals": [
+            {
+              "display": "I recently got a new 50mm prime lens",
+              "domain": "camera lens",
+              "domain_override_applied": true,
+              "episode_uuid": "41698283-0-2",
+              "object_key": "50mm prime lens"
+            },
+            {
+              "display": "I've been getting some great shots with my new 70-200mm zoom lens lately",
+              "domain": "camera lens",
+              "domain_override_applied": true,
+              "episode_uuid": "41698283-1-0",
+              "object_key": "70-200mm zoom lens"
+            },
+            {
+              "display": "I've been getting some great portrait shots with the remote flash triggers I got from that workshop",
+              "domain": "camera lens",
+              "domain_override_applied": true,
+              "episode_uuid": "41698283-1-2",
+              "object_key": "remote flash triggers"
+            }
+          ],
+          "routing": {
+            "applied": true,
+            "derived_token": "lens",
+            "evaluated": true,
+            "excluded_object_keys": [
+              "remote flash triggers"
+            ],
+            "noun_phrase": "camera lens",
+            "reason": null,
+            "support_count": 2
+          },
+          "sample_index": 0,
+          "selection": {
+            "anchor": {
+              "anchor_assertion_key": null,
+              "reason": null,
+              "status": "not_applicable"
+            },
+            "gate": "pass",
+            "has_unique_selection": true,
+            "reason": "latest selected",
+            "selected": {
+              "object_key": "70-200mm zoom lens",
+              "quote": "I've been getting some great shots with my new 70-200mm zoom lens lately",
+              "time_basis": "episode_reference",
+              "when": "2023-08-30T04:01:00Z"
+            },
+            "status": "unique"
+          }
+        },
+        {
+          "build_receipts": [
+            {
+              "built": true,
+              "object_key": "50mm prime lens",
+              "quote": "I recently got a new 50mm prime lens",
+              "reason": null,
+              "time_basis": "episode_reference",
+              "when": "2023-03-11T22:01:00Z"
+            },
+            {
+              "built": true,
+              "object_key": "70-200mm zoom lens",
+              "quote": "I've been getting some great shots with my new 70-200mm zoom lens lately",
+              "reason": null,
+              "time_basis": "episode_reference",
+              "when": "2023-08-30T04:01:00Z"
+            },
+            {
+              "built": true,
+              "object_key": "remote flash triggers",
+              "quote": "I've been getting some great portrait shots with the remote flash triggers I got from that workshop",
+              "reason": null,
+              "time_basis": "episode_reference",
+              "when": "2023-08-30T04:01:00Z"
+            }
+          ],
+          "correct": true,
+          "drop_reasons": [],
+          "projection": {
+            "complete": true,
+            "error": null,
+            "result": {
+              "complete": true,
+              "domain": "camera lens",
+              "drawn": 2,
+              "entry_count": 2,
+              "excluded_invalid_time": 0,
+              "expected": 2,
+              "namespace": "lme-event-history",
+              "predicate": "acquired",
+              "reason": "rebuilt lane complete",
+              "retired": 0,
+              "retired_views": [],
+              "subject_uuid": "subject-41698283",
+              "view_key": "view-1",
+              "written": 1
+            },
+            "timeline_entries": [
+              {
+                "object_key": "50mm prime lens",
+                "quote": "I recently got a new 50mm prime lens",
+                "time_basis": "episode_reference",
+                "when": "2023-03-11T22:01:00Z"
+              },
+              {
+                "object_key": "70-200mm zoom lens",
+                "quote": "I've been getting some great shots with my new 70-200mm zoom lens lately",
+                "time_basis": "episode_reference",
+                "when": "2023-08-30T04:01:00Z"
+              }
+            ]
+          },
+          "proposals": [
+            {
+              "display": "I recently got a new 50mm prime lens",
+              "domain": "camera lens",
+              "domain_override_applied": true,
+              "episode_uuid": "41698283-0-2",
+              "object_key": "50mm prime lens"
+            },
+            {
+              "display": "I've been getting some great shots with my new 70-200mm zoom lens lately",
+              "domain": "camera lens",
+              "domain_override_applied": true,
+              "episode_uuid": "41698283-1-0",
+              "object_key": "70-200mm zoom lens"
+            },
+            {
+              "display": "I've been getting some great portrait shots with the remote flash triggers I got from that workshop",
+              "domain": "camera lens",
+              "domain_override_applied": true,
+              "episode_uuid": "41698283-1-2",
+              "object_key": "remote flash triggers"
+            }
+          ],
+          "routing": {
+            "applied": true,
+            "derived_token": "lens",
+            "evaluated": true,
+            "excluded_object_keys": [
+              "remote flash triggers"
+            ],
+            "noun_phrase": "camera lens",
+            "reason": null,
+            "support_count": 2
+          },
+          "sample_index": 1,
+          "selection": {
+            "anchor": {
+              "anchor_assertion_key": null,
+              "reason": null,
+              "status": "not_applicable"
+            },
+            "gate": "pass",
+            "has_unique_selection": true,
+            "reason": "latest selected",
+            "selected": {
+              "object_key": "70-200mm zoom lens",
+              "quote": "I've been getting some great shots with my new 70-200mm zoom lens lately",
+              "time_basis": "episode_reference",
+              "when": "2023-08-30T04:01:00Z"
+            },
+            "status": "unique"
+          }
+        },
+        {
+          "build_receipts": [
+            {
+              "built": true,
+              "object_key": "50mm prime lens",
+              "quote": "I recently got a new 50mm prime lens",
+              "reason": null,
+              "time_basis": "episode_reference",
+              "when": "2023-03-11T22:01:00Z"
+            },
+            {
+              "built": true,
+              "object_key": "70-200mm zoom lens",
+              "quote": "I've been getting some great shots with my new 70-200mm zoom lens lately",
+              "reason": null,
+              "time_basis": "episode_reference",
+              "when": "2023-08-30T04:01:00Z"
+            },
+            {
+              "built": true,
+              "object_key": "remote flash triggers",
+              "quote": "I've been getting some great portrait shots with the remote flash triggers I got from that workshop",
+              "reason": null,
+              "time_basis": "episode_reference",
+              "when": "2023-08-30T04:01:00Z"
+            }
+          ],
+          "correct": true,
+          "drop_reasons": [],
+          "projection": {
+            "complete": true,
+            "error": null,
+            "result": {
+              "complete": true,
+              "domain": "camera lens",
+              "drawn": 2,
+              "entry_count": 2,
+              "excluded_invalid_time": 0,
+              "expected": 2,
+              "namespace": "lme-event-history",
+              "predicate": "acquired",
+              "reason": "rebuilt lane complete",
+              "retired": 0,
+              "retired_views": [],
+              "subject_uuid": "subject-41698283",
+              "view_key": "view-1",
+              "written": 1
+            },
+            "timeline_entries": [
+              {
+                "object_key": "50mm prime lens",
+                "quote": "I recently got a new 50mm prime lens",
+                "time_basis": "episode_reference",
+                "when": "2023-03-11T22:01:00Z"
+              },
+              {
+                "object_key": "70-200mm zoom lens",
+                "quote": "I've been getting some great shots with my new 70-200mm zoom lens lately",
+                "time_basis": "episode_reference",
+                "when": "2023-08-30T04:01:00Z"
+              }
+            ]
+          },
+          "proposals": [
+            {
+              "display": "I recently got a new 50mm prime lens",
+              "domain": "camera lens",
+              "domain_override_applied": true,
+              "episode_uuid": "41698283-0-2",
+              "object_key": "50mm prime lens"
+            },
+            {
+              "display": "I've been getting some great shots with my new 70-200mm zoom lens lately",
+              "domain": "camera lens",
+              "domain_override_applied": true,
+              "episode_uuid": "41698283-1-0",
+              "object_key": "70-200mm zoom lens"
+            },
+            {
+              "display": "I've been getting some great portrait shots with the remote flash triggers I got from that workshop",
+              "domain": "camera lens",
+              "domain_override_applied": true,
+              "episode_uuid": "41698283-1-2",
+              "object_key": "remote flash triggers"
+            }
+          ],
+          "routing": {
+            "applied": true,
+            "derived_token": "lens",
+            "evaluated": true,
+            "excluded_object_keys": [
+              "remote flash triggers"
+            ],
+            "noun_phrase": "camera lens",
+            "reason": null,
+            "support_count": 2
+          },
+          "sample_index": 2,
+          "selection": {
+            "anchor": {
+              "anchor_assertion_key": null,
+              "reason": null,
+              "status": "not_applicable"
+            },
+            "gate": "pass",
+            "has_unique_selection": true,
+            "reason": "latest selected",
+            "selected": {
+              "object_key": "70-200mm zoom lens",
+              "quote": "I've been getting some great shots with my new 70-200mm zoom lens lately",
+              "time_basis": "episode_reference",
+              "when": "2023-08-30T04:01:00Z"
+            },
+            "status": "unique"
+          }
+        }
+      ]
+    },
+    {
+      "aggregate": {
+        "abstentions": 1,
+        "correct_votes": 2,
+        "domain_override": {
+          "applied": true,
+          "lane_domain": "kitchen appliance"
+        },
+        "passed": true,
+        "required_votes": 2,
+        "routing": {
+          "applied_any_sample": false,
+          "derived_token": null,
+          "evaluated": true,
+          "noun_phrase": null,
+          "reason": "not_latest_intent"
+        },
+        "safety_control": false,
+        "safety_violation": false,
+        "total_samples": 3,
+        "wrong_unique_samples": []
+      },
+      "canonical": false,
+      "case_id": "0977f2af",
+      "generated_at": "2026-08-07T21:56:15.393404+00:00",
+      "learned_at": "2026-08-07T21:56:15.393404+00:00",
+      "llm_used": true,
+      "perceiver_version": "v1",
+      "persistence_used": false,
+      "production_authority_enabled": false,
+      "promotion_status": "not_evaluable",
+      "query_routing_measured": true,
+      "report_schema_version": 2,
+      "routing": {
+        "applied_any_sample": false,
+        "derived_token": null,
+        "evaluated": true,
+        "noun_phrase": null,
+        "reason": "not_latest_intent"
+      },
+      "samples": [
+        {
+          "build_receipts": [
+            {
+              "built": true,
+              "object_key": "instant pot",
+              "quote": "my new Instant Pot",
+              "reason": null,
+              "time_basis": "episode_reference",
+              "when": "2023-05-21T00:05:00Z"
+            },
+            {
+              "built": true,
+              "object_key": "air fryer",
+              "quote": "the Air Fryer I got yesterday",
+              "reason": null,
+              "time_basis": "episode_reference",
+              "when": "2023-05-21T22:02:00Z"
+            }
+          ],
+          "correct": true,
+          "drop_reasons": [],
+          "projection": {
+            "complete": true,
+            "error": null,
+            "result": {
+              "complete": true,
+              "domain": "kitchen appliance",
+              "drawn": 2,
+              "entry_count": 2,
+              "excluded_invalid_time": 0,
+              "expected": 2,
+              "namespace": "lme-event-history",
+              "predicate": "acquired",
+              "reason": "rebuilt lane complete",
+              "retired": 0,
+              "retired_views": [],
+              "subject_uuid": "subject-0977f2af",
+              "view_key": "view-1",
+              "written": 1
+            },
+            "timeline_entries": [
+              {
+                "object_key": "instant pot",
+                "quote": "my new Instant Pot",
+                "time_basis": "episode_reference",
+                "when": "2023-05-21T00:05:00Z"
+              },
+              {
+                "object_key": "air fryer",
+                "quote": "the Air Fryer I got yesterday",
+                "time_basis": "episode_reference",
+                "when": "2023-05-21T22:02:00Z"
+              }
+            ]
+          },
+          "proposals": [
+            {
+              "display": "my new Instant Pot",
+              "domain": "kitchen appliance",
+              "domain_override_applied": true,
+              "episode_uuid": "0977f2af-0-2",
+              "object_key": "instant pot"
+            },
+            {
+              "display": "the Air Fryer I got yesterday",
+              "domain": "kitchen appliance",
+              "domain_override_applied": true,
+              "episode_uuid": "0977f2af-1-2",
+              "object_key": "air fryer"
+            }
+          ],
+          "routing": {
+            "applied": false,
+            "derived_token": null,
+            "evaluated": true,
+            "excluded_object_keys": [],
+            "noun_phrase": null,
+            "reason": "not_latest_intent",
+            "support_count": 0
+          },
+          "sample_index": 0,
+          "selection": {
+            "anchor": {
+              "anchor_assertion_key": "7df2d52d2955f52ce4564eeef615e3479bbc782d4eb886f343e609ce05abc00f",
+              "reason": null,
+              "status": "resolved"
+            },
+            "gate": "pass",
+            "has_unique_selection": true,
+            "reason": "predecessor selected",
+            "selected": {
+              "object_key": "instant pot",
+              "quote": "my new Instant Pot",
+              "time_basis": "episode_reference",
+              "when": "2023-05-21T00:05:00Z"
+            },
+            "status": "unique"
+          }
+        },
+        {
+          "build_receipts": [
+            {
+              "built": true,
+              "object_key": "instant pot",
+              "quote": "using my new Instant Pot",
+              "reason": null,
+              "time_basis": "episode_reference",
+              "when": "2023-05-21T00:05:00Z"
+            },
+            {
+              "built": true,
+              "object_key": "air fryer i got yesterday",
+              "quote": "the Air Fryer I got yesterday",
+              "reason": null,
+              "time_basis": "episode_reference",
+              "when": "2023-05-21T22:02:00Z"
+            }
+          ],
+          "correct": false,
+          "drop_reasons": [],
+          "projection": {
+            "complete": true,
+            "error": null,
+            "result": {
+              "complete": true,
+              "domain": "kitchen appliance",
+              "drawn": 2,
+              "entry_count": 2,
+              "excluded_invalid_time": 0,
+              "expected": 2,
+              "namespace": "lme-event-history",
+              "predicate": "acquired",
+              "reason": "rebuilt lane complete",
+              "retired": 0,
+              "retired_views": [],
+              "subject_uuid": "subject-0977f2af",
+              "view_key": "view-1",
+              "written": 1
+            },
+            "timeline_entries": [
+              {
+                "object_key": "instant pot",
+                "quote": "using my new Instant Pot",
+                "time_basis": "episode_reference",
+                "when": "2023-05-21T00:05:00Z"
+              },
+              {
+                "object_key": "air fryer i got yesterday",
+                "quote": "the Air Fryer I got yesterday",
+                "time_basis": "episode_reference",
+                "when": "2023-05-21T22:02:00Z"
+              }
+            ]
+          },
+          "proposals": [
+            {
+              "display": "using my new Instant Pot",
+              "domain": "kitchen appliance",
+              "domain_override_applied": true,
+              "episode_uuid": "0977f2af-0-2",
+              "object_key": "instant pot"
+            },
+            {
+              "display": "the Air Fryer I got yesterday",
+              "domain": "kitchen appliance",
+              "domain_override_applied": true,
+              "episode_uuid": "0977f2af-1-2",
+              "object_key": "air fryer i got yesterday"
+            }
+          ],
+          "routing": {
+            "applied": false,
+            "derived_token": null,
+            "evaluated": true,
+            "excluded_object_keys": [],
+            "noun_phrase": null,
+            "reason": "not_latest_intent",
+            "support_count": 0
+          },
+          "sample_index": 1,
+          "selection": {
+            "anchor": {
+              "anchor_assertion_key": null,
+              "reason": "no_matching_anchor",
+              "status": "no_anchor"
+            },
+            "gate": "predecessor_anchor",
+            "has_unique_selection": false,
+            "reason": "no_matching_anchor",
+            "selected": null,
+            "status": "none"
+          }
+        },
+        {
+          "build_receipts": [
+            {
+              "built": true,
+              "object_key": "instant pot",
+              "quote": "using my new Instant Pot",
+              "reason": null,
+              "time_basis": "episode_reference",
+              "when": "2023-05-21T00:05:00Z"
+            },
+            {
+              "built": true,
+              "object_key": "air fryer",
+              "quote": "the Air Fryer I got yesterday",
+              "reason": null,
+              "time_basis": "episode_reference",
+              "when": "2023-05-21T22:02:00Z"
+            }
+          ],
+          "correct": true,
+          "drop_reasons": [],
+          "projection": {
+            "complete": true,
+            "error": null,
+            "result": {
+              "complete": true,
+              "domain": "kitchen appliance",
+              "drawn": 2,
+              "entry_count": 2,
+              "excluded_invalid_time": 0,
+              "expected": 2,
+              "namespace": "lme-event-history",
+              "predicate": "acquired",
+              "reason": "rebuilt lane complete",
+              "retired": 0,
+              "retired_views": [],
+              "subject_uuid": "subject-0977f2af",
+              "view_key": "view-1",
+              "written": 1
+            },
+            "timeline_entries": [
+              {
+                "object_key": "instant pot",
+                "quote": "using my new Instant Pot",
+                "time_basis": "episode_reference",
+                "when": "2023-05-21T00:05:00Z"
+              },
+              {
+                "object_key": "air fryer",
+                "quote": "the Air Fryer I got yesterday",
+                "time_basis": "episode_reference",
+                "when": "2023-05-21T22:02:00Z"
+              }
+            ]
+          },
+          "proposals": [
+            {
+              "display": "using my new Instant Pot",
+              "domain": "kitchen appliance",
+              "domain_override_applied": true,
+              "episode_uuid": "0977f2af-0-2",
+              "object_key": "instant pot"
+            },
+            {
+              "display": "the Air Fryer I got yesterday",
+              "domain": "kitchen appliance",
+              "domain_override_applied": true,
+              "episode_uuid": "0977f2af-1-2",
+              "object_key": "air fryer"
+            }
+          ],
+          "routing": {
+            "applied": false,
+            "derived_token": null,
+            "evaluated": true,
+            "excluded_object_keys": [],
+            "noun_phrase": null,
+            "reason": "not_latest_intent",
+            "support_count": 0
+          },
+          "sample_index": 2,
+          "selection": {
+            "anchor": {
+              "anchor_assertion_key": "7df2d52d2955f52ce4564eeef615e3479bbc782d4eb886f343e609ce05abc00f",
+              "reason": null,
+              "status": "resolved"
+            },
+            "gate": "pass",
+            "has_unique_selection": true,
+            "reason": "predecessor selected",
+            "selected": {
+              "object_key": "instant pot",
+              "quote": "using my new Instant Pot",
+              "time_basis": "episode_reference",
+              "when": "2023-05-21T00:05:00Z"
+            },
+            "status": "unique"
+          }
+        }
+      ]
+    },
+    {
+      "aggregate": {
+        "abstentions": 3,
+        "correct_votes": 3,
+        "domain_override": {
+          "applied": true,
+          "lane_domain": null
+        },
+        "passed": true,
+        "required_votes": 2,
+        "routing": {
+          "applied_any_sample": false,
+          "derived_token": null,
+          "evaluated": false,
+          "noun_phrase": null,
+          "reason": "no_question"
+        },
+        "safety_control": true,
+        "safety_violation": false,
+        "total_samples": 3,
+        "wrong_unique_samples": []
+      },
+      "canonical": false,
+      "case_id": "control-intent-only",
+      "generated_at": "2026-08-07T21:56:15.393404+00:00",
+      "learned_at": "2026-08-07T21:56:15.393404+00:00",
+      "llm_used": true,
+      "perceiver_version": "v1",
+      "persistence_used": false,
+      "production_authority_enabled": false,
+      "promotion_status": "not_evaluable",
+      "query_routing_measured": false,
+      "report_schema_version": 2,
+      "routing": {
+        "applied_any_sample": false,
+        "derived_token": null,
+        "evaluated": false,
+        "noun_phrase": null,
+        "reason": "no_question"
+      },
+      "samples": [
+        {
+          "build_receipts": [],
+          "correct": true,
+          "drop_reasons": [],
+          "projection": {
+            "complete": true,
+            "error": null,
+            "result": {
+              "complete": true,
+              "domain": "",
+              "drawn": null,
+              "entry_count": 0,
+              "excluded_invalid_time": 0,
+              "expected": null,
+              "namespace": "lme-event-history",
+              "predicate": "acquired",
+              "reason": "no retained entries; retired exact-lane views and wrote no empty view",
+              "retired": 0,
+              "retired_views": [],
+              "subject_uuid": "subject-control-intent-only",
+              "view_key": null,
+              "written": 0
+            },
+            "timeline_entries": []
+          },
+          "proposals": [],
+          "routing": {
+            "applied": false,
+            "derived_token": null,
+            "evaluated": false,
+            "excluded_object_keys": [],
+            "noun_phrase": null,
+            "reason": "no_question",
+            "support_count": 0
+          },
+          "sample_index": 0,
+          "selection": {
+            "anchor": {
+              "anchor_assertion_key": null,
+              "reason": null,
+              "status": "not_applicable"
+            },
+            "gate": "no_candidate",
+            "has_unique_selection": false,
+            "reason": "no eligible assertion in lane at/before as_of",
+            "selected": null,
+            "status": "none"
+          }
+        },
+        {
+          "build_receipts": [],
+          "correct": true,
+          "drop_reasons": [],
+          "projection": {
+            "complete": true,
+            "error": null,
+            "result": {
+              "complete": true,
+              "domain": "",
+              "drawn": null,
+              "entry_count": 0,
+              "excluded_invalid_time": 0,
+              "expected": null,
+              "namespace": "lme-event-history",
+              "predicate": "acquired",
+              "reason": "no retained entries; retired exact-lane views and wrote no empty view",
+              "retired": 0,
+              "retired_views": [],
+              "subject_uuid": "subject-control-intent-only",
+              "view_key": null,
+              "written": 0
+            },
+            "timeline_entries": []
+          },
+          "proposals": [],
+          "routing": {
+            "applied": false,
+            "derived_token": null,
+            "evaluated": false,
+            "excluded_object_keys": [],
+            "noun_phrase": null,
+            "reason": "no_question",
+            "support_count": 0
+          },
+          "sample_index": 1,
+          "selection": {
+            "anchor": {
+              "anchor_assertion_key": null,
+              "reason": null,
+              "status": "not_applicable"
+            },
+            "gate": "no_candidate",
+            "has_unique_selection": false,
+            "reason": "no eligible assertion in lane at/before as_of",
+            "selected": null,
+            "status": "none"
+          }
+        },
+        {
+          "build_receipts": [],
+          "correct": true,
+          "drop_reasons": [],
+          "projection": {
+            "complete": true,
+            "error": null,
+            "result": {
+              "complete": true,
+              "domain": "",
+              "drawn": null,
+              "entry_count": 0,
+              "excluded_invalid_time": 0,
+              "expected": null,
+              "namespace": "lme-event-history",
+              "predicate": "acquired",
+              "reason": "no retained entries; retired exact-lane views and wrote no empty view",
+              "retired": 0,
+              "retired_views": [],
+              "subject_uuid": "subject-control-intent-only",
+              "view_key": null,
+              "written": 0
+            },
+            "timeline_entries": []
+          },
+          "proposals": [],
+          "routing": {
+            "applied": false,
+            "derived_token": null,
+            "evaluated": false,
+            "excluded_object_keys": [],
+            "noun_phrase": null,
+            "reason": "no_question",
+            "support_count": 0
+          },
+          "sample_index": 2,
+          "selection": {
+            "anchor": {
+              "anchor_assertion_key": null,
+              "reason": null,
+              "status": "not_applicable"
+            },
+            "gate": "no_candidate",
+            "has_unique_selection": false,
+            "reason": "no eligible assertion in lane at/before as_of",
+            "selected": null,
+            "status": "none"
+          }
+        }
+      ]
+    },
+    {
+      "aggregate": {
+        "abstentions": 3,
+        "correct_votes": 3,
+        "domain_override": {
+          "applied": true,
+          "lane_domain": null
+        },
+        "passed": true,
+        "required_votes": 2,
+        "routing": {
+          "applied_any_sample": false,
+          "derived_token": null,
+          "evaluated": false,
+          "noun_phrase": null,
+          "reason": "no_question"
+        },
+        "safety_control": true,
+        "safety_violation": false,
+        "total_samples": 3,
+        "wrong_unique_samples": []
+      },
+      "canonical": false,
+      "case_id": "control-negated-acquisition",
+      "generated_at": "2026-08-07T21:56:15.393404+00:00",
+      "learned_at": "2026-08-07T21:56:15.393404+00:00",
+      "llm_used": true,
+      "perceiver_version": "v1",
+      "persistence_used": false,
+      "production_authority_enabled": false,
+      "promotion_status": "not_evaluable",
+      "query_routing_measured": false,
+      "report_schema_version": 2,
+      "routing": {
+        "applied_any_sample": false,
+        "derived_token": null,
+        "evaluated": false,
+        "noun_phrase": null,
+        "reason": "no_question"
+      },
+      "samples": [
+        {
+          "build_receipts": [],
+          "correct": true,
+          "drop_reasons": [],
+          "projection": {
+            "complete": true,
+            "error": null,
+            "result": {
+              "complete": true,
+              "domain": "",
+              "drawn": null,
+              "entry_count": 0,
+              "excluded_invalid_time": 0,
+              "expected": null,
+              "namespace": "lme-event-history",
+              "predicate": "acquired",
+              "reason": "no retained entries; retired exact-lane views and wrote no empty view",
+              "retired": 0,
+              "retired_views": [],
+              "subject_uuid": "subject-control-negated-acquisition",
+              "view_key": null,
+              "written": 0
+            },
+            "timeline_entries": []
+          },
+          "proposals": [],
+          "routing": {
+            "applied": false,
+            "derived_token": null,
+            "evaluated": false,
+            "excluded_object_keys": [],
+            "noun_phrase": null,
+            "reason": "no_question",
+            "support_count": 0
+          },
+          "sample_index": 0,
+          "selection": {
+            "anchor": {
+              "anchor_assertion_key": null,
+              "reason": null,
+              "status": "not_applicable"
+            },
+            "gate": "no_candidate",
+            "has_unique_selection": false,
+            "reason": "no eligible assertion in lane at/before as_of",
+            "selected": null,
+            "status": "none"
+          }
+        },
+        {
+          "build_receipts": [],
+          "correct": true,
+          "drop_reasons": [],
+          "projection": {
+            "complete": true,
+            "error": null,
+            "result": {
+              "complete": true,
+              "domain": "",
+              "drawn": null,
+              "entry_count": 0,
+              "excluded_invalid_time": 0,
+              "expected": null,
+              "namespace": "lme-event-history",
+              "predicate": "acquired",
+              "reason": "no retained entries; retired exact-lane views and wrote no empty view",
+              "retired": 0,
+              "retired_views": [],
+              "subject_uuid": "subject-control-negated-acquisition",
+              "view_key": null,
+              "written": 0
+            },
+            "timeline_entries": []
+          },
+          "proposals": [],
+          "routing": {
+            "applied": false,
+            "derived_token": null,
+            "evaluated": false,
+            "excluded_object_keys": [],
+            "noun_phrase": null,
+            "reason": "no_question",
+            "support_count": 0
+          },
+          "sample_index": 1,
+          "selection": {
+            "anchor": {
+              "anchor_assertion_key": null,
+              "reason": null,
+              "status": "not_applicable"
+            },
+            "gate": "no_candidate",
+            "has_unique_selection": false,
+            "reason": "no eligible assertion in lane at/before as_of",
+            "selected": null,
+            "status": "none"
+          }
+        },
+        {
+          "build_receipts": [],
+          "correct": true,
+          "drop_reasons": [],
+          "projection": {
+            "complete": true,
+            "error": null,
+            "result": {
+              "complete": true,
+              "domain": "",
+              "drawn": null,
+              "entry_count": 0,
+              "excluded_invalid_time": 0,
+              "expected": null,
+              "namespace": "lme-event-history",
+              "predicate": "acquired",
+              "reason": "no retained entries; retired exact-lane views and wrote no empty view",
+              "retired": 0,
+              "retired_views": [],
+              "subject_uuid": "subject-control-negated-acquisition",
+              "view_key": null,
+              "written": 0
+            },
+            "timeline_entries": []
+          },
+          "proposals": [],
+          "routing": {
+            "applied": false,
+            "derived_token": null,
+            "evaluated": false,
+            "excluded_object_keys": [],
+            "noun_phrase": null,
+            "reason": "no_question",
+            "support_count": 0
+          },
+          "sample_index": 2,
+          "selection": {
+            "anchor": {
+              "anchor_assertion_key": null,
+              "reason": null,
+              "status": "not_applicable"
+            },
+            "gate": "no_candidate",
+            "has_unique_selection": false,
+            "reason": "no eligible assertion in lane at/before as_of",
+            "selected": null,
+            "status": "none"
+          }
+        }
+      ]
+    },
+    {
+      "aggregate": {
+        "abstentions": 3,
+        "correct_votes": 3,
+        "domain_override": {
+          "applied": true,
+          "lane_domain": null
+        },
+        "passed": true,
+        "required_votes": 2,
+        "routing": {
+          "applied_any_sample": false,
+          "derived_token": null,
+          "evaluated": false,
+          "noun_phrase": null,
+          "reason": "no_question"
+        },
+        "safety_control": true,
+        "safety_violation": false,
+        "total_samples": 3,
+        "wrong_unique_samples": []
+      },
+      "canonical": false,
+      "case_id": "control-possession-only",
+      "generated_at": "2026-08-07T21:56:15.393404+00:00",
+      "learned_at": "2026-08-07T21:56:15.393404+00:00",
+      "llm_used": true,
+      "perceiver_version": "v1",
+      "persistence_used": false,
+      "production_authority_enabled": false,
+      "promotion_status": "not_evaluable",
+      "query_routing_measured": false,
+      "report_schema_version": 2,
+      "routing": {
+        "applied_any_sample": false,
+        "derived_token": null,
+        "evaluated": false,
+        "noun_phrase": null,
+        "reason": "no_question"
+      },
+      "samples": [
+        {
+          "build_receipts": [],
+          "correct": true,
+          "drop_reasons": [],
+          "projection": {
+            "complete": true,
+            "error": null,
+            "result": {
+              "complete": true,
+              "domain": "",
+              "drawn": null,
+              "entry_count": 0,
+              "excluded_invalid_time": 0,
+              "expected": null,
+              "namespace": "lme-event-history",
+              "predicate": "acquired",
+              "reason": "no retained entries; retired exact-lane views and wrote no empty view",
+              "retired": 0,
+              "retired_views": [],
+              "subject_uuid": "subject-control-possession-only",
+              "view_key": null,
+              "written": 0
+            },
+            "timeline_entries": []
+          },
+          "proposals": [],
+          "routing": {
+            "applied": false,
+            "derived_token": null,
+            "evaluated": false,
+            "excluded_object_keys": [],
+            "noun_phrase": null,
+            "reason": "no_question",
+            "support_count": 0
+          },
+          "sample_index": 0,
+          "selection": {
+            "anchor": {
+              "anchor_assertion_key": null,
+              "reason": null,
+              "status": "not_applicable"
+            },
+            "gate": "no_candidate",
+            "has_unique_selection": false,
+            "reason": "no eligible assertion in lane at/before as_of",
+            "selected": null,
+            "status": "none"
+          }
+        },
+        {
+          "build_receipts": [],
+          "correct": true,
+          "drop_reasons": [],
+          "projection": {
+            "complete": true,
+            "error": null,
+            "result": {
+              "complete": true,
+              "domain": "",
+              "drawn": null,
+              "entry_count": 0,
+              "excluded_invalid_time": 0,
+              "expected": null,
+              "namespace": "lme-event-history",
+              "predicate": "acquired",
+              "reason": "no retained entries; retired exact-lane views and wrote no empty view",
+              "retired": 0,
+              "retired_views": [],
+              "subject_uuid": "subject-control-possession-only",
+              "view_key": null,
+              "written": 0
+            },
+            "timeline_entries": []
+          },
+          "proposals": [],
+          "routing": {
+            "applied": false,
+            "derived_token": null,
+            "evaluated": false,
+            "excluded_object_keys": [],
+            "noun_phrase": null,
+            "reason": "no_question",
+            "support_count": 0
+          },
+          "sample_index": 1,
+          "selection": {
+            "anchor": {
+              "anchor_assertion_key": null,
+              "reason": null,
+              "status": "not_applicable"
+            },
+            "gate": "no_candidate",
+            "has_unique_selection": false,
+            "reason": "no eligible assertion in lane at/before as_of",
+            "selected": null,
+            "status": "none"
+          }
+        },
+        {
+          "build_receipts": [],
+          "correct": true,
+          "drop_reasons": [],
+          "projection": {
+            "complete": true,
+            "error": null,
+            "result": {
+              "complete": true,
+              "domain": "",
+              "drawn": null,
+              "entry_count": 0,
+              "excluded_invalid_time": 0,
+              "expected": null,
+              "namespace": "lme-event-history",
+              "predicate": "acquired",
+              "reason": "no retained entries; retired exact-lane views and wrote no empty view",
+              "retired": 0,
+              "retired_views": [],
+              "subject_uuid": "subject-control-possession-only",
+              "view_key": null,
+              "written": 0
+            },
+            "timeline_entries": []
+          },
+          "proposals": [],
+          "routing": {
+            "applied": false,
+            "derived_token": null,
+            "evaluated": false,
+            "excluded_object_keys": [],
+            "noun_phrase": null,
+            "reason": "no_question",
+            "support_count": 0
+          },
+          "sample_index": 2,
+          "selection": {
+            "anchor": {
+              "anchor_assertion_key": null,
+              "reason": null,
+              "status": "not_applicable"
+            },
+            "gate": "no_candidate",
+            "has_unique_selection": false,
+            "reason": "no eligible assertion in lane at/before as_of",
+            "selected": null,
+            "status": "none"
+          }
+        }
+      ]
+    }
+  ],
+  "config": {
+    "model": "gpt-4o-mini",
+    "required_votes": 2,
+    "samples": 3,
+    "temperature": 0.7
+  },
+  "generated_at": "2026-08-07T21:56:15.393404+00:00",
+  "llm_used": true,
+  "noncanonical": true,
+  "persistence_used": false,
+  "production_authority_enabled": false,
+  "promotion_status": "not_evaluable",
+  "provenance": {
+    "bench": {
+      "commit": "0bd3f765141e574d1f77805e326d1414aef3e6d2",
+      "dirty": true,
+      "expected_commit_checked": false,
+      "root": "C:\\Users\\thron\\IdeaProjects\\projects\\archolith\\archolith-bench",
+      "state": "dirty"
+    },
+    "fixture": {
+      "panel_id": "event-history-acceptance-v1",
+      "path": "C:\\Users\\thron\\IdeaProjects\\projects\\archolith\\archolith-bench\\fixtures\\event_history_acceptance_v1.json",
+      "raw_sha256": "b200c4c493756c2a4a64e8c138b7f9dcd20e76197136a7588f3a1db9a1651d0b",
+      "schema_version": 1
+    },
+    "llm_used": true,
+    "menhir": {
+      "commit": "370eff1e20f3f4c29d97a5761047ec51a339c7b8",
+      "dirty": false,
+      "expected_commit_checked": false,
+      "root": "C:\\Users\\thron\\IdeaProjects\\projects\\archolith\\menhir",
+      "state": "clean"
+    },
+    "perceiver_version": "v1",
+    "predicate": "acquired",
+    "reference_time_normalization": {
+      "accepted_formats": [
+        "ISO-8601",
+        "LongMemEval %Y/%m/%d (%a) %H:%M"
+      ],
+      "adapter": "generic-dataset-adapter",
+      "emitted_format": "canonical UTC YYYY-MM-DDTHH:MM:SSZ",
+      "note": "fixture carries no timezone; ordering is the measured property, so UTC Z is attached to give event-history selectors a monotonic basis",
+      "utc_is_dataset_convention": true
+    },
+    "source_fixture": {
+      "declared_source_fixture": "fixtures/longmemeval/knowledge_update_subset.json",
+      "kind": "knowledge-update",
+      "path": "C:\\Users\\thron\\IdeaProjects\\projects\\archolith\\archolith-bench\\fixtures\\longmemeval\\knowledge_update_subset.json",
+      "sha256": {
+        "canonical_crlf_sha256": "bba252a302e7b257a0f7457fe97411f7de144aafd1c6b44c98a0e88ee8570907",
+        "expected_sha256": "bba252a302e7b257a0f7457fe97411f7de144aafd1c6b44c98a0e88ee8570907",
+        "match_mode": "raw",
+        "raw_sha256": "bba252a302e7b257a0f7457fe97411f7de144aafd1c6b44c98a0e88ee8570907"
+      }
+    }
+  },
+  "query_routing_measured": true,
+  "report_schema_version": 2,
+  "routing_coverage": {
+    "measured_cases": 2,
+    "total_cases": 5
+  },
+  "usage": {
+    "cached_tokens": 2048,
+    "calls": 15,
+    "input_tokens": 10539,
+    "missing_usage_calls": 0,
+    "model": "gpt-4o-mini",
+    "output_tokens": 1897,
+    "per_call": [
+      {
+        "cached_tokens": 0,
+        "completion_tokens": 349,
+        "latency_ms": 4797.0,
+        "model": "gpt-4o-mini",
+        "prompt_tokens": 1171,
+        "raw_usage": {
+          "completion_tokens": 349,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "prompt_tokens": 1171,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 0
+          },
+          "total_tokens": 1520
+        },
+        "temperature": 0.7,
+        "total_tokens": 1520,
+        "usage_missing": false
+      },
+      {
+        "cached_tokens": 1024,
+        "completion_tokens": 349,
+        "latency_ms": 3844.0,
+        "model": "gpt-4o-mini",
+        "prompt_tokens": 1171,
+        "raw_usage": {
+          "completion_tokens": 349,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "prompt_tokens": 1171,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 1024
+          },
+          "total_tokens": 1520
+        },
+        "temperature": 0.7,
+        "total_tokens": 1520,
+        "usage_missing": false
+      },
+      {
+        "cached_tokens": 1024,
+        "completion_tokens": 349,
+        "latency_ms": 4453.0,
+        "model": "gpt-4o-mini",
+        "prompt_tokens": 1171,
+        "raw_usage": {
+          "completion_tokens": 349,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "prompt_tokens": 1171,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 1024
+          },
+          "total_tokens": 1520
+        },
+        "temperature": 0.7,
+        "total_tokens": 1520,
+        "usage_missing": false
+      },
+      {
+        "cached_tokens": 0,
+        "completion_tokens": 254,
+        "latency_ms": 2828.0,
+        "model": "gpt-4o-mini",
+        "prompt_tokens": 955,
+        "raw_usage": {
+          "completion_tokens": 254,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "prompt_tokens": 955,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 0
+          },
+          "total_tokens": 1209
+        },
+        "temperature": 0.7,
+        "total_tokens": 1209,
+        "usage_missing": false
+      },
+      {
+        "cached_tokens": 0,
+        "completion_tokens": 260,
+        "latency_ms": 2703.0,
+        "model": "gpt-4o-mini",
+        "prompt_tokens": 955,
+        "raw_usage": {
+          "completion_tokens": 260,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "prompt_tokens": 955,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 0
+          },
+          "total_tokens": 1215
+        },
+        "temperature": 0.7,
+        "total_tokens": 1215,
+        "usage_missing": false
+      },
+      {
+        "cached_tokens": 0,
+        "completion_tokens": 252,
+        "latency_ms": 5203.0,
+        "model": "gpt-4o-mini",
+        "prompt_tokens": 955,
+        "raw_usage": {
+          "completion_tokens": 252,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "prompt_tokens": 955,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 0
+          },
+          "total_tokens": 1207
+        },
+        "temperature": 0.7,
+        "total_tokens": 1207,
+        "usage_missing": false
+      },
+      {
+        "cached_tokens": 0,
+        "completion_tokens": 8,
+        "latency_ms": 516.0,
+        "model": "gpt-4o-mini",
+        "prompt_tokens": 464,
+        "raw_usage": {
+          "completion_tokens": 8,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "prompt_tokens": 464,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 0
+          },
+          "total_tokens": 472
+        },
+        "temperature": 0.7,
+        "total_tokens": 472,
+        "usage_missing": false
+      },
+      {
+        "cached_tokens": 0,
+        "completion_tokens": 8,
+        "latency_ms": 438.0,
+        "model": "gpt-4o-mini",
+        "prompt_tokens": 464,
+        "raw_usage": {
+          "completion_tokens": 8,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "prompt_tokens": 464,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 0
+          },
+          "total_tokens": 472
+        },
+        "temperature": 0.7,
+        "total_tokens": 472,
+        "usage_missing": false
+      },
+      {
+        "cached_tokens": 0,
+        "completion_tokens": 11,
+        "latency_ms": 468.0,
+        "model": "gpt-4o-mini",
+        "prompt_tokens": 464,
+        "raw_usage": {
+          "completion_tokens": 11,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "prompt_tokens": 464,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 0
+          },
+          "total_tokens": 475
+        },
+        "temperature": 0.7,
+        "total_tokens": 475,
+        "usage_missing": false
+      },
+      {
+        "cached_tokens": 0,
+        "completion_tokens": 11,
+        "latency_ms": 563.0,
+        "model": "gpt-4o-mini",
+        "prompt_tokens": 464,
+        "raw_usage": {
+          "completion_tokens": 11,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "prompt_tokens": 464,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 0
+          },
+          "total_tokens": 475
+        },
+        "temperature": 0.7,
+        "total_tokens": 475,
+        "usage_missing": false
+      },
+      {
+        "cached_tokens": 0,
+        "completion_tokens": 11,
+        "latency_ms": 578.0,
+        "model": "gpt-4o-mini",
+        "prompt_tokens": 464,
+        "raw_usage": {
+          "completion_tokens": 11,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "prompt_tokens": 464,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 0
+          },
+          "total_tokens": 475
+        },
+        "temperature": 0.7,
+        "total_tokens": 475,
+        "usage_missing": false
+      },
+      {
+        "cached_tokens": 0,
+        "completion_tokens": 11,
+        "latency_ms": 484.0,
+        "model": "gpt-4o-mini",
+        "prompt_tokens": 464,
+        "raw_usage": {
+          "completion_tokens": 11,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "prompt_tokens": 464,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 0
+          },
+          "total_tokens": 475
+        },
+        "temperature": 0.7,
+        "total_tokens": 475,
+        "usage_missing": false
+      },
+      {
+        "cached_tokens": 0,
+        "completion_tokens": 8,
+        "latency_ms": 610.0,
+        "model": "gpt-4o-mini",
+        "prompt_tokens": 459,
+        "raw_usage": {
+          "completion_tokens": 8,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "prompt_tokens": 459,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 0
+          },
+          "total_tokens": 467
+        },
+        "temperature": 0.7,
+        "total_tokens": 467,
+        "usage_missing": false
+      },
+      {
+        "cached_tokens": 0,
+        "completion_tokens": 8,
+        "latency_ms": 453.0,
+        "model": "gpt-4o-mini",
+        "prompt_tokens": 459,
+        "raw_usage": {
+          "completion_tokens": 8,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "prompt_tokens": 459,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 0
+          },
+          "total_tokens": 467
+        },
+        "temperature": 0.7,
+        "total_tokens": 467,
+        "usage_missing": false
+      },
+      {
+        "cached_tokens": 0,
+        "completion_tokens": 8,
+        "latency_ms": 437.0,
+        "model": "gpt-4o-mini",
+        "prompt_tokens": 459,
+        "raw_usage": {
+          "completion_tokens": 8,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          },
+          "prompt_tokens": 459,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 0
+          },
+          "total_tokens": 467
+        },
+        "temperature": 0.7,
+        "total_tokens": 467,
+        "usage_missing": false
+      }
+    ],
+    "temperature": 0.7,
+    "total_tokens": 12436
+  }
+}

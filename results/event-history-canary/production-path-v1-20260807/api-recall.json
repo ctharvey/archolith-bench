@@ -1,0 +1,296 @@
+[
+  {
+    "namespace": "event-canary-latest",
+    "query": "Which item did I buy most recently?",
+    "response": {
+      "query": "Which item did I buy most recently?",
+      "preset": "knowledge",
+      "results": [
+        {
+          "uuid": "681b39c3-6746-4993-b273-daa4f5d25f14",
+          "name": "history of user: acquired (2 recorded occurrence(s)) — 2025-01-10: acquired a blue notebook (blue notebook); 2025-03-15: acquired a brass compass (brass compass)",
+          "content": "Occurrence history — user: acquired (2 occurrence(s)):\n  2025-01-10: acquired a blue notebook — object blue notebook, source c7d80c10516010e151eb2fb3eaa0eb89b970385d2124a69cce1f4f67fbd11ef7, \"I bought a blue notebook.\"\n  2025-03-15: acquired a brass compass — object brass compass, source 91dbc3d05b2e87c079bf4b1e0612dbc53b4eed48544e9ba16075a9bd76f909de, \"I bought a brass compass.\"",
+          "scope": "PERSISTENT",
+          "memory_type": "SEMANTIC",
+          "final_score": 1.099995940683434,
+          "retrieval_score": 1.0,
+          "retrieval_score_kind": "graphiti_rrf",
+          "relevance_basis": "legacy_rrf_threshold_unvalidated",
+          "is_superseded_view": false,
+          "is_scalar_authority": false,
+          "temporal_facts": []
+        }
+      ],
+      "candidates_evaluated": 1,
+      "trace": {
+        "query": "Which item did I buy most recently?",
+        "preset": "knowledge",
+        "total_ms": 331,
+        "phases": {
+          "vector_search": 305,
+          "metadata_fetch": 10,
+          "adjacency": 0,
+          "scoring": 0,
+          "temporal_enrichment": 3,
+          "stale_labeling": 5,
+          "verification_enrichment": 0,
+          "post_updates": 6,
+          "total": 331
+        },
+        "candidates": [
+          {
+            "uuid": "681b39c3-6746-4993-b273-daa4f5d25f14",
+            "source": "vector",
+            "similarity": 1.0,
+            "survived_floor": true,
+            "score_parts": {
+              "semantic_similarity": 1.0,
+              "adjacency_bonus": 0.0,
+              "recency_bonus": 0.9999594068343415,
+              "prominence_bonus": 0.0,
+              "conflict_bonus": 0.0,
+              "type_boost": 0.0,
+              "preset": "knowledge",
+              "alpha": 0.2,
+              "beta": 0.1,
+              "gamma": 0.1,
+              "delta": 0.0
+            },
+            "final_score": 1.099995940683434,
+            "rank": 0,
+            "bm25_rank": 1,
+            "cosine_rank": null,
+            "contributing_sources": [
+              "vector"
+            ],
+            "content_rank": null,
+            "content_cosine": null
+          }
+        ],
+        "assertion_shadow": null,
+        "facet_shadow": null,
+        "facet_active": null,
+        "view_reachability": {
+          "uuid": "681b39c3-6746-4993-b273-daa4f5d25f14",
+          "view_kind": "timeline",
+          "rank": 1,
+          "tokens_to_view": 96
+        },
+        "rank_shadow_warning": null
+      },
+      "event_authority_layer": [
+        {
+          "predicate": "acquired",
+          "object_key": "brass compass",
+          "object_display": "a brass compass",
+          "valid_at": "2025-03-15T14:30:00Z",
+          "stated_span": "I bought a brass compass.",
+          "assertion_key": "655633103b0389aee0e6f28403bc0669f473e233bd5f9987fe5973c3388b0f9d",
+          "episode_uuid": "16a14110-8455-4092-a1a5-be9b6c1e56b8",
+          "turn_evidence_uuid": "16a14110-8455-4092-a1a5-be9b6c1e56b8",
+          "domain": "",
+          "time_basis": "episode_reference",
+          "status": "advisory",
+          "gate": "route",
+          "reason": "generic route stays advisory (no scope token)",
+          "subject_uuid": "848e4d4b-420c-55fd-bb48-d6f0df01c8b5",
+          "has_foundation": true,
+          "kind": "generic_advisory"
+        }
+      ]
+    }
+  },
+  {
+    "namespace": "event-canary-predecessor",
+    "query": "What did I buy right before the glass blender?",
+    "response": {
+      "query": "What did I buy right before the glass blender?",
+      "preset": "knowledge",
+      "results": [
+        {
+          "uuid": "6f123201-0623-4a55-b561-e67e7066e781",
+          "name": "history of user: acquired (3 recorded occurrence(s)) — 2025-01-05: acquired a steel kettle (steel kettle); 2025-02-06: acquired a red toaster (red toaster); 2025-03-07: acquired a glass blender (glass blender)",
+          "content": "Occurrence history — user: acquired (3 occurrence(s)):\n  2025-01-05: acquired a steel kettle — object steel kettle, source a2151333f4a6c0b42131683b9a882cd08efbb7f03a73c5bdd0ee692b908f6b7a, \"I bought a steel kettle.\"\n  2025-02-06: acquired a red toaster — object red toaster, source b7c7fe9c54a233f9744c72020f90a69b1d1db9cc677a19af9032b7f576701f96, \"I bought a red toaster.\"\n  2025-03-07: acquired a glass blender — object glass blender, source 7ec5ee4ba71cabdaf08b1dc610765b3372bdd3b0a17ba290a6140b8d5823c660, \"I bought a glass blender.\"",
+          "scope": "PERSISTENT",
+          "memory_type": "SEMANTIC",
+          "final_score": 1.0999959631522005,
+          "retrieval_score": 1.0,
+          "retrieval_score_kind": "graphiti_rrf",
+          "relevance_basis": "legacy_rrf_threshold_unvalidated",
+          "is_superseded_view": false,
+          "is_scalar_authority": false,
+          "temporal_facts": []
+        }
+      ],
+      "candidates_evaluated": 1,
+      "trace": {
+        "query": "What did I buy right before the glass blender?",
+        "preset": "knowledge",
+        "total_ms": 94,
+        "phases": {
+          "vector_search": 69,
+          "metadata_fetch": 4,
+          "adjacency": 0,
+          "scoring": 0,
+          "temporal_enrichment": 2,
+          "stale_labeling": 5,
+          "verification_enrichment": 0,
+          "post_updates": 11,
+          "total": 94
+        },
+        "candidates": [
+          {
+            "uuid": "6f123201-0623-4a55-b561-e67e7066e781",
+            "source": "vector",
+            "similarity": 1.0,
+            "survived_floor": true,
+            "score_parts": {
+              "semantic_similarity": 1.0,
+              "adjacency_bonus": 0.0,
+              "recency_bonus": 0.9999596315220048,
+              "prominence_bonus": 0.0,
+              "conflict_bonus": 0.0,
+              "type_boost": 0.0,
+              "preset": "knowledge",
+              "alpha": 0.2,
+              "beta": 0.1,
+              "gamma": 0.1,
+              "delta": 0.0
+            },
+            "final_score": 1.0999959631522005,
+            "rank": 0,
+            "bm25_rank": 1,
+            "cosine_rank": null,
+            "contributing_sources": [
+              "vector"
+            ],
+            "content_rank": null,
+            "content_cosine": null
+          }
+        ],
+        "assertion_shadow": null,
+        "facet_shadow": null,
+        "facet_active": null,
+        "view_reachability": {
+          "uuid": "6f123201-0623-4a55-b561-e67e7066e781",
+          "view_kind": "timeline",
+          "rank": 1,
+          "tokens_to_view": 135
+        },
+        "rank_shadow_warning": null
+      },
+      "event_authority_layer": [
+        {
+          "predicate": "acquired",
+          "object_key": "red toaster",
+          "object_display": "a red toaster",
+          "valid_at": "2025-02-06T12:00:00Z",
+          "stated_span": "I bought a red toaster.",
+          "assertion_key": "49c204c4b1e8a54b80efac281837be77b3e75c959a252b6a4030ad48634d0b94",
+          "episode_uuid": "be85760a-aa00-416e-a6b0-92c680c268dc",
+          "turn_evidence_uuid": "be85760a-aa00-416e-a6b0-92c680c268dc",
+          "domain": "",
+          "time_basis": "episode_reference",
+          "status": "leads",
+          "gate": "pass",
+          "reason": "unique non-generic selection with verified foundation",
+          "subject_uuid": "26b0150f-fc91-525f-8001-6bcb9c914c1e",
+          "has_foundation": true,
+          "kind": "predecessor"
+        }
+      ]
+    }
+  },
+  {
+    "namespace": "event-canary-ambiguity",
+    "query": "Which item did I buy most recently?",
+    "response": {
+      "query": "Which item did I buy most recently?",
+      "preset": "knowledge",
+      "results": [
+        {
+          "uuid": "8cae5425-348a-4b7a-b6f2-d5e9968013ab",
+          "name": "history of user: acquired (2 recorded occurrence(s)) — 2025-05-01: acquired a silver tray (silver tray); 2025-05-01: acquired a cedar box (cedar box)",
+          "content": "Occurrence history — user: acquired (2 occurrence(s)):\n  2025-05-01: acquired a silver tray — object silver tray, source 395e64691aa30204233f35a58f39ad495cab52d240381968d7c2aa8bb0e7d2af, \"I bought a silver tray.\"\n  2025-05-01: acquired a cedar box — object cedar box, source 2740d1ce91e530ff63fafdc76814899d45c12ba40845ceaaffeef03004d19eaa, \"I bought a cedar box.\"",
+          "scope": "PERSISTENT",
+          "memory_type": "SEMANTIC",
+          "final_score": 1.099995968307548,
+          "retrieval_score": 1.0,
+          "retrieval_score_kind": "graphiti_rrf",
+          "relevance_basis": "legacy_rrf_threshold_unvalidated",
+          "is_superseded_view": false,
+          "is_scalar_authority": false,
+          "temporal_facts": []
+        }
+      ],
+      "candidates_evaluated": 1,
+      "trace": {
+        "query": "Which item did I buy most recently?",
+        "preset": "knowledge",
+        "total_ms": 93,
+        "phases": {
+          "vector_search": 73,
+          "metadata_fetch": 4,
+          "adjacency": 0,
+          "scoring": 0,
+          "temporal_enrichment": 2,
+          "stale_labeling": 5,
+          "verification_enrichment": 0,
+          "post_updates": 5,
+          "total": 93
+        },
+        "candidates": [
+          {
+            "uuid": "8cae5425-348a-4b7a-b6f2-d5e9968013ab",
+            "source": "vector",
+            "similarity": 1.0,
+            "survived_floor": true,
+            "score_parts": {
+              "semantic_similarity": 1.0,
+              "adjacency_bonus": 0.0,
+              "recency_bonus": 0.9999596830754806,
+              "prominence_bonus": 0.0,
+              "conflict_bonus": 0.0,
+              "type_boost": 0.0,
+              "preset": "knowledge",
+              "alpha": 0.2,
+              "beta": 0.1,
+              "gamma": 0.1,
+              "delta": 0.0
+            },
+            "final_score": 1.099995968307548,
+            "rank": 0,
+            "bm25_rank": 1,
+            "cosine_rank": null,
+            "contributing_sources": [
+              "vector"
+            ],
+            "content_rank": null,
+            "content_cosine": null
+          }
+        ],
+        "assertion_shadow": null,
+        "facet_shadow": null,
+        "facet_active": null,
+        "view_reachability": {
+          "uuid": "8cae5425-348a-4b7a-b6f2-d5e9968013ab",
+          "view_kind": "timeline",
+          "rank": 1,
+          "tokens_to_view": 91
+        },
+        "rank_shadow_warning": null
+      },
+      "event_authority_layer": [
+        {
+          "predicate": "acquired",
+          "status": "advisory",
+          "gate": "ambiguity",
+          "reason": "an in-scope domain lane is ambiguous",
+          "subject_uuid": "e752f7f0-3c4c-5103-91f8-0d6c403d6b27",
+          "has_foundation": false,
+          "kind": "generic_advisory"
+        }
+      ]
+    }
+  }
+]

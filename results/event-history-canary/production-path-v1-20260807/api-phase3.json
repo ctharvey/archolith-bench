@@ -1,0 +1,84 @@
+{
+  "run_id": "production-path-v1-20260807",
+  "ingested": 9,
+  "phase3": [
+    {
+      "namespace": "event-canary-latest",
+      "response": {
+        "namespace": "event-canary-latest",
+        "phase3_selected": true,
+        "dirty_after": true,
+        "namespaces_dirty": 0,
+        "namespaces_processed": 0,
+        "views_written": 0,
+        "abstained": 0,
+        "corrections_applied": 0,
+        "llm_calls": 1,
+        "scalar_enabled": false,
+        "scalar_namespaces_processed": 0,
+        "scalar_states_written": 0,
+        "scalar_advisory": 0,
+        "scalar_repair_pending": 0,
+        "event_history_enabled": true,
+        "event_namespaces_processed": 1,
+        "event_namespaces_failed": 0,
+        "event_assertions_recorded": 2,
+        "event_assertions_created": 2,
+        "event_views_rebuilt": 1,
+        "event_llm_calls": 1
+      }
+    },
+    {
+      "namespace": "event-canary-predecessor",
+      "response": {
+        "namespace": "event-canary-predecessor",
+        "phase3_selected": true,
+        "dirty_after": true,
+        "namespaces_dirty": 0,
+        "namespaces_processed": 0,
+        "views_written": 0,
+        "abstained": 0,
+        "corrections_applied": 0,
+        "llm_calls": 1,
+        "scalar_enabled": false,
+        "scalar_namespaces_processed": 0,
+        "scalar_states_written": 0,
+        "scalar_advisory": 0,
+        "scalar_repair_pending": 0,
+        "event_history_enabled": true,
+        "event_namespaces_processed": 1,
+        "event_namespaces_failed": 0,
+        "event_assertions_recorded": 3,
+        "event_assertions_created": 3,
+        "event_views_rebuilt": 1,
+        "event_llm_calls": 1
+      }
+    },
+    {
+      "namespace": "event-canary-ambiguity",
+      "response": {
+        "namespace": "event-canary-ambiguity",
+        "phase3_selected": true,
+        "dirty_after": true,
+        "namespaces_dirty": 0,
+        "namespaces_processed": 0,
+        "views_written": 0,
+        "abstained": 0,
+        "corrections_applied": 0,
+        "llm_calls": 1,
+        "scalar_enabled": false,
+        "scalar_namespaces_processed": 0,
+        "scalar_states_written": 0,
+        "scalar_advisory": 0,
+        "scalar_repair_pending": 0,
+        "event_history_enabled": true,
+        "event_namespaces_processed": 1,
+        "event_namespaces_failed": 0,
+        "event_assertions_recorded": 2,
+        "event_assertions_created": 2,
+        "event_views_rebuilt": 1,
+        "event_llm_calls": 1
+      }
+    }
+  ]
+}

@@ -1,5 +1,68 @@
 # archolith-bench Changelog
 
+## 2026-08-06 - Record dependency scalar bridge Phase-A r2 evidence
+
+Recorded authoritative offline 48-case Phase-A reports at
+`results/dependency-scalar-bridge/phase-a-v1-20260806-r2/report.json` and `report.md` for fixture
+SHA `bde118508cf55c94bbd10fc88fbc625a0f465859a545f3ca79deb391a25ba57b`. JSON SHA256:
+`53aff17ecd1d758f2d808050e9ac8e2512f269a3254ae2fee99f25d2696fc412`; Markdown SHA256:
+`3284c6d81d47e22907c7fcd6fe79993ca65fa386a7206366d9d079ac78999287`.
+
+R2 measured 5/6 supported identities and provenance exact, 0/14 unsupported compositions, 0/28
+false-current outcomes, 45/45 evidence provenance, and 45/45 Menhir bridge provenance. Cue exact
+was 179/192; edges were 135 true-positive / 180 predicted / 144 gold (precision .75, recall
+.9375, F1 .8333). Proposal parity was 45/48 because three history candidates failed closed at the
+canonical adapter's `temporal_past_only`; composer replay was stable 45/45. The canonical baseline
+composed 2/48 (43 abstentions, 3 adapter drops). Promotion remains `not_evaluable`; recognition,
+role/operation classification, performance, cache, and full adapter/parser/emission replay remain
+unmeasured.
+
+R1 was the historical first execution with incomplete git provenance. R2 changed instrumentation
+only; aggregates and per-case outcomes are identical to R1. The one supported miss is bare
+`retain`; it is not being added post-hoc because that would tune to holdout and admit non-possession
+senses. Any such support requires a separately authored independent policy panel.
+
+## 2026-08-06 - Add cumulative-completion scalar holdout panel
+
+Added the source-authored non-LME `fixtures/scalar_identity_cumulative_v1.json` contract: 24 cases
+in 12 clean/noisy pairs, split into six train and six holdout pairs with disjoint nouns, values, and
+templates. Positive labels cover only present-perfect completion with strict `so far`/`to date`
+surfaces; Menhir's typed operation remains `absolute`. Adversarial pairs cover simple past,
+negation, modality/future, history tails, coordination/second numerics, and subset/empty targets.
+The isolated comparison runner reports baseline clean **12/12** (6 composed), baseline noisy
+**6/12** (0 composed), isolated clean/noisy **12/12** (6 composed each), a **+6** noisy composition
+gain, and **0/0** false-current-state errors. Reports remain source-free and `not_evaluable`; this
+does not enable production promotion or routing.
+
+## 2026-08-06 - Compare canonical and mapped-isolated scalar adapters
+
+Added a source-free offline comparison that runs the unchanged noisy fixture through both Menhir's
+canonical research adapter and the opt-in mapped-isolated adapter. The isolated path improved noisy
+correctness from 12/15 to 15/15 and noisy compositions from 2 to 5 while clean correctness remained
+15/15 and false-current-state errors remained 0/0. On the frozen 78-task replay, the baseline
+composed 0/36 candidates while the isolated path composed 1/36, including one answer-bearing
+composition; this remains bounded structural-grammar evidence. Promotion remains `not_evaluable`.
+
+## 2026-08-06 - Add paired noisy scalar identity panel
+
+Added a strict 30-case non-LME panel containing 15 clean/noisy pairs across punctuation, casing,
+fragments, contractions, misspellings, repeated words, speech-like forms, conjunctions, modality,
+history, events, subsets, and corrections. Reports separate clean/noisy slices, paired invariance,
+coverage, and false-current-state errors. The unchanged fixture exposed one adjacent-transposition
+false-current target; Menhir's generic fail-closed veto moved the final result to clean 15/15, noisy
+15/15, and zero false-current-state errors. Promotion remains `not_evaluable`.
+
+## 2026-08-06 - Add research scalar identity acceptance panel
+
+Added a strict, non-LME 15-case panel and offline runner for the pure Menhir research-candidate
+adapter. The panel scores parser admission separately from structural composition, relation, target,
+and abstention reason across totals/subsets, delta/event amounts, current/history/correction,
+contractions/modality, weak targets, and ambiguous identity. Its first 13/15 run exposed two generic
+false compositions; after Menhir's `structural-v3` fail-closed repair, the unchanged panel is 15/15.
+The frozen 78-task offline replay then admitted 33 of 36 research candidates but structurally
+composed zero, showing that safe clause/grammar coverage remains the blocker. Promotion remains
+`not_evaluable`.
+
 ## 2026-08-06 - Record structural-v2 possessive measurement follow-up
 
 Updated the shadow integration's composer-version expectation to `structural-v2` and replayed the

@@ -2,6 +2,51 @@
 
 No database. All state is in-memory dataclasses, JSON files on disk, and checkpoint files.
 
+## Offline scalar identity acceptance report
+
+`archolith_bench.scalar_identity_acceptance_panel` evaluates source-bound raw research candidates
+through Menhir's pure `research_scalar_adapter` and structural composer. The versioned non-LME
+fixture is `fixtures/scalar_identity_acceptance_v1.json`. Reports separate parse status/reason from
+composition status/reason/relation/target, contain no source quote, and always remain
+`promotion_status=not_evaluable`.
+
+## Offline noisy scalar identity report
+
+`archolith_bench.scalar_identity_noisy_panel` evaluates the versioned non-LME
+`fixtures/scalar_identity_noisy_v1.json` as clean/noisy pairs through the same pure Menhir research
+adapter and structural composer. Each case retains an exact source locator and hashes; reports omit
+source quotes.
+
+The aggregate separates clean/noisy correctness, parser admissions, compositions, paired invariance,
+perturbation coverage, and false-current-state errors. A noisy case may correctly abstain rather than
+match the clean case. `paired_invariant` is reserved for transformations that should preserve the
+same composed identity. Promotion is always `not_evaluable`.
+
+## Offline mapped-isolation comparison report
+
+`archolith_bench.scalar_identity_isolated_comparison` runs source-authored fixtures through the
+canonical `research-adapter-v1` and opt-in `research-adapter-isolated-v2`. It records each path's
+quote-free actual identity, correctness, mismatch dimensions, and false-current-state flag, plus
+clean/noisy composition gains and the exact case IDs whose identities differ.
+
+The isolated Menhir module and version are required; absence is an error, not a baseline fallback.
+The report does not contain source text and always remains `promotion_status=not_evaluable`.
+
+## Offline cumulative-completion scalar report
+
+`fixtures/scalar_identity_cumulative_v1.json` is a source-authored, non-LME extension with 24 cases
+in 12 clean/noisy pairs: six train pairs and six holdout pairs with disjoint nouns, values, and
+templates. Positive labels are intentionally narrow: present-perfect `have completed|finished|closed`
+with `so far` or `to date`; their typed operation is `absolute`, not a new cumulative operation.
+Adversarial pairs cover simple past, negation, modality/future, history tails, coordination/second
+numerics, and subset/empty targets. The isolated comparison command is
+`python scripts/measure_scalar_identity_isolated_comparison.py fixtures/scalar_identity_cumulative_v1.json`
+with the normal Menhir root and report-output flags.
+
+Validated aggregates are baseline clean 12/12 (6 composed), baseline noisy 6/12 (0 composed), and
+isolated clean/noisy 12/12 (6 composed each), for a +6 noisy composition gain and 0/0
+false-current-state errors. Reports remain source-free and `promotion_status=not_evaluable`.
+
 ## Offline deterministic scalar shadow report
 
 `archolith_bench.deterministic_scalar_shadow` measures Menhir's frozen typed-scalar proposals over

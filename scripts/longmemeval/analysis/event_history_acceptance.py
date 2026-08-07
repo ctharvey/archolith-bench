@@ -299,12 +299,15 @@ def materialize_cases(
         if not isinstance(expected_status, str) or expected_status not in {"unique", "none", "ambiguous"}:
             raise _error(context, "expected_status must be unique, none, or ambiguous")
         episodes: tuple[ExperimentEpisode, ...]
+        question_text: str | None = None
         if qid:
             if not isinstance(qid, str) or not qid:
                 raise _error(context, "question_id must be a non-empty string")
             question = _find_question(source_data, qid)
             _validate_source_answer(question, raw, qid)
             episodes = build_episodes_from_question(question, qid)
+            if isinstance(question.get("question"), str) and question["question"].strip():
+                question_text = question["question"].strip()
         else:
             episodes = _materialize_episodes(raw.get("episodes") or [], context)
         expected_object_key = raw.get("expected_object_key")
@@ -327,6 +330,7 @@ def materialize_cases(
                     anchor_object_key=anchor_object_key,
                     lane_domain=raw.get("domain"),
                     safety_control=bool(raw.get("safety_control", False)),
+                    question=question_text,
                 ),
             )
         )
@@ -512,6 +516,7 @@ def run_acceptance(
     case_reports: list[dict[str, Any]] = []
     failures: list[str] = []
     safety_violations: list[str] = []
+    routing_measured_cases = 0
     for case_id, case in cases:
         report = analyze_case(
             case,
@@ -524,6 +529,8 @@ def run_acceptance(
         )
         aggregate = report["aggregate"]
         case_reports.append({"case_id": case_id, **report})
+        if report["query_routing_measured"]:
+            routing_measured_cases += 1
         if not aggregate["passed"]:
             failures.append(case_id)
         if aggregate["safety_violation"]:
@@ -535,13 +542,17 @@ def run_acceptance(
         menhir_metadata = {"state": "unavailable"}
 
     report = {
-        "report_schema_version": 1,
+        "report_schema_version": 2,
         "promotion_status": "not_evaluable",
         "canonical": False,
         "noncanonical": True,
         "production_authority_enabled": False,
         "persistence_used": False,
-        "query_routing_measured": False,
+        "query_routing_measured": routing_measured_cases > 0,
+        "routing_coverage": {
+            "measured_cases": routing_measured_cases,
+            "total_cases": len(cases),
+        },
         "llm_used": True,
         "generated_at": generated,
         "provenance": {

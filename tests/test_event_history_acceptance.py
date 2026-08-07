@@ -19,6 +19,7 @@ from archolith_bench.event_history_acceptance import (
     ExperimentEpisode,
     ProbeEventHistoryApi,
     analyze_case,
+    derive_latest_scope,
     load_menhir_event_history_api,
 )
 
@@ -437,3 +438,173 @@ def test_projection_incomplete_fails_closed():
     assert sample["selection"]["reason"] == "rebuild_error:RuntimeError"
     assert sample["correct"] is False
     assert report["aggregate"]["passed"] is False
+
+
+# --- deterministic exact-object-scope routing ------------------------------
+
+def _scope_case(case_id, episodes, question, intent="latest", expected_status="unique",
+                expected_object_key=None, anchor_object_key=None) -> ExperimentCase:
+    return ExperimentCase(
+        case_id=case_id,
+        namespace="generic",
+        subject_uuid="subject-1",
+        episodes=tuple(episodes),
+        intent=intent,
+        expected_status=expected_status,
+        expected_object_key=expected_object_key,
+        anchor_object_key=anchor_object_key,
+        question=question,
+    )
+
+
+def test_router_type_kind_and_which_forms():
+    assert derive_latest_scope("What type of notebook did I acquire most recently?", "latest")["derived_token"] == "notebook"
+    assert derive_latest_scope("What kind of hiking shoe did I purchase most recently?", "latest")["derived_token"] == "shoe"
+    assert derive_latest_scope("Which notebook did I buy most recently?", "latest")["derived_token"] == "notebook"
+    assert derive_latest_scope("Which watch did I get most recently?", "latest")["derived_token"] == "watch"
+
+
+def test_router_returns_terminal_head_noun_for_multiword_query():
+    result = derive_latest_scope("Which hiking shoe did I buy most recently?", "latest")
+    assert result["derived_token"] == "shoe"
+    assert result["noun_phrase"] == "hiking shoe"
+    result = derive_latest_scope("What type of trail running shoe did I buy most recently?", "latest")
+    assert result["derived_token"] == "shoe"
+    assert result["noun_phrase"] == "trail running shoe"
+
+
+def test_router_abstains():
+    assert derive_latest_scope(None, "latest")["reason"] == "no_question"
+    assert derive_latest_scope(None, "latest")["evaluated"] is False
+    assert derive_latest_scope("Which notebook did I buy most recently?", "predecessor")["reason"] == "not_latest_intent"
+    assert derive_latest_scope("Which notebook did I buy?", "latest")["reason"] == "missing_recency_cue"
+    assert derive_latest_scope("Which item did I buy most recently?", "latest")["reason"] == "generic_noun"
+    assert derive_latest_scope("What type of thing did I buy most recently?", "latest")["reason"] == "generic_noun"
+    assert derive_latest_scope("Which of the notebooks did I buy most recently?", "latest")["reason"] == "no_noun_phrase"
+    assert derive_latest_scope("Which one did I buy most recently?", "latest")["reason"] == "no_noun_phrase"
+    assert derive_latest_scope("Which backpack did I buy most recently?", "latest")["derived_token"] == "backpack"
+
+
+def test_latest_scope_applies_when_two_distinct_keys(api):
+    case = _scope_case(
+        "scope-applied",
+        episodes=[
+            _episode("ep0", "acquired a leather notebook", "2026-07-20T00:00:00+00:00", "e0"),
+            _episode("ep1", "acquired a spiral notebook", "2026-07-25T00:00:00+00:00", "e1"),
+            _episode("ep2", "acquired a backpack", "2026-08-01T00:00:00+00:00", "e2"),
+        ],
+        question="Which notebook did I buy most recently?",
+        expected_object_key="spiral notebook",
+    )
+    envelopes = [
+        _envelope(0, [_event("user", "leather notebook", "acquired a leather notebook")]),
+        _envelope(1, [_event("user", "spiral notebook", "acquired a spiral notebook")]),
+        _envelope(2, [_event("user", "backpack", "acquired a backpack")]),
+    ]
+    report = analyze_case(case, _menhir_root(), _llm_for(envelopes), api=api)
+    assert report["query_routing_measured"] is True
+    assert report["routing"]["derived_token"] == "notebook"
+    assert report["routing"]["applied_any_sample"] is True
+    sample = report["samples"][0]
+    assert sample["routing"]["applied"] is True
+    assert sample["routing"]["support_count"] == 2
+    assert sample["routing"]["excluded_object_keys"] == ["backpack"]
+    assert sample["selection"]["selected"]["object_key"] == "spiral notebook"
+    assert report["aggregate"]["correct_votes"] == 3
+    assert report["aggregate"]["passed"] is True
+
+
+def test_latest_scope_one_match_abstains(api):
+    case = _scope_case(
+        "scope-one-match",
+        episodes=[
+            _episode("ep0", "acquired a leather notebook", "2026-07-20T00:00:00+00:00", "e0"),
+            _episode("ep1", "acquired a backpack", "2026-08-01T00:00:00+00:00", "e1"),
+        ],
+        question="Which notebook did I buy most recently?",
+        expected_object_key="backpack",
+    )
+    envelopes = [
+        _envelope(0, [_event("user", "leather notebook", "acquired a leather notebook")]),
+        _envelope(1, [_event("user", "backpack", "acquired a backpack")]),
+    ]
+    report = analyze_case(case, _menhir_root(), _llm_for(envelopes), api=api)
+    sample = report["samples"][0]
+    assert sample["routing"]["applied"] is False
+    assert sample["routing"]["support_count"] == 1
+    assert sample["selection"]["selected"]["object_key"] == "backpack"
+    assert report["routing"]["applied_any_sample"] is False
+
+
+def test_latest_scope_generic_noun_abstains(api):
+    case = _scope_case(
+        "scope-generic",
+        episodes=[
+            _episode("ep0", "acquired a notebook", "2026-07-20T00:00:00+00:00", "e0"),
+        ],
+        question="Which item did I buy most recently?",
+        expected_object_key="notebook",
+    )
+    envelopes = [_envelope(0, [_event("user", "notebook", "acquired a notebook")])]
+    report = analyze_case(case, _menhir_root(), _llm_for(envelopes), api=api)
+    assert report["routing"]["derived_token"] is None
+    assert report["routing"]["reason"] == "generic_noun"
+    assert report["samples"][0]["routing"]["applied"] is False
+
+
+def test_latest_scope_predecessor_unchanged(api):
+    case = _scope_case(
+        "scope-predecessor",
+        episodes=[
+            _episode("ep0", "acquired a leather notebook", "2026-07-20T00:00:00+00:00", "e0"),
+            _episode("ep1", "acquired a spiral notebook", "2026-08-01T00:00:00+00:00", "e1"),
+        ],
+        question="Which notebook did I buy most recently?",
+        intent="predecessor",
+        expected_object_key="leather notebook",
+        anchor_object_key="spiral notebook",
+    )
+    envelopes = [
+        _envelope(0, [_event("user", "leather notebook", "acquired a leather notebook")]),
+        _envelope(1, [_event("user", "spiral notebook", "acquired a spiral notebook")]),
+    ]
+    report = analyze_case(case, _menhir_root(), _llm_for(envelopes), api=api)
+    sample = report["samples"][0]
+    assert report["routing"]["reason"] == "not_latest_intent"
+    assert sample["routing"]["applied"] is False
+    assert sample["selection"]["anchor"]["status"] == "resolved"
+    assert sample["selection"]["selected"]["object_key"] == "leather notebook"
+
+
+def test_latest_scope_whole_token_matching(api):
+    case = _scope_case(
+        "scope-whole-token",
+        episodes=[
+            _episode("ep0", "acquired a spiral notebook", "2026-07-20T00:00:00+00:00", "e0"),
+            _episode("ep1", "acquired notebooks", "2026-08-01T00:00:00+00:00", "e1"),
+        ],
+        question="Which notebook did I buy most recently?",
+        expected_object_key="notebooks",
+    )
+    envelopes = [
+        _envelope(0, [_event("user", "spiral notebook", "acquired a spiral notebook")]),
+        _envelope(1, [_event("user", "notebooks", "acquired notebooks")]),
+    ]
+    report = analyze_case(case, _menhir_root(), _llm_for(envelopes), api=api)
+    sample = report["samples"][0]
+    assert sample["routing"]["applied"] is False
+    # "notebooks" is not a whole-token match for "notebook", so support stays at 1
+    assert sample["routing"]["support_count"] == 1
+    assert sample["selection"]["selected"]["object_key"] == "notebooks"
+
+
+def test_query_routing_measured_false_without_question(api):
+    case = _latest_two_episode_case("routing-no-question")
+    envelopes = [
+        _envelope(0, [_event("user", "pencil", "acquired a pencil last week")]),
+        _envelope(1, [_event("user", "notebook", "acquired a notebook yesterday")]),
+    ]
+    report = analyze_case(case, _menhir_root(), _llm_for(envelopes), api=api)
+    assert report["query_routing_measured"] is False
+    assert report["routing"]["evaluated"] is False
+    assert report["aggregate"]["routing"]["evaluated"] is False

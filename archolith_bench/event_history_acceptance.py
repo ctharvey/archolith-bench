@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import re
 import sys
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
@@ -29,7 +30,7 @@ from archolith_bench.deterministic_scalar_shadow import (
     resolve_menhir_root,
 )
 
-REPORT_SCHEMA_VERSION = 1
+REPORT_SCHEMA_VERSION = 2
 PROMOTION_STATUS = "not_evaluable"
 PERCEIVER_VERSION = "v1"
 EVENT_HISTORY_PREDICATE = "acquired"
@@ -63,6 +64,7 @@ class ExperimentCase:
     anchor_object_key: str | None = None
     lane_domain: str | None = None
     safety_control: bool = False
+    question: str | None = None
 
 
 @dataclass(frozen=True)
@@ -84,6 +86,165 @@ def _normalize_object_key(value: Any) -> Any:
     if isinstance(value, str):
         return value.strip().lower()
     return value
+
+
+_GENERIC_NOUNS = frozenset({
+    "thing", "things", "item", "items", "object", "objects",
+    "gadget", "gadgets", "equipment", "device", "devices",
+    "stuff", "tool", "tools", "product", "products",
+    "accessory", "accessories", "supply", "supplies", "gear",
+})
+
+_RECENCY_CUES = ("most recently", "most recent", "latest")
+
+_PATTERN_TYPE_KIND = re.compile(r"^\s*what\s+(?:type|kind)\s+of\s+(.+?)\s+did\b", re.IGNORECASE)
+_PATTERN_WHICH = re.compile(r"^\s*which\s+(.+?)\s+did\b", re.IGNORECASE)
+_NOUN_PATTERNS = (_PATTERN_TYPE_KIND, _PATTERN_WHICH)
+
+
+def derive_latest_scope(question: str | None, intent: str) -> dict[str, Any]:
+    """Deterministic, fail-closed router for LATEST queries.
+
+    Derives one normalized exact lexical object noun from conservative question forms
+    (``What type/kind of <noun> did I ... most recently?`` / ``Which <noun> did I ...?``).
+    Abstains on predecessor intent, missing recency cue, generic terminal nouns,
+    malformed/ambiguous forms, and missing questions.  ``applied`` is only set by
+    ``_apply_scope`` once a per-sample support threshold is proven; this function never
+    narrows anything itself.
+    """
+    if question is None or not question.strip():
+        return {
+            "evaluated": False,
+            "applied": False,
+            "derived_token": None,
+            "noun_phrase": None,
+            "reason": "no_question",
+            "support_count": 0,
+            "excluded_object_keys": [],
+        }
+    if intent != "latest":
+        return {
+            "evaluated": True,
+            "applied": False,
+            "derived_token": None,
+            "noun_phrase": None,
+            "reason": "not_latest_intent",
+            "support_count": 0,
+            "excluded_object_keys": [],
+        }
+    normalized = " ".join(question.strip().lower().split())
+    if not any(cue in normalized for cue in _RECENCY_CUES):
+        return {
+            "evaluated": True,
+            "applied": False,
+            "derived_token": None,
+            "noun_phrase": None,
+            "reason": "missing_recency_cue",
+            "support_count": 0,
+            "excluded_object_keys": [],
+        }
+    noun_phrase = _extract_noun_phrase(normalized)
+    if noun_phrase is None:
+        return {
+            "evaluated": True,
+            "applied": False,
+            "derived_token": None,
+            "noun_phrase": None,
+            "reason": "no_noun_phrase",
+            "support_count": 0,
+            "excluded_object_keys": [],
+        }
+    head = noun_phrase.split()[-1]
+    if head in _GENERIC_NOUNS:
+        return {
+            "evaluated": True,
+            "applied": False,
+            "derived_token": None,
+            "noun_phrase": noun_phrase,
+            "reason": "generic_noun",
+            "support_count": 0,
+            "excluded_object_keys": [],
+        }
+    return {
+        "evaluated": True,
+        "applied": False,
+        "derived_token": head,
+        "noun_phrase": noun_phrase,
+        "reason": None,
+        "support_count": 0,
+        "excluded_object_keys": [],
+    }
+
+
+def _extract_noun_phrase(normalized: str) -> str | None:
+    for pattern in _NOUN_PATTERNS:
+        match = pattern.match(normalized)
+        if not match:
+            continue
+        noun_phrase = match.group(1).strip()
+        if not noun_phrase:
+            return None
+        words = noun_phrase.split()
+        if words[0] in {"of", "one", "a", "an", "the"}:
+            return None
+        if noun_phrase.startswith("one of"):
+            return None
+        return noun_phrase
+    return None
+
+
+def _object_key_contains_token(object_key: Any, token: str) -> bool:
+    key = _normalize_object_key(object_key)
+    if not isinstance(key, str):
+        return False
+    token_words = token.split()
+    key_words = key.split()
+    width = len(token_words)
+    return any(
+        key_words[i:i + width] == token_words
+        for i in range(len(key_words) - width + 1)
+    )
+
+
+def _apply_scope(
+    assertions: list[Any], router: dict[str, Any]
+) -> tuple[list[Any], dict[str, Any]]:
+    """Narrow assertions to a proven historical category, failing closed otherwise.
+
+    The derived noun is applied only when at least two DISTINCT assertion object keys in the
+    sample contain it as a whole token, proving a historical category rather than a single lucky
+    answer.  Otherwise the full assertion set is preserved unchanged.
+    """
+    routing = dict(router)
+    token = router["derived_token"]
+    if not token:
+        routing["support_count"] = 0
+        routing["applied"] = False
+        routing["excluded_object_keys"] = []
+        return assertions, routing
+    matching = [
+        assertion
+        for assertion in assertions
+        if _object_key_contains_token(_field_value(assertion, "object_key"), token)
+    ]
+    matching_keys = {
+        _normalize_object_key(_field_value(assertion, "object_key"))
+        for assertion in matching
+    }
+    support_count = len(matching_keys)
+    routing["support_count"] = support_count
+    if support_count >= 2:
+        excluded = {
+            _normalize_object_key(_field_value(assertion, "object_key"))
+            for assertion in assertions
+            if _normalize_object_key(_field_value(assertion, "object_key")) not in matching_keys
+        }
+        routing["applied"] = True
+        routing["excluded_object_keys"] = sorted(excluded)
+        return matching, routing
+    routing["applied"] = False
+    routing["excluded_object_keys"] = []
+    return assertions, routing
 
 
 def _status_value(result: Any) -> str:
@@ -440,6 +601,8 @@ def analyze_case(
     correct_votes = 0
     wrong_unique: list[int] = []
     abstentions = 0
+    router = derive_latest_scope(case.question, case.intent)
+    query_routing_measured = router["evaluated"]
     for sample_index in range(samples):
         parser_drops: list[str] = []
         try:
@@ -474,7 +637,8 @@ def analyze_case(
             ]
             drop_reasons = list(parser_drops) + build_drops
 
-        source = _InMemorySource(assertions)
+        scope_assertions, routing = _apply_scope(assertions, router)
+        source = _InMemorySource(scope_assertions)
         sink = _InMemorySink()
         service = loaded_api.event_history_service_type(source, sink)
         try:
@@ -486,7 +650,7 @@ def analyze_case(
             projection_error = None
         timeline = [_entry_record(entry) for entry in sink.latest_drawn()]
         projection_complete = projection_error is None and _projection_complete(projection, sink)
-        selection = _selection_record(loaded_api, lane, case, assertions)
+        selection = _selection_record(loaded_api, lane, case, scope_assertions)
         if not projection_complete:
             selection = {
                 **selection,
@@ -508,6 +672,7 @@ def analyze_case(
                 "proposals": proposal_rows,
                 "build_receipts": build_receipts,
                 "drop_reasons": drop_reasons,
+                "routing": routing,
                 "projection": {
                     "result": _jsonable(projection),
                     "complete": projection_complete,
@@ -530,13 +695,20 @@ def analyze_case(
         "canonical": False,
         "production_authority_enabled": False,
         "persistence_used": False,
-        "query_routing_measured": False,
+        "query_routing_measured": query_routing_measured,
         "llm_used": True,
         "case_id": case.case_id,
         "generated_at": generated_at,
         "learned_at": learned_at,
         "perceiver_version": loaded_api.perceiver_version,
         "samples": sample_rows,
+        "routing": {
+            "evaluated": router["evaluated"],
+            "derived_token": router["derived_token"],
+            "noun_phrase": router["noun_phrase"],
+            "reason": router["reason"],
+            "applied_any_sample": any(row["routing"]["applied"] for row in sample_rows),
+        },
         "aggregate": {
             "total_samples": samples,
             "correct_votes": correct_votes,
@@ -547,6 +719,13 @@ def analyze_case(
             "wrong_unique_samples": wrong_unique,
             "abstentions": abstentions,
             "domain_override": {"applied": True, "lane_domain": case.lane_domain},
+            "routing": {
+                "evaluated": router["evaluated"],
+                "derived_token": router["derived_token"],
+                "noun_phrase": router["noun_phrase"],
+                "reason": router["reason"],
+                "applied_any_sample": any(row["routing"]["applied"] for row in sample_rows),
+            },
         },
     }
 
@@ -608,6 +787,7 @@ def encode_case(case: ExperimentCase) -> str:
             "anchor_object_key": case.anchor_object_key,
             "lane_domain": case.lane_domain,
             "safety_control": case.safety_control,
+            "question": case.question,
         },
         sort_keys=True,
         ensure_ascii=False,
@@ -620,6 +800,7 @@ __all__ = [
     "EventHistoryProbeError",
     "ProbeEventHistoryApi",
     "analyze_case",
+    "derive_latest_scope",
     "encode_case",
     "load_menhir_event_history_api",
     "summarize_report",

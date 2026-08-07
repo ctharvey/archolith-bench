@@ -268,10 +268,14 @@ def test_fixture_loading_and_materialization(tmp_path):
     assert latest_case.intent == "latest"
     assert latest_case.expected_object_key == "70-200mm zoom lens"
     assert latest_case.lane_domain == "camera lens"
+    assert latest_case.question == "question for 41698283"
     assert any(episode.content == "I recently bought a zoom lens for my camera." for episode in latest_case.episodes)
     predecessor_case = cases[1][1]
     assert predecessor_case.anchor_object_key == "air fryer"
     assert predecessor_case.intent == "predecessor"
+    assert predecessor_case.question == "question for 0977f2af"
+    control_case = cases[2][1]
+    assert control_case.question is None
     assert latest_case.episodes[0].uuid == "41698283-0-0"
     assert latest_case.episodes[0].turn_evidence_uuid == "evidence-41698283-0-0"
 
@@ -357,8 +361,15 @@ def test_run_acceptance_writes_report_and_aggregates_usage(tmp_path):
     assert report["promotion_status"] == "not_evaluable"
     assert report["production_authority_enabled"] is False
     assert report["persistence_used"] is False
-    assert report["query_routing_measured"] is False
     assert report["llm_used"] is True
+    assert report["report_schema_version"] == 2
+    # two qid cases carry real source questions, so routing was evaluated for them
+    assert report["query_routing_measured"] is True
+    assert report["routing_coverage"] == {"measured_cases": 2, "total_cases": 3}
+    by_case = {c["case_id"]: c for c in report["cases"]}
+    assert by_case["41698283"]["query_routing_measured"] is True
+    assert by_case["0977f2af"]["query_routing_measured"] is True
+    assert by_case["control-intent-only"]["query_routing_measured"] is False
     assert report["config"]["model"] == "gpt-4o-mini"
     num_calls = report["usage"]["calls"]
     assert num_calls == 3 * 3  # 3 cases x samples=3

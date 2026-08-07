@@ -106,7 +106,7 @@ def test_happy_path_uses_real_menhir_gate_and_extractor(tmp_path, api):
     assert namespace["compositional"]["llm_composed"] == 1
     assert namespace["comparison_detail"]["canonical_schema_version"] == 2
     assert namespace["comparison_detail"]["compositional_schema_version"] == 1
-    assert namespace["comparison_detail"]["composer_version"] == "structural-v2"
+    assert namespace["comparison_detail"]["composer_version"] == "structural-v4"
     assert namespace["compositional"]["diagnostic_vs_llm"][
         "compositional_exact_agreements"] == 1
     assert report["aggregate"]["compositional"]["deterministic_composed"] == 1

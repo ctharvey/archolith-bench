@@ -25,7 +25,7 @@ Frozen detector snapshots are saved in each run's results directory where applic
 | **v5 derived (offline)** | 2026-07-18 | 78 | n/a (offline) | *(no paid run)* | n/a | Delta-fold "assumptions" arm; fires 1/78 (69fee5aa -> ~38 correct); all offline gates pass; NOT benchmax, no paid run on n=1 |
 | **scalar-ku-20260722** | 2026-07-22 | 78 | adaptive | *(measure-only, no QA)* | gpt-4o-mini | Scalar-consolidation MEASURE run (k=3). Materialization, not recall-scored: 18/78 (23%) scalar views, 20/78 typed. See section below + `.agent/reviews/menhir-lme-scalar-ku-20260722-results.md` |
 | **scalar-current-candidate-v3-20260728** | 2026-07-29 | 32/78 | adaptive | **(killed / INVALID)** | gpt-4o-mini | Mixed-code/provenance run; item `2133c1b5` was consolidated with one real FAILED episode under threshold 2. Do not resume, score, or compare. |
-| **scalar-canonical-ku78-v1-20260806** | 2026-08-06 | 78 | adaptive | **0.872** | gpt-4o-mini | Fresh canonical candidate ingest; 68/78 recall vs 6/78 (0.077) no-memory; harness exit 0. |
+| **scalar-canonical-ku78-v1-20260806** | 2026-08-06 | 78 | adaptive | **0.872** | gpt-4o-mini | **CANONICAL BENCHMARK EVIDENCE.** Fresh candidate-arm ingest; 68/78 recall vs 6/78 (0.077) no-memory; harness exit 0. |
 
 ## Invalidated Run (scalar-current-candidate-v3-20260728)
 
@@ -334,6 +334,10 @@ All runs: Menhir commit `6d37255`, Bench commit `8209c20`
 
 ## 2026-08-06 — `scalar-canonical-ku78-v1-20260806` (canonical PASS)
 
+- **Evidence status: CANONICAL.** This is the authoritative 78-item scalar knowledge-update result
+  and is eligible for future comparisons. “Candidate arm” names the evaluated benchmark arm; it
+  does not make the run noncanonical. Earlier interrupted, resumed, diagnostic, and mixed-code
+  attempts remain development evidence only and must not be substituted for this result.
 - Purpose: fresh canonical 78-item candidate-arm ingest and recall validation of the current scalar
   state/history implementation.
 - Result: Menhir recall **68/78 (0.872)**; no-memory baseline **6/78 (0.077)**; delta **+0.795**.

@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "panel_id": "event-history-acceptance-v1",
+  "noncanonical": true,
+  "source_fixture": "fixtures/longmemeval/knowledge_update_subset.json",
+  "source_sha256": "bba252a302e7b257a0f7457fe97411f7de144aafd1c6b44c98a0e88ee8570907",
+  "source_fixture_kind": "knowledge-update",
+  "perceiver_version": "v1",
+  "predicate": "acquired",
+  "cases": [
+    {
+      "case_id": "41698283",
+      "question_id": "41698283",
+      "intent": "latest",
+      "expected_status": "unique",
+      "expected_object_key": "70-200mm zoom lens",
+      "anchor_object_key": null,
+      "domain": "camera lens",
+      "safety_control": false
+    },
+    {
+      "case_id": "0977f2af",
+      "question_id": "0977f2af",
+      "intent": "predecessor",
+      "expected_status": "unique",
+      "expected_object_key": "instant pot",
+      "anchor_object_key": "air fryer",
+      "domain": "kitchen appliance",
+      "safety_control": false
+    },
+    {
+      "case_id": "control-intent-only",
+      "question_id": null,
+      "intent": "latest",
+      "expected_status": "none",
+      "expected_object_key": null,
+      "anchor_object_key": null,
+      "domain": null,
+      "safety_control": true,
+      "episodes": [
+        {
+          "uuid": "ctl-intent-1",
+          "content": "I am planning to buy a new espresso machine next month once I have saved up enough.",
+          "reference_time": "2026-01-10T00:00:00+00:00",
+          "turn_evidence_uuid": "evidence-ctl-intent-1"
+        }
+      ]
+    },
+    {
+      "case_id": "control-negated-acquisition",
+      "question_id": null,
+      "intent": "latest",
+      "expected_status": "none",
+      "expected_object_key": null,
+      "anchor_object_key": null,
+      "domain": null,
+      "safety_control": true,
+      "episodes": [
+        {
+          "uuid": "ctl-negated-1",
+          "content": "I did not purchase the air fryer today; I only added it to my wish list.",
+          "reference_time": "2026-01-11T00:00:00+00:00",
+          "turn_evidence_uuid": "evidence-ctl-negated-1"
+        }
+      ]
+    },
+    {
+      "case_id": "control-possession-only",
+      "question_id": null,
+      "intent": "latest",
+      "expected_status": "none",
+      "expected_object_key": null,
+      "anchor_object_key": null,
+      "domain": null,
+      "safety_control": true,
+      "episodes": [
+        {
+          "uuid": "ctl-possession-1",
+          "content": "The stand mixer in my kitchen is old and still works well.",
+          "reference_time": "2026-01-12T00:00:00+00:00",
+          "turn_evidence_uuid": "evidence-ctl-possession-1"
+        }
+      ]
+    }
+  ]
+}

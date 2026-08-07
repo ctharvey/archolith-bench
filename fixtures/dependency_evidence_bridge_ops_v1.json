@@ -1,0 +1,3409 @@
+{
+  "schema_version": "dependency-evidence-bridge-ops-v1",
+  "fixture_version": "1.0.0",
+  "description": "Independent generic Phase-A source-bound dependency evidence panel.",
+  "relation_types": [
+    "balance",
+    "duration",
+    "frequency",
+    "measurement",
+    "quantity",
+    "schedule_time",
+    "state"
+  ],
+  "splits": {
+    "train": 24,
+    "holdout": 24
+  },
+  "fine_role_counts": {
+    "current_total": 6,
+    "delta": 6,
+    "one_off_event": 6,
+    "standing_expiry": 6,
+    "history": 6,
+    "subset": 6,
+    "modality": 6,
+    "attribution": 6
+  },
+  "metadata": {
+    "fixture_sha256": "bde118508cf55c94bbd10fc88fbc625a0f465859a545f3ca79deb391a25ba57b",
+    "hash_basis": "sha256(canonical_json(cases))",
+    "authoring_revision": "dependency-bridge-ops-v1-independent-generic",
+    "denominators": {
+      "cases": 48,
+      "claim_spans": 48,
+      "dependency_paths": 48,
+      "gold_edge_count": 144,
+      "role_labels": 48,
+      "operation_labels": 48,
+      "relation_payloads": 48,
+      "target_scope_payloads": 48,
+      "value_payloads": 48
+    },
+    "phase_a_supported": 6,
+    "phase_a_unsupported": 14,
+    "phase_a_true_negatives": 28
+  },
+  "cases": [
+    {
+      "case_id": "train-current_total-01",
+      "split": "train",
+      "topology": "direct",
+      "text": "I have 101 aethers.",
+      "episode_id": "episode-train-current_total-01",
+      "claim_ordinal": 0,
+      "source_key": "2a30af783634be67cf881705ca3ce8f682e1f487adb7ef7229eebc4af0907eb7",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 18,
+        "text": "I have 101 aethers",
+        "sha256": "126423a469eaee368b79dc8efc7cf0c055e02911c0d783171026a3d26840a172"
+      },
+      "quantity_span": {
+        "start_char": 7,
+        "end_char": 10,
+        "text": "101",
+        "sha256": "16dc368a89b428b2485484313ba67a3912ca03f2b2b42429174a4f8b3dc84e44"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 2,
+          "numeric": 7,
+          "target": 11
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "have",
+          "numeric": "101",
+          "target": "aethers"
+        },
+        "edges": [
+          {
+            "head_char": 2,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 11,
+            "dependent_char": 7,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 2,
+            "dependent_char": 11,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "current_total",
+      "role_variant": null,
+      "operation_gold": "absolute",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "aethers",
+      "role_scope": "",
+      "value": {
+        "magnitude": 101,
+        "sign": 1
+      },
+      "temporal_state": "present",
+      "totality": "total",
+      "grounding": "holding_state",
+      "admit_gold": true,
+      "phase_a_expectation": "supported",
+      "source_sha256": "78714668a8b359d6ae2c6f2095ec11da8cdbc13cb9980d054f8c99423d93bd75",
+      "phase_a_reason": null
+    },
+    {
+      "case_id": "train-current_total-02",
+      "split": "train",
+      "topology": "distractor",
+      "text": "I keep 102 braskets beside 1119 virels1.",
+      "episode_id": "episode-train-current_total-02",
+      "claim_ordinal": 0,
+      "source_key": "12774ec74a21c22e96ce6925904d23291a3e17299611b2db2d523c027f1bda58",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 19,
+        "text": "I keep 102 braskets",
+        "sha256": "dfe1423a4b2d8908d51f267212314df78ac9af2ce8c175f1693dc4da5aef39ae"
+      },
+      "quantity_span": {
+        "start_char": 7,
+        "end_char": 10,
+        "text": "102",
+        "sha256": "37834f2f25762f23e1f74a531cbe445db73d6765ebe60878a7dfbecd7d4af6e1"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 2,
+          "numeric": 7,
+          "target": 11
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "keep",
+          "numeric": "102",
+          "target": "braskets"
+        },
+        "edges": [
+          {
+            "head_char": 2,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 11,
+            "dependent_char": 7,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 2,
+            "dependent_char": 11,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "current_total",
+      "role_variant": null,
+      "operation_gold": "absolute",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "braskets",
+      "role_scope": "",
+      "value": {
+        "magnitude": 102,
+        "sign": 1
+      },
+      "temporal_state": "present",
+      "totality": "total",
+      "grounding": "holding_state",
+      "admit_gold": true,
+      "phase_a_expectation": "supported",
+      "source_sha256": "3735bb95682537ba1faccc664df8ebc155b1d97645f7a31dd6550b69ad6f032a",
+      "phase_a_reason": null
+    },
+    {
+      "case_id": "train-current_total-03",
+      "split": "train",
+      "topology": "multiclause",
+      "text": "Nera has 1137 virels2, but I hold 103 cindrels.",
+      "episode_id": "episode-train-current_total-03",
+      "claim_ordinal": 0,
+      "source_key": "7720679549faae7326480cdcb5b5ef9aa74e232ab31a9189557cfebd7b776e81",
+      "claim_span": {
+        "start_char": 27,
+        "end_char": 46,
+        "text": "I hold 103 cindrels",
+        "sha256": "35f950237d6b4087af23cad50ff862a27915c60ee172d47959ff452ec9ee500f"
+      },
+      "quantity_span": {
+        "start_char": 34,
+        "end_char": 37,
+        "text": "103",
+        "sha256": "454f63ac30c8322997ef025edff6abd23e0dbe7b8a3d5126a894e4a168c1b59b"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 27,
+          "predicate": 29,
+          "numeric": 34,
+          "target": 38
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "hold",
+          "numeric": "103",
+          "target": "cindrels"
+        },
+        "edges": [
+          {
+            "head_char": 29,
+            "dependent_char": 27,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 38,
+            "dependent_char": 34,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 29,
+            "dependent_char": 38,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "current_total",
+      "role_variant": null,
+      "operation_gold": "absolute",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "cindrels",
+      "role_scope": "",
+      "value": {
+        "magnitude": 103,
+        "sign": 1
+      },
+      "temporal_state": "present",
+      "totality": "total",
+      "grounding": "holding_state",
+      "admit_gold": true,
+      "phase_a_expectation": "supported",
+      "source_sha256": "0204e0c3df3ad9d6845a272f650bd28e173549bf9b6fb2676816690f46f7e998",
+      "phase_a_reason": null
+    },
+    {
+      "case_id": "train-delta-01",
+      "split": "train",
+      "topology": "direct",
+      "text": "I added 104 dornets.",
+      "episode_id": "episode-train-delta-01",
+      "claim_ordinal": 0,
+      "source_key": "aef26013a8dffe5c341b3d127c91d6a34c9a02f4cb5d90a3ab07a70528ebfff8",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 19,
+        "text": "I added 104 dornets",
+        "sha256": "29f796d83ae013f38c0b3f9967e576ecffecb5a6d3f272286d2ed65c6eff69f6"
+      },
+      "quantity_span": {
+        "start_char": 8,
+        "end_char": 11,
+        "text": "104",
+        "sha256": "5ef6fdf32513aa7cd11f72beccf132b9224d33f271471fff402742887a171edf"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 2,
+          "numeric": 8,
+          "target": 12
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "added",
+          "numeric": "104",
+          "target": "dornets"
+        },
+        "edges": [
+          {
+            "head_char": 2,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 12,
+            "dependent_char": 8,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 2,
+            "dependent_char": 12,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "delta",
+      "role_variant": null,
+      "operation_gold": "delta",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "dornets",
+      "role_scope": "",
+      "value": {
+        "magnitude": 104,
+        "sign": 1
+      },
+      "temporal_state": "present",
+      "totality": "partial",
+      "grounding": "supported_delta",
+      "admit_gold": true,
+      "phase_a_expectation": "unsupported_abstain",
+      "source_sha256": "5853ad16e0362cb387b93cb1543b5d6ba30b61efc93535b1263e70e62144e9db",
+      "phase_a_reason": "operation_unsupported"
+    },
+    {
+      "case_id": "train-delta-02",
+      "split": "train",
+      "topology": "distractor",
+      "text": "I sold 105 elvins beside 1122 virels1.",
+      "episode_id": "episode-train-delta-02",
+      "claim_ordinal": 0,
+      "source_key": "aff29e9c6d852c4a853e78555c6a6eb928996bdfe002be02fafe6c822068c8a3",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 17,
+        "text": "I sold 105 elvins",
+        "sha256": "0538100fa78b4372dfdcd227785559275ff9d474af7345da87608465f65d033a"
+      },
+      "quantity_span": {
+        "start_char": 7,
+        "end_char": 10,
+        "text": "105",
+        "sha256": "1253e9373e781b7500266caa55150e08e210bc8cd8cc70d89985e3600155e860"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 2,
+          "numeric": 7,
+          "target": 11
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "sold",
+          "numeric": "105",
+          "target": "elvins"
+        },
+        "edges": [
+          {
+            "head_char": 2,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 11,
+            "dependent_char": 7,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 2,
+            "dependent_char": 11,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "delta",
+      "role_variant": null,
+      "operation_gold": "delta",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "elvins",
+      "role_scope": "",
+      "value": {
+        "magnitude": 105,
+        "sign": -1
+      },
+      "temporal_state": "present",
+      "totality": "partial",
+      "grounding": "supported_delta",
+      "admit_gold": true,
+      "phase_a_expectation": "unsupported_abstain",
+      "source_sha256": "eb646fb5dccf3131c18958055b46ce4bf1e4c21dcf2d550a936b1a7692d1ee7a",
+      "phase_a_reason": "operation_unsupported"
+    },
+    {
+      "case_id": "train-delta-03",
+      "split": "train",
+      "topology": "multiclause",
+      "text": "Volo has 1140 virels2, but I acquired 106 farnels.",
+      "episode_id": "episode-train-delta-03",
+      "claim_ordinal": 0,
+      "source_key": "cfeaecda9127fa889fd523b95da0dae14dd73148ad9368ba99e5128a288ed430",
+      "claim_span": {
+        "start_char": 27,
+        "end_char": 49,
+        "text": "I acquired 106 farnels",
+        "sha256": "ce3bf1710716b8de3e25d236beede9b1074bcf02fc404b21afab3d6d352a8081"
+      },
+      "quantity_span": {
+        "start_char": 38,
+        "end_char": 41,
+        "text": "106",
+        "sha256": "482d9673cfee5de391f97fde4d1c84f9f8d6f2cf0784fcffb958b4032de7236c"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 27,
+          "predicate": 29,
+          "numeric": 38,
+          "target": 42
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "acquired",
+          "numeric": "106",
+          "target": "farnels"
+        },
+        "edges": [
+          {
+            "head_char": 29,
+            "dependent_char": 27,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 42,
+            "dependent_char": 38,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 29,
+            "dependent_char": 42,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "delta",
+      "role_variant": null,
+      "operation_gold": "delta",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "farnels",
+      "role_scope": "",
+      "value": {
+        "magnitude": 106,
+        "sign": 1
+      },
+      "temporal_state": "present",
+      "totality": "partial",
+      "grounding": "supported_delta",
+      "admit_gold": true,
+      "phase_a_expectation": "unsupported_abstain",
+      "source_sha256": "8138cda0c5a1460f33b3b6270f6aeffb319add90718954026091c1c78fe171e7",
+      "phase_a_reason": "operation_unsupported"
+    },
+    {
+      "case_id": "train-one_off_event-01",
+      "split": "train",
+      "topology": "direct",
+      "text": "I baked 107 grommets.",
+      "episode_id": "episode-train-one_off_event-01",
+      "claim_ordinal": 0,
+      "source_key": "9563a1a4c734aeb2bf7c39448f684acc405419ce372d822a2efe0479f06c4e95",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 20,
+        "text": "I baked 107 grommets",
+        "sha256": "f992f56b47d4fe783f8cc56b42c6aeacc35d00fcd3110bdd468f050d79d41836"
+      },
+      "quantity_span": {
+        "start_char": 8,
+        "end_char": 11,
+        "text": "107",
+        "sha256": "3346f2bbf6c34bd2dbe28bd1bb657d0e9c37392a1d5ec9929e6a5df4763ddc2d"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 2,
+          "numeric": 8,
+          "target": 12
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "baked",
+          "numeric": "107",
+          "target": "grommets"
+        },
+        "edges": [
+          {
+            "head_char": 2,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 12,
+            "dependent_char": 8,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 2,
+            "dependent_char": 12,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "event",
+      "role_variant": "one_off_event",
+      "operation_gold": null,
+      "abstention_reason": "non_holding_event",
+      "relation_type": "quantity",
+      "target_literal": "grommets",
+      "role_scope": "",
+      "value": {
+        "magnitude": 107,
+        "sign": 1
+      },
+      "temporal_state": "event",
+      "totality": "partial",
+      "grounding": "event_only",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "8658bed137c5262fe8416c8315167b0a7218956e09aac0a6eccb68041a6b838d",
+      "phase_a_reason": "non_holding_event"
+    },
+    {
+      "case_id": "train-one_off_event-02",
+      "split": "train",
+      "topology": "distractor",
+      "text": "I visited 108 halvores beside 1125 virels1.",
+      "episode_id": "episode-train-one_off_event-02",
+      "claim_ordinal": 0,
+      "source_key": "cd0a9a6bb3a2206fce569e424cbb7647822708b9c207e99e4db5c3ebbdbd568b",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 22,
+        "text": "I visited 108 halvores",
+        "sha256": "91ad96eb7b786a2700dd3b90c1af2bc29304777f9f67e4290da26d773fb5dec4"
+      },
+      "quantity_span": {
+        "start_char": 10,
+        "end_char": 13,
+        "text": "108",
+        "sha256": "9537f32ec7599e1ae953af6c9f929fe747ff9dadf79a9beff1f304c550173011"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 2,
+          "numeric": 10,
+          "target": 14
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "visited",
+          "numeric": "108",
+          "target": "halvores"
+        },
+        "edges": [
+          {
+            "head_char": 2,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 14,
+            "dependent_char": 10,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 2,
+            "dependent_char": 14,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "event",
+      "role_variant": "one_off_event",
+      "operation_gold": null,
+      "abstention_reason": "non_holding_event",
+      "relation_type": "quantity",
+      "target_literal": "halvores",
+      "role_scope": "",
+      "value": {
+        "magnitude": 108,
+        "sign": 1
+      },
+      "temporal_state": "event",
+      "totality": "partial",
+      "grounding": "event_only",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "7deee370cc7e8f358d411e7afb5ef14440eebbc4df448733cda8dcfb1b02900e",
+      "phase_a_reason": "non_holding_event"
+    },
+    {
+      "case_id": "train-one_off_event-03",
+      "split": "train",
+      "topology": "multiclause",
+      "text": "Sera has 1143 virels2, but I shipped 109 islets.",
+      "episode_id": "episode-train-one_off_event-03",
+      "claim_ordinal": 0,
+      "source_key": "83faa46c6f6baa37ed08b883a9f8fc36328f99c8f0323c35a53eaee9f57a4241",
+      "claim_span": {
+        "start_char": 27,
+        "end_char": 47,
+        "text": "I shipped 109 islets",
+        "sha256": "37326122608e3734548e7608176d3de24fdda70ce8af8d4262f3b9819974c147"
+      },
+      "quantity_span": {
+        "start_char": 37,
+        "end_char": 40,
+        "text": "109",
+        "sha256": "0fd42b3f73c448b34940b339f87d07adf116b05c0227aad72e8f0ee90533e699"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 27,
+          "predicate": 29,
+          "numeric": 37,
+          "target": 41
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "shipped",
+          "numeric": "109",
+          "target": "islets"
+        },
+        "edges": [
+          {
+            "head_char": 29,
+            "dependent_char": 27,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 41,
+            "dependent_char": 37,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 29,
+            "dependent_char": 41,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "event",
+      "role_variant": "one_off_event",
+      "operation_gold": null,
+      "abstention_reason": "non_holding_event",
+      "relation_type": "quantity",
+      "target_literal": "islets",
+      "role_scope": "",
+      "value": {
+        "magnitude": 109,
+        "sign": 1
+      },
+      "temporal_state": "event",
+      "totality": "partial",
+      "grounding": "event_only",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "259c59d0b987f60b0da5b242f95c7d7446a00f2badfc1c7a164a71ad3e64d0d4",
+      "phase_a_reason": "non_holding_event"
+    },
+    {
+      "case_id": "train-standing_expiry-01",
+      "split": "train",
+      "topology": "direct",
+      "text": "I no longer have 110 jarnicks.",
+      "episode_id": "episode-train-standing_expiry-01",
+      "claim_ordinal": 0,
+      "source_key": "7c154f63d8f0e7da84f1489a3614baecd5166362ab8cbc617079fb1acbb4b8f5",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 29,
+        "text": "I no longer have 110 jarnicks",
+        "sha256": "af9e721b0817f29280056f1d9474f7a083da89c3c68a9957562d7e152af44db6"
+      },
+      "quantity_span": {
+        "start_char": 17,
+        "end_char": 20,
+        "text": "110",
+        "sha256": "9bdb2af6799204a299c603994b8e400e4b1fd625efdb74066cc869fee42c9df3"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 12,
+          "numeric": 17,
+          "target": 21
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "have",
+          "numeric": "110",
+          "target": "jarnicks"
+        },
+        "edges": [
+          {
+            "head_char": 12,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 21,
+            "dependent_char": 17,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 12,
+            "dependent_char": 21,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "event",
+      "role_variant": "standing_expiry",
+      "operation_gold": "expire",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "jarnicks",
+      "role_scope": "",
+      "value": {
+        "magnitude": 110,
+        "sign": 1
+      },
+      "temporal_state": "expired",
+      "totality": "entire",
+      "grounding": "expiry",
+      "admit_gold": true,
+      "phase_a_expectation": "unsupported_abstain",
+      "source_sha256": "e3d57938fa2aac3e883c26a4da307cf6edf0a84b93440df5b1827d370b566a86",
+      "phase_a_reason": "operation_unsupported"
+    },
+    {
+      "case_id": "train-standing_expiry-02",
+      "split": "train",
+      "topology": "distractor",
+      "text": "I no longer hold 111 kelders beside 1128 virels1.",
+      "episode_id": "episode-train-standing_expiry-02",
+      "claim_ordinal": 0,
+      "source_key": "c428a5d6e824618fef25108c66b247a6ca74cebed0c8ef72557c40e136b517a4",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 28,
+        "text": "I no longer hold 111 kelders",
+        "sha256": "47098f43d326a14022f3a2a47cf5f0709ce109746c39043da52991b6d1916327"
+      },
+      "quantity_span": {
+        "start_char": 17,
+        "end_char": 20,
+        "text": "111",
+        "sha256": "f6e0a1e2ac41945a9aa7ff8a8aaa0cebc12a3bcc981a929ad5cf810a090e11ae"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 12,
+          "numeric": 17,
+          "target": 21
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "hold",
+          "numeric": "111",
+          "target": "kelders"
+        },
+        "edges": [
+          {
+            "head_char": 12,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 21,
+            "dependent_char": 17,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 12,
+            "dependent_char": 21,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "event",
+      "role_variant": "standing_expiry",
+      "operation_gold": "expire",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "kelders",
+      "role_scope": "",
+      "value": {
+        "magnitude": 111,
+        "sign": 1
+      },
+      "temporal_state": "expired",
+      "totality": "entire",
+      "grounding": "expiry",
+      "admit_gold": true,
+      "phase_a_expectation": "unsupported_abstain",
+      "source_sha256": "77da40a2de105ee9414ee708b10e5e88dd10c111e27a0e44bd9f13721d1225d7",
+      "phase_a_reason": "operation_unsupported"
+    },
+    {
+      "case_id": "train-standing_expiry-03",
+      "split": "train",
+      "topology": "multiclause",
+      "text": "Tarin has 1146 virels2, but I no longer keep 112 lumets.",
+      "episode_id": "episode-train-standing_expiry-03",
+      "claim_ordinal": 0,
+      "source_key": "c9287386267b437f872fa9df84a983992a29345a8bf7f617b4500f70980757e7",
+      "claim_span": {
+        "start_char": 28,
+        "end_char": 55,
+        "text": "I no longer keep 112 lumets",
+        "sha256": "11043595c98f8ed89f2b9dddfc16d00b27ec6023f0b75c0a98cb7d185eb7f73a"
+      },
+      "quantity_span": {
+        "start_char": 45,
+        "end_char": 48,
+        "text": "112",
+        "sha256": "b1556dea32e9d0cdbfed038fd7787275775ea40939c146a64e205bcb349ad02f"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 28,
+          "predicate": 40,
+          "numeric": 45,
+          "target": 49
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "keep",
+          "numeric": "112",
+          "target": "lumets"
+        },
+        "edges": [
+          {
+            "head_char": 40,
+            "dependent_char": 28,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 49,
+            "dependent_char": 45,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 40,
+            "dependent_char": 49,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "event",
+      "role_variant": "standing_expiry",
+      "operation_gold": "expire",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "lumets",
+      "role_scope": "",
+      "value": {
+        "magnitude": 112,
+        "sign": 1
+      },
+      "temporal_state": "expired",
+      "totality": "entire",
+      "grounding": "expiry",
+      "admit_gold": true,
+      "phase_a_expectation": "unsupported_abstain",
+      "source_sha256": "d2e8572c731375cc1f820e202aab1ba6e703707631bfa85c6462671a4ba0d80d",
+      "phase_a_reason": "operation_unsupported"
+    },
+    {
+      "case_id": "train-history-01",
+      "split": "train",
+      "topology": "direct",
+      "text": "Previously, I had 113 marnels.",
+      "episode_id": "episode-train-history-01",
+      "claim_ordinal": 0,
+      "source_key": "ee2409bd6426f812ecbf3b1b85953484a6d9c29ecb5d300aa9d6fc33d6f61861",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 29,
+        "text": "Previously, I had 113 marnels",
+        "sha256": "3be67742c6842f792c4f1b0201e78837bab44b44e7ec7e94527f3121f897e1a6"
+      },
+      "quantity_span": {
+        "start_char": 18,
+        "end_char": 21,
+        "text": "113",
+        "sha256": "6c658ee83fb7e812482494f3e416a876f63f418a0b8a1f5e76d47ee4177035cb"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 12,
+          "predicate": 14,
+          "numeric": 18,
+          "target": 22
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "had",
+          "numeric": "113",
+          "target": "marnels"
+        },
+        "edges": [
+          {
+            "head_char": 14,
+            "dependent_char": 12,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 22,
+            "dependent_char": 18,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 14,
+            "dependent_char": 22,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "history",
+      "role_variant": null,
+      "operation_gold": "absolute",
+      "abstention_reason": "past_only",
+      "relation_type": "quantity",
+      "target_literal": "marnels",
+      "role_scope": "",
+      "value": {
+        "magnitude": 113,
+        "sign": 1
+      },
+      "temporal_state": "past",
+      "totality": "total",
+      "grounding": "past_only",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "ab36f7411f42c32caa26be974157cfe75ca1fb792297a9242ebe0cb84ca1711b",
+      "phase_a_reason": "past_only"
+    },
+    {
+      "case_id": "train-history-02",
+      "split": "train",
+      "topology": "distractor",
+      "text": "Formerly, I held 114 norvets beside 1131 virels1.",
+      "episode_id": "episode-train-history-02",
+      "claim_ordinal": 0,
+      "source_key": "8dfd6d54075fd4531780fbc2c28a68393f64629fe2d74010a518fc14e0368372",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 28,
+        "text": "Formerly, I held 114 norvets",
+        "sha256": "e2f91454e2485f07e6a73d0a9f3d2b8d475b15dbe74c71e2ef44de4bb3c28ce8"
+      },
+      "quantity_span": {
+        "start_char": 17,
+        "end_char": 20,
+        "text": "114",
+        "sha256": "9f1f9dce319c4700ef28ec8c53bd3cc8e6abe64c68385479ab89215806a5bdd6"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 10,
+          "predicate": 12,
+          "numeric": 17,
+          "target": 21
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "held",
+          "numeric": "114",
+          "target": "norvets"
+        },
+        "edges": [
+          {
+            "head_char": 12,
+            "dependent_char": 10,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 21,
+            "dependent_char": 17,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 12,
+            "dependent_char": 21,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "history",
+      "role_variant": null,
+      "operation_gold": "absolute",
+      "abstention_reason": "past_only",
+      "relation_type": "quantity",
+      "target_literal": "norvets",
+      "role_scope": "",
+      "value": {
+        "magnitude": 114,
+        "sign": 1
+      },
+      "temporal_state": "past",
+      "totality": "total",
+      "grounding": "past_only",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "3dc3a40bf4ded1a6fea6191dbe60f62edf1bd139b0ed6894603c5ebfea2d553a",
+      "phase_a_reason": "past_only"
+    },
+    {
+      "case_id": "train-history-03",
+      "split": "train",
+      "topology": "multiclause",
+      "text": "Miro has 1149 virels2, but Once, I kept 115 orlums.",
+      "episode_id": "episode-train-history-03",
+      "claim_ordinal": 0,
+      "source_key": "7decad1dc60e0efa27668f14850efd0856913ad4f4f258745bcb0fb863ba9fcd",
+      "claim_span": {
+        "start_char": 27,
+        "end_char": 50,
+        "text": "Once, I kept 115 orlums",
+        "sha256": "a43f32d5ac6826128992d3d99923be6e1d7bd032a4648eef851daf6552ce694d"
+      },
+      "quantity_span": {
+        "start_char": 40,
+        "end_char": 43,
+        "text": "115",
+        "sha256": "28dae7c8bde2f3ca608f86d0e16a214dee74c74bee011cdfdd46bc04b655bc14"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 33,
+          "predicate": 35,
+          "numeric": 40,
+          "target": 44
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "kept",
+          "numeric": "115",
+          "target": "orlums"
+        },
+        "edges": [
+          {
+            "head_char": 35,
+            "dependent_char": 33,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 44,
+            "dependent_char": 40,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 35,
+            "dependent_char": 44,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "history",
+      "role_variant": null,
+      "operation_gold": "absolute",
+      "abstention_reason": "past_only",
+      "relation_type": "quantity",
+      "target_literal": "orlums",
+      "role_scope": "",
+      "value": {
+        "magnitude": 115,
+        "sign": 1
+      },
+      "temporal_state": "past",
+      "totality": "total",
+      "grounding": "past_only",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "611ec5ac1ac80acb491110b48d2bd8819995a245af04249d0e2e4e448e988bf6",
+      "phase_a_reason": "past_only"
+    },
+    {
+      "case_id": "train-subset-01",
+      "split": "train",
+      "topology": "direct",
+      "text": "I have 116 other pexels.",
+      "episode_id": "episode-train-subset-01",
+      "claim_ordinal": 0,
+      "source_key": "654141a813f629ba947bb68ecf860ae0303e34d16523e611d1b95f513fd18aa1",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 23,
+        "text": "I have 116 other pexels",
+        "sha256": "4872bcd74393f37e86f2e6d414b1163471cdba1f6aea7441daa507c035ddcc88"
+      },
+      "quantity_span": {
+        "start_char": 7,
+        "end_char": 10,
+        "text": "116",
+        "sha256": "e5b861a6d8a966dfca7e7341cd3eb6be9901688d547a72ebed0b1f5e14f3d08d"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 2,
+          "numeric": 7,
+          "target": 17
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "have",
+          "numeric": "116",
+          "target": "pexels"
+        },
+        "edges": [
+          {
+            "head_char": 2,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 17,
+            "dependent_char": 7,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 2,
+            "dependent_char": 17,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "subset",
+      "role_variant": null,
+      "operation_gold": "absolute",
+      "abstention_reason": "subset_non_authoritative",
+      "relation_type": "quantity",
+      "target_literal": "pexels",
+      "role_scope": "",
+      "value": {
+        "magnitude": 116,
+        "sign": 1
+      },
+      "temporal_state": "present",
+      "totality": "partial",
+      "grounding": "subset_non_authoritative",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "fbd3ff3c083e8f6292256bb6406c76189848da23e0405fc3fc5241b27e0ce80c",
+      "phase_a_reason": "subset_non_authoritative"
+    },
+    {
+      "case_id": "train-subset-02",
+      "split": "train",
+      "topology": "distractor",
+      "text": "I keep 117 spare quarnets beside 1134 virels1.",
+      "episode_id": "episode-train-subset-02",
+      "claim_ordinal": 0,
+      "source_key": "584b693da734286e7a73fc603a4bf6b9e3747fa7541cc761be6fb6c365570eee",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 25,
+        "text": "I keep 117 spare quarnets",
+        "sha256": "aced4274e768547d1689f20aa4924e0628ec2640903cce2458101eb6cf6ff5c8"
+      },
+      "quantity_span": {
+        "start_char": 7,
+        "end_char": 10,
+        "text": "117",
+        "sha256": "2ac878b0e2180616993b4b6aa71e61166fdc86c28d47e359d0ee537eb11d46d3"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 2,
+          "numeric": 7,
+          "target": 17
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "keep",
+          "numeric": "117",
+          "target": "quarnets"
+        },
+        "edges": [
+          {
+            "head_char": 2,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 17,
+            "dependent_char": 7,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 2,
+            "dependent_char": 17,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "subset",
+      "role_variant": null,
+      "operation_gold": "absolute",
+      "abstention_reason": "subset_non_authoritative",
+      "relation_type": "quantity",
+      "target_literal": "quarnets",
+      "role_scope": "",
+      "value": {
+        "magnitude": 117,
+        "sign": 1
+      },
+      "temporal_state": "present",
+      "totality": "partial",
+      "grounding": "subset_non_authoritative",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "cb6521970bcb25c74bc71b32d52869cffb11b43ba14b706c0fb32a381fb6ce0f",
+      "phase_a_reason": "subset_non_authoritative"
+    },
+    {
+      "case_id": "train-subset-03",
+      "split": "train",
+      "topology": "multiclause",
+      "text": "Luma has 1152 virels2, but I added 118 rivets to my set.",
+      "episode_id": "episode-train-subset-03",
+      "claim_ordinal": 0,
+      "source_key": "75b7eca79d7fdaf903f1038d915ea0a748bd05b0dd3b59ef90bf98e0afd3cb3f",
+      "claim_span": {
+        "start_char": 27,
+        "end_char": 55,
+        "text": "I added 118 rivets to my set",
+        "sha256": "d266334fe3d85ca1caee00851ac610cf4a0fa1678f1b155ad241e02e5deb9e48"
+      },
+      "quantity_span": {
+        "start_char": 35,
+        "end_char": 38,
+        "text": "118",
+        "sha256": "85daaf6f7055cd5736287faed9603d712920092c4f8fd0097ec3b650bf27530e"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 27,
+          "predicate": 29,
+          "numeric": 35,
+          "target": 39
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "added",
+          "numeric": "118",
+          "target": "rivets"
+        },
+        "edges": [
+          {
+            "head_char": 29,
+            "dependent_char": 27,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 39,
+            "dependent_char": 35,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 29,
+            "dependent_char": 39,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "subset",
+      "role_variant": null,
+      "operation_gold": "delta",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "rivets",
+      "role_scope": "",
+      "value": {
+        "magnitude": 118,
+        "sign": 1
+      },
+      "temporal_state": "present",
+      "totality": "partial",
+      "grounding": "subset_explicit_delta",
+      "admit_gold": true,
+      "phase_a_expectation": "unsupported_abstain",
+      "source_sha256": "0ff35d6ea52f31bb11b687599ba578e1d45cf4e0f699a7cafdfd6cbf79c071ae",
+      "phase_a_reason": "operation_unsupported"
+    },
+    {
+      "case_id": "train-modality-01",
+      "split": "train",
+      "topology": "direct",
+      "text": "I may have 119 solvets.",
+      "episode_id": "episode-train-modality-01",
+      "claim_ordinal": 0,
+      "source_key": "00119d744bdf3e45c096297c31896c243c48eb854618f47ab1ffc2e46eb287db",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 22,
+        "text": "I may have 119 solvets",
+        "sha256": "92765878a4e01571ad272fd8407f47fbf6852924a6a9bbfa08e1bc6456b40f08"
+      },
+      "quantity_span": {
+        "start_char": 11,
+        "end_char": 14,
+        "text": "119",
+        "sha256": "3038bfb575bee6a0e61945eff8784835bb2c720634e42734678c083994b7f018"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 6,
+          "numeric": 11,
+          "target": 15
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "have",
+          "numeric": "119",
+          "target": "solvets"
+        },
+        "edges": [
+          {
+            "head_char": 6,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 15,
+            "dependent_char": 11,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 6,
+            "dependent_char": 15,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "modality",
+      "role_variant": null,
+      "operation_gold": null,
+      "abstention_reason": "modal",
+      "relation_type": "quantity",
+      "target_literal": "solvets",
+      "role_scope": "",
+      "value": {
+        "magnitude": 119,
+        "sign": 1
+      },
+      "temporal_state": "uncertain",
+      "totality": "partial",
+      "grounding": "modal",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "5e0ac68c10a979d5e7eca0842fd303432d8a34d55503d05ca54d865100c71647",
+      "phase_a_reason": "modal"
+    },
+    {
+      "case_id": "train-modality-02",
+      "split": "train",
+      "topology": "distractor",
+      "text": "I might hold 120 taverns beside 1137 virels1.",
+      "episode_id": "episode-train-modality-02",
+      "claim_ordinal": 0,
+      "source_key": "3ddc75dac22d2367da01bd9fdc03be7a318617058cc89478f6c6ac4a17bd89b3",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 24,
+        "text": "I might hold 120 taverns",
+        "sha256": "d68936405b937428de94d0f55619b57a82972fce5b42fb279fc16e96b0a75345"
+      },
+      "quantity_span": {
+        "start_char": 13,
+        "end_char": 16,
+        "text": "120",
+        "sha256": "2abaca4911e68fa9bfbf3482ee797fd5b9045b841fdff7253557c5fe15de6477"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 8,
+          "numeric": 13,
+          "target": 17
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "hold",
+          "numeric": "120",
+          "target": "taverns"
+        },
+        "edges": [
+          {
+            "head_char": 8,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 17,
+            "dependent_char": 13,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 8,
+            "dependent_char": 17,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "modality",
+      "role_variant": null,
+      "operation_gold": null,
+      "abstention_reason": "modal",
+      "relation_type": "quantity",
+      "target_literal": "taverns",
+      "role_scope": "",
+      "value": {
+        "magnitude": 120,
+        "sign": 1
+      },
+      "temporal_state": "uncertain",
+      "totality": "partial",
+      "grounding": "modal",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "301730f8483c2c310866c4044408771b39db49386540ef9fda5f9374b366c012",
+      "phase_a_reason": "modal"
+    },
+    {
+      "case_id": "train-modality-03",
+      "split": "train",
+      "topology": "multiclause",
+      "text": "Kato has 1155 virels2, but I will keep 121 ulvets.",
+      "episode_id": "episode-train-modality-03",
+      "claim_ordinal": 0,
+      "source_key": "624db098168b04f8205ca0e3b3b667984a7783d07410ab9ee25b92beb648d99e",
+      "claim_span": {
+        "start_char": 27,
+        "end_char": 49,
+        "text": "I will keep 121 ulvets",
+        "sha256": "69c6c50a9d9a25aa6059ff955e13fc382fc3affcd15fe96b9819bb08fe486b9d"
+      },
+      "quantity_span": {
+        "start_char": 39,
+        "end_char": 42,
+        "text": "121",
+        "sha256": "89aa1e580023722db67646e8149eb246c748e180e34a1cf679ab0b41a416d904"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 27,
+          "predicate": 34,
+          "numeric": 39,
+          "target": 43
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "keep",
+          "numeric": "121",
+          "target": "ulvets"
+        },
+        "edges": [
+          {
+            "head_char": 34,
+            "dependent_char": 27,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 43,
+            "dependent_char": 39,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 34,
+            "dependent_char": 43,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "modality",
+      "role_variant": null,
+      "operation_gold": null,
+      "abstention_reason": "modal",
+      "relation_type": "quantity",
+      "target_literal": "ulvets",
+      "role_scope": "",
+      "value": {
+        "magnitude": 121,
+        "sign": 1
+      },
+      "temporal_state": "uncertain",
+      "totality": "partial",
+      "grounding": "modal",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "fc0c5ace3d4b35d821cf16e1e7f31dbcddc1de52e2467c66c1c54e7185479db4",
+      "phase_a_reason": "modal"
+    },
+    {
+      "case_id": "train-attribution-01",
+      "split": "train",
+      "topology": "direct",
+      "text": "Reni has 122 vexors.",
+      "episode_id": "episode-train-attribution-01",
+      "claim_ordinal": 0,
+      "source_key": "6685fc715407752dff7fe48ed927680c685f3f4c0672fb78810fbe0185939ab6",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 19,
+        "text": "Reni has 122 vexors",
+        "sha256": "6997ea956b9b8ffb119f176f6816afb5c7b8506e9d34720a8200b921b8170207"
+      },
+      "quantity_span": {
+        "start_char": 9,
+        "end_char": 12,
+        "text": "122",
+        "sha256": "1be00341082e25c4e251ca6713e767f7131a2823b0052caf9c9b006ec512f6cb"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 5,
+          "numeric": 9,
+          "target": 13
+        },
+        "node_literals": {
+          "subject": "Reni",
+          "predicate": "has",
+          "numeric": "122",
+          "target": "vexors"
+        },
+        "edges": [
+          {
+            "head_char": 5,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 13,
+            "dependent_char": 9,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 5,
+            "dependent_char": 13,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "attribution",
+      "role_variant": null,
+      "operation_gold": null,
+      "abstention_reason": "attributed_source",
+      "relation_type": "quantity",
+      "target_literal": "vexors",
+      "role_scope": "",
+      "value": {
+        "magnitude": 122,
+        "sign": 1
+      },
+      "temporal_state": "reported",
+      "totality": "partial",
+      "grounding": "attributed_source",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "201e081549e968d544bfde5329c58ea8a7837061d4558fea01c7ef116882dd31",
+      "phase_a_reason": "attributed_source"
+    },
+    {
+      "case_id": "train-attribution-02",
+      "split": "train",
+      "topology": "distractor",
+      "text": "Reni says I have 123 wexels beside 1140 virels1.",
+      "episode_id": "episode-train-attribution-02",
+      "claim_ordinal": 0,
+      "source_key": "b05e367dad37901afad8925c51d9b0bac3eab2308230ebeb5a68199d2b7c51a5",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 27,
+        "text": "Reni says I have 123 wexels",
+        "sha256": "ba328f18cdd11489bbcecd5ec0f81f1d90b099dfd211d6516caefd0c98352bca"
+      },
+      "quantity_span": {
+        "start_char": 17,
+        "end_char": 20,
+        "text": "123",
+        "sha256": "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 10,
+          "predicate": 12,
+          "numeric": 17,
+          "target": 21
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "have",
+          "numeric": "123",
+          "target": "wexels"
+        },
+        "edges": [
+          {
+            "head_char": 12,
+            "dependent_char": 10,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 21,
+            "dependent_char": 17,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 12,
+            "dependent_char": 21,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "attribution",
+      "role_variant": null,
+      "operation_gold": null,
+      "abstention_reason": "attributed_source",
+      "relation_type": "quantity",
+      "target_literal": "wexels",
+      "role_scope": "",
+      "value": {
+        "magnitude": 123,
+        "sign": 1
+      },
+      "temporal_state": "reported",
+      "totality": "partial",
+      "grounding": "attributed_source",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "965371e6715e69aedecb0c56815aadd7a9b1c0130426115373b9b2303b3e644c",
+      "phase_a_reason": "attributed_source"
+    },
+    {
+      "case_id": "train-attribution-03",
+      "split": "train",
+      "topology": "multiclause",
+      "text": "According to Reni, I keep 124 yonders, but I have 1158 virels2.",
+      "episode_id": "episode-train-attribution-03",
+      "claim_ordinal": 0,
+      "source_key": "c8eda091eee3bf9c7856501f1f3501c131d021aa06661c905b2540914a7f76b4",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 37,
+        "text": "According to Reni, I keep 124 yonders",
+        "sha256": "070dd74d6e8f8c1e51a1f5572d88eddf7c1a4b3983c5b0d3cc63766377b52123"
+      },
+      "quantity_span": {
+        "start_char": 26,
+        "end_char": 29,
+        "text": "124",
+        "sha256": "6affdae3b3c1aa6aa7689e9b6a7b3225a636aa1ac0025f490cca1285ceaf1487"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 19,
+          "predicate": 21,
+          "numeric": 26,
+          "target": 30
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "keep",
+          "numeric": "124",
+          "target": "yonders"
+        },
+        "edges": [
+          {
+            "head_char": 21,
+            "dependent_char": 19,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 30,
+            "dependent_char": 26,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 21,
+            "dependent_char": 30,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "attribution",
+      "role_variant": null,
+      "operation_gold": null,
+      "abstention_reason": "attributed_source",
+      "relation_type": "quantity",
+      "target_literal": "yonders",
+      "role_scope": "",
+      "value": {
+        "magnitude": 124,
+        "sign": 1
+      },
+      "temporal_state": "reported",
+      "totality": "partial",
+      "grounding": "attributed_source",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "129778cb8939a31a5d56fc5e595b2d4f207417371030d5a66c05c499b61d4305",
+      "phase_a_reason": "attributed_source"
+    },
+    {
+      "case_id": "holdout-current_total-01",
+      "split": "holdout",
+      "topology": "direct",
+      "text": "I own 201 bexels.",
+      "episode_id": "episode-holdout-current_total-01",
+      "claim_ordinal": 0,
+      "source_key": "524d339b18989f1e888eedbf16b9ea3fcced4c0d75de531dda7b1900eb6d26d7",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 16,
+        "text": "I own 201 bexels",
+        "sha256": "b413933dba00cd14bd87f8de36e8d1897796155e4e3332c73352652d02ad1db4"
+      },
+      "quantity_span": {
+        "start_char": 6,
+        "end_char": 9,
+        "text": "201",
+        "sha256": "43974ed74066b207c30ffd0fed5146762e6c60745ac977004bc14507c7c42b50"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 2,
+          "numeric": 6,
+          "target": 10
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "own",
+          "numeric": "201",
+          "target": "bexels"
+        },
+        "edges": [
+          {
+            "head_char": 2,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 10,
+            "dependent_char": 6,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 2,
+            "dependent_char": 10,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "current_total",
+      "role_variant": null,
+      "operation_gold": "absolute",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "bexels",
+      "role_scope": "",
+      "value": {
+        "magnitude": 201,
+        "sign": 1
+      },
+      "temporal_state": "present",
+      "totality": "total",
+      "grounding": "holding_state",
+      "admit_gold": true,
+      "phase_a_expectation": "supported",
+      "source_sha256": "9d77df8ca21e6452ba99e5289ee8fcc5fd737c69bdb7d89d38340f49f7d42aaa",
+      "phase_a_reason": null
+    },
+    {
+      "case_id": "holdout-current_total-02",
+      "split": "holdout",
+      "topology": "distractor",
+      "text": "I store 202 caverns beside 1219 qorels1.",
+      "episode_id": "episode-holdout-current_total-02",
+      "claim_ordinal": 0,
+      "source_key": "dbf1ba0aaf6bef128391a1fc28f524d3cab5373bd9f931b47c7f5611c9495b20",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 19,
+        "text": "I store 202 caverns",
+        "sha256": "b36528b5610c84b99988a4d10f7e1a34bdccbb5e979c721ee85573923ca4f1eb"
+      },
+      "quantity_span": {
+        "start_char": 8,
+        "end_char": 11,
+        "text": "202",
+        "sha256": "c17edaae86e4016a583e098582f6dbf3eccade8ef83747df9ba617ded9d31309"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 2,
+          "numeric": 8,
+          "target": 12
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "store",
+          "numeric": "202",
+          "target": "caverns"
+        },
+        "edges": [
+          {
+            "head_char": 2,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 12,
+            "dependent_char": 8,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 2,
+            "dependent_char": 12,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "current_total",
+      "role_variant": null,
+      "operation_gold": "absolute",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "caverns",
+      "role_scope": "",
+      "value": {
+        "magnitude": 202,
+        "sign": 1
+      },
+      "temporal_state": "present",
+      "totality": "total",
+      "grounding": "holding_state",
+      "admit_gold": true,
+      "phase_a_expectation": "supported",
+      "source_sha256": "ba2d829c5351a54d781d29f2aa4b6a0f0d01a14c52cf1a659b6b4369daf9da7e",
+      "phase_a_reason": null
+    },
+    {
+      "case_id": "holdout-current_total-03",
+      "split": "holdout",
+      "topology": "multiclause",
+      "text": "Cora has 1237 qorels2, but I retain 203 drelvins.",
+      "episode_id": "episode-holdout-current_total-03",
+      "claim_ordinal": 0,
+      "source_key": "e83951cf87a8e258f5eaae6526df1ad3454626cfd86c6cc3685438e0f1a738b9",
+      "claim_span": {
+        "start_char": 27,
+        "end_char": 48,
+        "text": "I retain 203 drelvins",
+        "sha256": "bf616b1aa28d5c523d5eea2dad1040b5bb106ecd62ae8c647a3e9dfca27b17e0"
+      },
+      "quantity_span": {
+        "start_char": 36,
+        "end_char": 39,
+        "text": "203",
+        "sha256": "4621c1d55fa4e86ce0dae4288302641baac86dd53f76227c892df9d300682d41"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 27,
+          "predicate": 29,
+          "numeric": 36,
+          "target": 40
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "retain",
+          "numeric": "203",
+          "target": "drelvins"
+        },
+        "edges": [
+          {
+            "head_char": 29,
+            "dependent_char": 27,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 40,
+            "dependent_char": 36,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 29,
+            "dependent_char": 40,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "current_total",
+      "role_variant": null,
+      "operation_gold": "absolute",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "drelvins",
+      "role_scope": "",
+      "value": {
+        "magnitude": 203,
+        "sign": 1
+      },
+      "temporal_state": "present",
+      "totality": "total",
+      "grounding": "holding_state",
+      "admit_gold": true,
+      "phase_a_expectation": "supported",
+      "source_sha256": "4b9b65aa395a2226f074f3df73f2e611fb2f89d8d34ca110a0e6f51d2b2916d8",
+      "phase_a_reason": null
+    },
+    {
+      "case_id": "holdout-delta-01",
+      "split": "holdout",
+      "topology": "direct",
+      "text": "I gained 204 ezmets.",
+      "episode_id": "episode-holdout-delta-01",
+      "claim_ordinal": 0,
+      "source_key": "47766752ad2ba88d754aadea22f8d36680889fe693133697b5c6e084dcd0bb3f",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 19,
+        "text": "I gained 204 ezmets",
+        "sha256": "547228c2e3bac9dbe7f60b88d2d37c077317670f9f8d6a9e09284099ce0ab7d3"
+      },
+      "quantity_span": {
+        "start_char": 9,
+        "end_char": 12,
+        "text": "204",
+        "sha256": "fc56dbc6d4652b315b86b71c8d688c1ccdea9c5f1fd07763d2659fde2e2fc49a"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 2,
+          "numeric": 9,
+          "target": 13
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "gained",
+          "numeric": "204",
+          "target": "ezmets"
+        },
+        "edges": [
+          {
+            "head_char": 2,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 13,
+            "dependent_char": 9,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 2,
+            "dependent_char": 13,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "delta",
+      "role_variant": null,
+      "operation_gold": "delta",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "ezmets",
+      "role_scope": "",
+      "value": {
+        "magnitude": 204,
+        "sign": 1
+      },
+      "temporal_state": "present",
+      "totality": "partial",
+      "grounding": "supported_delta",
+      "admit_gold": true,
+      "phase_a_expectation": "unsupported_abstain",
+      "source_sha256": "9739c48f0d4ba5188ab016bd5c12c15fcaf846d7e9d952678ef04466005807cd",
+      "phase_a_reason": "operation_unsupported"
+    },
+    {
+      "case_id": "holdout-delta-02",
+      "split": "holdout",
+      "topology": "distractor",
+      "text": "I removed 205 faylors beside 1222 qorels1.",
+      "episode_id": "episode-holdout-delta-02",
+      "claim_ordinal": 0,
+      "source_key": "1f8fdc3c692a500c968d58646262c4865d18d257fbe94e4ad3d022526210457c",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 21,
+        "text": "I removed 205 faylors",
+        "sha256": "cb479a2f377d880cf7d5eb598f59c4f0bb1ebd0346b0274b5dc611d636523870"
+      },
+      "quantity_span": {
+        "start_char": 10,
+        "end_char": 13,
+        "text": "205",
+        "sha256": "f8809aff4d69bece79dabe35be0c708b890d7eafb841f121330667b77d2e2590"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 2,
+          "numeric": 10,
+          "target": 14
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "removed",
+          "numeric": "205",
+          "target": "faylors"
+        },
+        "edges": [
+          {
+            "head_char": 2,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 14,
+            "dependent_char": 10,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 2,
+            "dependent_char": 14,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "delta",
+      "role_variant": null,
+      "operation_gold": "delta",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "faylors",
+      "role_scope": "",
+      "value": {
+        "magnitude": 205,
+        "sign": -1
+      },
+      "temporal_state": "present",
+      "totality": "partial",
+      "grounding": "supported_delta",
+      "admit_gold": true,
+      "phase_a_expectation": "unsupported_abstain",
+      "source_sha256": "3a36d7722c4519077796cd64fe1c23e51efff1586e85cbbd20043654026d6ebe",
+      "phase_a_reason": "operation_unsupported"
+    },
+    {
+      "case_id": "holdout-delta-03",
+      "split": "holdout",
+      "topology": "multiclause",
+      "text": "Dax has 1240 qorels2, but I secured 206 galders.",
+      "episode_id": "episode-holdout-delta-03",
+      "claim_ordinal": 0,
+      "source_key": "8c774ca0b5d72be5cd79e46752cce981f8d1aca8f738d21fe8faabf803ddea4e",
+      "claim_span": {
+        "start_char": 26,
+        "end_char": 47,
+        "text": "I secured 206 galders",
+        "sha256": "06931616a19b87ed7067aa95bcc94f52e274aa9f5291de0e08c97cb1a0dc9087"
+      },
+      "quantity_span": {
+        "start_char": 36,
+        "end_char": 39,
+        "text": "206",
+        "sha256": "5cf4e26bd3d87da5e03f80a43a64f1220a1f4ba9e1d6348caea83c06353c3f39"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 26,
+          "predicate": 28,
+          "numeric": 36,
+          "target": 40
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "secured",
+          "numeric": "206",
+          "target": "galders"
+        },
+        "edges": [
+          {
+            "head_char": 28,
+            "dependent_char": 26,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 40,
+            "dependent_char": 36,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 28,
+            "dependent_char": 40,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "delta",
+      "role_variant": null,
+      "operation_gold": "delta",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "galders",
+      "role_scope": "",
+      "value": {
+        "magnitude": 206,
+        "sign": 1
+      },
+      "temporal_state": "present",
+      "totality": "partial",
+      "grounding": "supported_delta",
+      "admit_gold": true,
+      "phase_a_expectation": "unsupported_abstain",
+      "source_sha256": "8dbc2c9f576b5695e4ab472d3d66673a4acb4088b13d42f4db83ecd901238cd3",
+      "phase_a_reason": "operation_unsupported"
+    },
+    {
+      "case_id": "holdout-one_off_event-01",
+      "split": "holdout",
+      "topology": "direct",
+      "text": "I painted 207 hivens.",
+      "episode_id": "episode-holdout-one_off_event-01",
+      "claim_ordinal": 0,
+      "source_key": "fd5e7df6e371d5044fc41bb7da864a7f9844935d0723368b9fd0b942797c331f",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 20,
+        "text": "I painted 207 hivens",
+        "sha256": "93649803fb40d86472e006c6d640f891d6848793549eee51109626fc44ca560d"
+      },
+      "quantity_span": {
+        "start_char": 10,
+        "end_char": 13,
+        "text": "207",
+        "sha256": "968076be2e38cf897d4d6cea3faca9c037e1a4e3b4b7744fb2533e07751bd30a"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 2,
+          "numeric": 10,
+          "target": 14
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "painted",
+          "numeric": "207",
+          "target": "hivens"
+        },
+        "edges": [
+          {
+            "head_char": 2,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 14,
+            "dependent_char": 10,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 2,
+            "dependent_char": 14,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "event",
+      "role_variant": "one_off_event",
+      "operation_gold": null,
+      "abstention_reason": "non_holding_event",
+      "relation_type": "quantity",
+      "target_literal": "hivens",
+      "role_scope": "",
+      "value": {
+        "magnitude": 207,
+        "sign": 1
+      },
+      "temporal_state": "event",
+      "totality": "partial",
+      "grounding": "event_only",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "45244b0bfc2a560f9c49fd8d42f5eb78e4ac3f86efff73949b0aeea11dd8546c",
+      "phase_a_reason": "non_holding_event"
+    },
+    {
+      "case_id": "holdout-one_off_event-02",
+      "split": "holdout",
+      "topology": "distractor",
+      "text": "I mailed 208 jovels beside 1225 qorels1.",
+      "episode_id": "episode-holdout-one_off_event-02",
+      "claim_ordinal": 0,
+      "source_key": "e94661e7ae230c461b5b19ab15822d076330b3eb1f602f248074cc854ed2fc05",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 19,
+        "text": "I mailed 208 jovels",
+        "sha256": "3d49f42cc23ca305e1362128b978d6b5aff64c34d0de1df93c04faa1457c1061"
+      },
+      "quantity_span": {
+        "start_char": 9,
+        "end_char": 12,
+        "text": "208",
+        "sha256": "8df66f64b57424391d363fd6b811fed3c430c77597da265025728bd637bad804"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 2,
+          "numeric": 9,
+          "target": 13
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "mailed",
+          "numeric": "208",
+          "target": "jovels"
+        },
+        "edges": [
+          {
+            "head_char": 2,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 13,
+            "dependent_char": 9,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 2,
+            "dependent_char": 13,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "event",
+      "role_variant": "one_off_event",
+      "operation_gold": null,
+      "abstention_reason": "non_holding_event",
+      "relation_type": "quantity",
+      "target_literal": "jovels",
+      "role_scope": "",
+      "value": {
+        "magnitude": 208,
+        "sign": 1
+      },
+      "temporal_state": "event",
+      "totality": "partial",
+      "grounding": "event_only",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "efd130d06b756e496d8181a8c715c4914341ab62b0d6758623849c905b39c0e9",
+      "phase_a_reason": "non_holding_event"
+    },
+    {
+      "case_id": "holdout-one_off_event-03",
+      "split": "holdout",
+      "topology": "multiclause",
+      "text": "Eli has 1243 qorels2, but I counted 209 kraxels.",
+      "episode_id": "episode-holdout-one_off_event-03",
+      "claim_ordinal": 0,
+      "source_key": "f6bd30ccd8508bd1cda7eec0811a688edddb43d08370066095d55d2f8573bf89",
+      "claim_span": {
+        "start_char": 26,
+        "end_char": 47,
+        "text": "I counted 209 kraxels",
+        "sha256": "791dacf8309f8883eaafddca7ea55d0ef5aac98f498549420bb6cd28c5230d9c"
+      },
+      "quantity_span": {
+        "start_char": 36,
+        "end_char": 39,
+        "text": "209",
+        "sha256": "83f814f7a92e365cbd79f9addceed185761a8d38a06a2d4350bb1fe4b7632b34"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 26,
+          "predicate": 28,
+          "numeric": 36,
+          "target": 40
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "counted",
+          "numeric": "209",
+          "target": "kraxels"
+        },
+        "edges": [
+          {
+            "head_char": 28,
+            "dependent_char": 26,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 40,
+            "dependent_char": 36,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 28,
+            "dependent_char": 40,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "event",
+      "role_variant": "one_off_event",
+      "operation_gold": null,
+      "abstention_reason": "non_holding_event",
+      "relation_type": "quantity",
+      "target_literal": "kraxels",
+      "role_scope": "",
+      "value": {
+        "magnitude": 209,
+        "sign": 1
+      },
+      "temporal_state": "event",
+      "totality": "partial",
+      "grounding": "event_only",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "e583e42ec28962251a87fcb0b71ce43d9aa8db4e1b19d983d4fd7292441609fa",
+      "phase_a_reason": "non_holding_event"
+    },
+    {
+      "case_id": "holdout-standing_expiry-01",
+      "split": "holdout",
+      "topology": "direct",
+      "text": "I no longer own 210 lorvins.",
+      "episode_id": "episode-holdout-standing_expiry-01",
+      "claim_ordinal": 0,
+      "source_key": "9865e2d32878ff83df4f52512a04d1c4c98f9cbc8166da64a1b1bf12fc81ea29",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 27,
+        "text": "I no longer own 210 lorvins",
+        "sha256": "3f0ba1963f768cd793d768a998f1833612a6b63828e4fd4fddccd77e5ac72187"
+      },
+      "quantity_span": {
+        "start_char": 16,
+        "end_char": 19,
+        "text": "210",
+        "sha256": "d29d53701d3c859e29e1b90028eec1ca8e2f29439198b6e036c60951fb458aa1"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 12,
+          "numeric": 16,
+          "target": 20
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "own",
+          "numeric": "210",
+          "target": "lorvins"
+        },
+        "edges": [
+          {
+            "head_char": 12,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 20,
+            "dependent_char": 16,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 12,
+            "dependent_char": 20,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "event",
+      "role_variant": "standing_expiry",
+      "operation_gold": "expire",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "lorvins",
+      "role_scope": "",
+      "value": {
+        "magnitude": 210,
+        "sign": 1
+      },
+      "temporal_state": "expired",
+      "totality": "entire",
+      "grounding": "expiry",
+      "admit_gold": true,
+      "phase_a_expectation": "unsupported_abstain",
+      "source_sha256": "7880772c5b3bd3d85ca759cc773e11ee143398f0cd631f709a788b619d3883c5",
+      "phase_a_reason": "operation_unsupported"
+    },
+    {
+      "case_id": "holdout-standing_expiry-02",
+      "split": "holdout",
+      "topology": "distractor",
+      "text": "I no longer store 211 maverns beside 1228 qorels1.",
+      "episode_id": "episode-holdout-standing_expiry-02",
+      "claim_ordinal": 0,
+      "source_key": "f0ff1da9a10c76687a2f82db2afc84ef34b92434e221ebd2286a140928a806cc",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 29,
+        "text": "I no longer store 211 maverns",
+        "sha256": "01d32be0baff0ae7f314596ddcf5b57dfb9dbc794533a6e4f1ccf432d023efd4"
+      },
+      "quantity_span": {
+        "start_char": 18,
+        "end_char": 21,
+        "text": "211",
+        "sha256": "093434a3ee9e0a010bb2c2aae06c2614dd24894062a1caf26718a01e175569b8"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 12,
+          "numeric": 18,
+          "target": 22
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "store",
+          "numeric": "211",
+          "target": "maverns"
+        },
+        "edges": [
+          {
+            "head_char": 12,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 22,
+            "dependent_char": 18,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 12,
+            "dependent_char": 22,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "event",
+      "role_variant": "standing_expiry",
+      "operation_gold": "expire",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "maverns",
+      "role_scope": "",
+      "value": {
+        "magnitude": 211,
+        "sign": 1
+      },
+      "temporal_state": "expired",
+      "totality": "entire",
+      "grounding": "expiry",
+      "admit_gold": true,
+      "phase_a_expectation": "unsupported_abstain",
+      "source_sha256": "cbcbafc9bfe119445fc8990326bcd7fd7822db90368ee58f1422ce961e45f4cf",
+      "phase_a_reason": "operation_unsupported"
+    },
+    {
+      "case_id": "holdout-standing_expiry-03",
+      "split": "holdout",
+      "topology": "multiclause",
+      "text": "Fia has 1246 qorels2, but I no longer retain 212 nexels.",
+      "episode_id": "episode-holdout-standing_expiry-03",
+      "claim_ordinal": 0,
+      "source_key": "19670ff0787de49c413d960531bcaa32a4bf56d7211315ca5baaa77de661cfdf",
+      "claim_span": {
+        "start_char": 26,
+        "end_char": 55,
+        "text": "I no longer retain 212 nexels",
+        "sha256": "5948d125fbf805d600a61eaa62db945aa2922e9e41a01861c92223aa09212aee"
+      },
+      "quantity_span": {
+        "start_char": 45,
+        "end_char": 48,
+        "text": "212",
+        "sha256": "fa2b7af0a811b9acde602aacb78e3638e8506dfead5fe6c3425b10b526f94bdd"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 26,
+          "predicate": 38,
+          "numeric": 45,
+          "target": 49
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "retain",
+          "numeric": "212",
+          "target": "nexels"
+        },
+        "edges": [
+          {
+            "head_char": 38,
+            "dependent_char": 26,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 49,
+            "dependent_char": 45,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 38,
+            "dependent_char": 49,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "event",
+      "role_variant": "standing_expiry",
+      "operation_gold": "expire",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "nexels",
+      "role_scope": "",
+      "value": {
+        "magnitude": 212,
+        "sign": 1
+      },
+      "temporal_state": "expired",
+      "totality": "entire",
+      "grounding": "expiry",
+      "admit_gold": true,
+      "phase_a_expectation": "unsupported_abstain",
+      "source_sha256": "f441600d2ad551a142c2347c336b7299ea3df291297ead15927f29ade4a802cf",
+      "phase_a_reason": "operation_unsupported"
+    },
+    {
+      "case_id": "holdout-history-01",
+      "split": "holdout",
+      "topology": "direct",
+      "text": "Earlier, I owned 213 polvins.",
+      "episode_id": "episode-holdout-history-01",
+      "claim_ordinal": 0,
+      "source_key": "3f70bde94c49ba883c5f0ba7e9fb757828b16540661d9d1027ed283499beba18",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 28,
+        "text": "Earlier, I owned 213 polvins",
+        "sha256": "e879138e22a09eae56072e3597efd7d173774dc12f70cd05cca4a1a2f5777dc8"
+      },
+      "quantity_span": {
+        "start_char": 17,
+        "end_char": 20,
+        "text": "213",
+        "sha256": "d48ff4b2f68a10fd7c86f185a6ccede0dc0f2c48538d697cb33b6ada3f1e85db"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 9,
+          "predicate": 11,
+          "numeric": 17,
+          "target": 21
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "owned",
+          "numeric": "213",
+          "target": "polvins"
+        },
+        "edges": [
+          {
+            "head_char": 11,
+            "dependent_char": 9,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 21,
+            "dependent_char": 17,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 11,
+            "dependent_char": 21,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "history",
+      "role_variant": null,
+      "operation_gold": "absolute",
+      "abstention_reason": "past_only",
+      "relation_type": "quantity",
+      "target_literal": "polvins",
+      "role_scope": "",
+      "value": {
+        "magnitude": 213,
+        "sign": 1
+      },
+      "temporal_state": "past",
+      "totality": "total",
+      "grounding": "past_only",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "5f181242ef8523fec63a816aa6e3405fd7ebce85a317be4f201fa7e0cdb14d80",
+      "phase_a_reason": "past_only"
+    },
+    {
+      "case_id": "holdout-history-02",
+      "split": "holdout",
+      "topology": "distractor",
+      "text": "Previously, I retained 214 qadrels beside 1231 qorels1.",
+      "episode_id": "episode-holdout-history-02",
+      "claim_ordinal": 0,
+      "source_key": "d581e414d7b5fd6185215fa9421c07419a93634056fe5e754e6f978af32ab6de",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 34,
+        "text": "Previously, I retained 214 qadrels",
+        "sha256": "4625bf766f43a76d7fa9d2b409105d9e84d917151146a70eb05252aca931a1a0"
+      },
+      "quantity_span": {
+        "start_char": 23,
+        "end_char": 26,
+        "text": "214",
+        "sha256": "802b906a18591ead8a6dd809b262ace4c65c16e89764c40ae326cfcff811e10c"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 12,
+          "predicate": 14,
+          "numeric": 23,
+          "target": 27
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "retained",
+          "numeric": "214",
+          "target": "qadrels"
+        },
+        "edges": [
+          {
+            "head_char": 14,
+            "dependent_char": 12,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 27,
+            "dependent_char": 23,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 14,
+            "dependent_char": 27,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "history",
+      "role_variant": null,
+      "operation_gold": "absolute",
+      "abstention_reason": "past_only",
+      "relation_type": "quantity",
+      "target_literal": "qadrels",
+      "role_scope": "",
+      "value": {
+        "magnitude": 214,
+        "sign": 1
+      },
+      "temporal_state": "past",
+      "totality": "total",
+      "grounding": "past_only",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "092aecea1445a0003d54e16c46f7dee6a57d1251e0c6207207a220eb97d03797",
+      "phase_a_reason": "past_only"
+    },
+    {
+      "case_id": "holdout-history-03",
+      "split": "holdout",
+      "topology": "multiclause",
+      "text": "Goro has 1249 qorels2, but Once, I stored 215 raverns.",
+      "episode_id": "episode-holdout-history-03",
+      "claim_ordinal": 0,
+      "source_key": "c0fb683e318d03907b87f2dcb74654b7d3de0d2ead691fac7a47a49768965ac2",
+      "claim_span": {
+        "start_char": 27,
+        "end_char": 53,
+        "text": "Once, I stored 215 raverns",
+        "sha256": "e7e8bd0728da51d20fa4d5f72477b9324236eb75a7abb0d369db4a749a4a04f9"
+      },
+      "quantity_span": {
+        "start_char": 42,
+        "end_char": 45,
+        "text": "215",
+        "sha256": "d86580a57f7bf542e85202283cb845953c9d28f80a8e651db08b2fc0b2d6a731"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 33,
+          "predicate": 35,
+          "numeric": 42,
+          "target": 46
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "stored",
+          "numeric": "215",
+          "target": "raverns"
+        },
+        "edges": [
+          {
+            "head_char": 35,
+            "dependent_char": 33,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 46,
+            "dependent_char": 42,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 35,
+            "dependent_char": 46,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "history",
+      "role_variant": null,
+      "operation_gold": "absolute",
+      "abstention_reason": "past_only",
+      "relation_type": "quantity",
+      "target_literal": "raverns",
+      "role_scope": "",
+      "value": {
+        "magnitude": 215,
+        "sign": 1
+      },
+      "temporal_state": "past",
+      "totality": "total",
+      "grounding": "past_only",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "54b3c78e4fa3f77c5071e3c1793d3d22b446619032c3d1acaca220836ab31f1c",
+      "phase_a_reason": "past_only"
+    },
+    {
+      "case_id": "holdout-subset-01",
+      "split": "holdout",
+      "topology": "direct",
+      "text": "I own 216 other seldors.",
+      "episode_id": "episode-holdout-subset-01",
+      "claim_ordinal": 0,
+      "source_key": "2f8d34c12d552aa63456b80e104df43e07b4a19ec69bfb99ef58432adbb56b62",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 23,
+        "text": "I own 216 other seldors",
+        "sha256": "1e47aa0be06459badcb31aa0c7f6b078051625317ea25e831bbd9985a2c4a413"
+      },
+      "quantity_span": {
+        "start_char": 6,
+        "end_char": 9,
+        "text": "216",
+        "sha256": "0f4121d0ef1df4c86854c7ebb47ae1c93de8aec8f944035eeaa6495dd71a0678"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 2,
+          "numeric": 6,
+          "target": 16
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "own",
+          "numeric": "216",
+          "target": "seldors"
+        },
+        "edges": [
+          {
+            "head_char": 2,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 16,
+            "dependent_char": 6,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 2,
+            "dependent_char": 16,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "subset",
+      "role_variant": null,
+      "operation_gold": "absolute",
+      "abstention_reason": "subset_non_authoritative",
+      "relation_type": "quantity",
+      "target_literal": "seldors",
+      "role_scope": "",
+      "value": {
+        "magnitude": 216,
+        "sign": 1
+      },
+      "temporal_state": "present",
+      "totality": "partial",
+      "grounding": "subset_non_authoritative",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "fede4e6922d993c659c15ae6364aa01211064152249a0cf171fdb24df33e7335",
+      "phase_a_reason": "subset_non_authoritative"
+    },
+    {
+      "case_id": "holdout-subset-02",
+      "split": "holdout",
+      "topology": "distractor",
+      "text": "I store 217 spare tovells beside 1234 qorels1.",
+      "episode_id": "episode-holdout-subset-02",
+      "claim_ordinal": 0,
+      "source_key": "6302b201a35ede489f1fa91caaab121df30e56a124ea3b3eec724ebbefca36ed",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 25,
+        "text": "I store 217 spare tovells",
+        "sha256": "deb5f3fbe174420ede744f31f7e8c6512928c5d4ae44ad98a8d775659695c3ce"
+      },
+      "quantity_span": {
+        "start_char": 8,
+        "end_char": 11,
+        "text": "217",
+        "sha256": "16badfc6202cb3f8889e0f2779b19218af4cbb736e56acadce8148aba9a7a9f8"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 2,
+          "numeric": 8,
+          "target": 18
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "store",
+          "numeric": "217",
+          "target": "tovells"
+        },
+        "edges": [
+          {
+            "head_char": 2,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 18,
+            "dependent_char": 8,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 2,
+            "dependent_char": 18,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "subset",
+      "role_variant": null,
+      "operation_gold": "absolute",
+      "abstention_reason": "subset_non_authoritative",
+      "relation_type": "quantity",
+      "target_literal": "tovells",
+      "role_scope": "",
+      "value": {
+        "magnitude": 217,
+        "sign": 1
+      },
+      "temporal_state": "present",
+      "totality": "partial",
+      "grounding": "subset_non_authoritative",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "7bcc492bf1e768e2ee27fa0b24608c1ff39878a076cf5f6d6cf977f74fd6baf1",
+      "phase_a_reason": "subset_non_authoritative"
+    },
+    {
+      "case_id": "holdout-subset-03",
+      "split": "holdout",
+      "topology": "multiclause",
+      "text": "Hana has 1252 qorels2, but I removed 218 uvrins from my set.",
+      "episode_id": "episode-holdout-subset-03",
+      "claim_ordinal": 0,
+      "source_key": "ad08a521c137abbaf77cc8ba8b90db208c2de59bc49b56cba50507ce3c09408d",
+      "claim_span": {
+        "start_char": 27,
+        "end_char": 59,
+        "text": "I removed 218 uvrins from my set",
+        "sha256": "6c8f3c6bd372ed71f6d00ac06895d5590b2448b66ef246689ce70854ad09da65"
+      },
+      "quantity_span": {
+        "start_char": 37,
+        "end_char": 40,
+        "text": "218",
+        "sha256": "5966abd0cbfc86f98a186531b2b4ee5f6e910120ce13222f98207203dfc9a9a2"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 27,
+          "predicate": 29,
+          "numeric": 37,
+          "target": 41
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "removed",
+          "numeric": "218",
+          "target": "uvrins"
+        },
+        "edges": [
+          {
+            "head_char": 29,
+            "dependent_char": 27,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 41,
+            "dependent_char": 37,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 29,
+            "dependent_char": 41,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "subset",
+      "role_variant": null,
+      "operation_gold": "delta",
+      "abstention_reason": null,
+      "relation_type": "quantity",
+      "target_literal": "uvrins",
+      "role_scope": "",
+      "value": {
+        "magnitude": 218,
+        "sign": -1
+      },
+      "temporal_state": "present",
+      "totality": "partial",
+      "grounding": "subset_explicit_delta",
+      "admit_gold": true,
+      "phase_a_expectation": "unsupported_abstain",
+      "source_sha256": "8ad3664be56db3f1994adc562f822912dc9ed72499106642385c9f89cffa9fbe",
+      "phase_a_reason": "operation_unsupported"
+    },
+    {
+      "case_id": "holdout-modality-01",
+      "split": "holdout",
+      "topology": "direct",
+      "text": "I might own 219 welders.",
+      "episode_id": "episode-holdout-modality-01",
+      "claim_ordinal": 0,
+      "source_key": "7db2c152775ee43f6a85b0109789d0fe0dc8344b8d62c2a69398a1ffdee144ba",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 23,
+        "text": "I might own 219 welders",
+        "sha256": "953f67bc643e709eb82e69f1c09217951c4d1983f2dc4a6a9451689453920b29"
+      },
+      "quantity_span": {
+        "start_char": 12,
+        "end_char": 15,
+        "text": "219",
+        "sha256": "314f04b30f62e0056bd059354a5536fb2e302107eed143b5fa2aa0bbba07f608"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 8,
+          "numeric": 12,
+          "target": 16
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "own",
+          "numeric": "219",
+          "target": "welders"
+        },
+        "edges": [
+          {
+            "head_char": 8,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 16,
+            "dependent_char": 12,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 8,
+            "dependent_char": 16,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "modality",
+      "role_variant": null,
+      "operation_gold": null,
+      "abstention_reason": "modal",
+      "relation_type": "quantity",
+      "target_literal": "welders",
+      "role_scope": "",
+      "value": {
+        "magnitude": 219,
+        "sign": 1
+      },
+      "temporal_state": "uncertain",
+      "totality": "partial",
+      "grounding": "modal",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "8ba3c116fe01dab0ce1dd6b0d640bc237ce34b625be7ada0155bb077a9e50e69",
+      "phase_a_reason": "modal"
+    },
+    {
+      "case_id": "holdout-modality-02",
+      "split": "holdout",
+      "topology": "distractor",
+      "text": "I may retain 220 xavels beside 1237 qorels1.",
+      "episode_id": "episode-holdout-modality-02",
+      "claim_ordinal": 0,
+      "source_key": "ad2b38884d17d0cfc14ac17b85dcb0a672aac23da220e77a4ddd120db4e5396c",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 23,
+        "text": "I may retain 220 xavels",
+        "sha256": "0275cb1f44cef61f4b25a0b5ff7e03f2467ec12c90addd5310a6f328077ee40f"
+      },
+      "quantity_span": {
+        "start_char": 13,
+        "end_char": 16,
+        "text": "220",
+        "sha256": "36790ecd55c2030dc553685bef719df653f413a20cdad1bfd1dc934c76686ddd"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 6,
+          "numeric": 13,
+          "target": 17
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "retain",
+          "numeric": "220",
+          "target": "xavels"
+        },
+        "edges": [
+          {
+            "head_char": 6,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 17,
+            "dependent_char": 13,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 6,
+            "dependent_char": 17,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "modality",
+      "role_variant": null,
+      "operation_gold": null,
+      "abstention_reason": "modal",
+      "relation_type": "quantity",
+      "target_literal": "xavels",
+      "role_scope": "",
+      "value": {
+        "magnitude": 220,
+        "sign": 1
+      },
+      "temporal_state": "uncertain",
+      "totality": "partial",
+      "grounding": "modal",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "c69775d3848a39718761222bd24532f297c2677856b61acbe622544afb4b876f",
+      "phase_a_reason": "modal"
+    },
+    {
+      "case_id": "holdout-modality-03",
+      "split": "holdout",
+      "topology": "multiclause",
+      "text": "Ivo has 1255 qorels2, but I could store 221 yarnels.",
+      "episode_id": "episode-holdout-modality-03",
+      "claim_ordinal": 0,
+      "source_key": "03403bd3bae6e81649af56e0b6b0bf8a9aed8dfdeffcf52c257a0b8846d9b3b8",
+      "claim_span": {
+        "start_char": 26,
+        "end_char": 51,
+        "text": "I could store 221 yarnels",
+        "sha256": "7f2fc47cedb7545227d4163fc7953aea7cf6df5c9fa152e32f2bd4f3564e8c89"
+      },
+      "quantity_span": {
+        "start_char": 40,
+        "end_char": 43,
+        "text": "221",
+        "sha256": "67e9c3acebb154a282f326d4ff1951cd1f342e58e74d562b556b517da5e56132"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 26,
+          "predicate": 34,
+          "numeric": 40,
+          "target": 44
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "store",
+          "numeric": "221",
+          "target": "yarnels"
+        },
+        "edges": [
+          {
+            "head_char": 34,
+            "dependent_char": 26,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 44,
+            "dependent_char": 40,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 34,
+            "dependent_char": 44,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "modality",
+      "role_variant": null,
+      "operation_gold": null,
+      "abstention_reason": "modal",
+      "relation_type": "quantity",
+      "target_literal": "yarnels",
+      "role_scope": "",
+      "value": {
+        "magnitude": 221,
+        "sign": 1
+      },
+      "temporal_state": "uncertain",
+      "totality": "partial",
+      "grounding": "modal",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "0e996e076539238d81747abad799e8bd2748aaf6bc46fe06cc9229bb3d54b025",
+      "phase_a_reason": "modal"
+    },
+    {
+      "case_id": "holdout-attribution-01",
+      "split": "holdout",
+      "topology": "direct",
+      "text": "Jexa owns 222 zovens.",
+      "episode_id": "episode-holdout-attribution-01",
+      "claim_ordinal": 0,
+      "source_key": "f8d83e5813c8c0e72449101e962812a7bb0a248f144af5b08a04116a11151827",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 20,
+        "text": "Jexa owns 222 zovens",
+        "sha256": "e998e9070bbfc192b5cc33001c0ddb33391992973d020332642719e5b7ebb38f"
+      },
+      "quantity_span": {
+        "start_char": 10,
+        "end_char": 13,
+        "text": "222",
+        "sha256": "9b871512327c09ce91dd649b3f96a63b7408ef267c8cc5710114e629730cb61f"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 0,
+          "predicate": 5,
+          "numeric": 10,
+          "target": 14
+        },
+        "node_literals": {
+          "subject": "Jexa",
+          "predicate": "owns",
+          "numeric": "222",
+          "target": "zovens"
+        },
+        "edges": [
+          {
+            "head_char": 5,
+            "dependent_char": 0,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 14,
+            "dependent_char": 10,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 5,
+            "dependent_char": 14,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "attribution",
+      "role_variant": null,
+      "operation_gold": null,
+      "abstention_reason": "attributed_source",
+      "relation_type": "quantity",
+      "target_literal": "zovens",
+      "role_scope": "",
+      "value": {
+        "magnitude": 222,
+        "sign": 1
+      },
+      "temporal_state": "reported",
+      "totality": "partial",
+      "grounding": "attributed_source",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "3958de48fcc323ae24a288c205b2efb09ce68b5deff6ca21e74026875ad77a73",
+      "phase_a_reason": "attributed_source"
+    },
+    {
+      "case_id": "holdout-attribution-02",
+      "split": "holdout",
+      "topology": "distractor",
+      "text": "Jexa claims I own 223 abrix beside 1240 qorels1.",
+      "episode_id": "episode-holdout-attribution-02",
+      "claim_ordinal": 0,
+      "source_key": "49d02953893a806b733b7ca790458ab54f1076402954cb8cef7babfe6504a2b1",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 27,
+        "text": "Jexa claims I own 223 abrix",
+        "sha256": "048c13d2a7d706d06588f27e031f885ff0818fc3952b4b48f44ee4f1c743ce0c"
+      },
+      "quantity_span": {
+        "start_char": 18,
+        "end_char": 21,
+        "text": "223",
+        "sha256": "56f4da26ed956730309fa1488611ee0f13b0ac95ebb1bc9b5d210e31ff70e79c"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 12,
+          "predicate": 14,
+          "numeric": 18,
+          "target": 22
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "own",
+          "numeric": "223",
+          "target": "abrix"
+        },
+        "edges": [
+          {
+            "head_char": 14,
+            "dependent_char": 12,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 22,
+            "dependent_char": 18,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 14,
+            "dependent_char": 22,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "attribution",
+      "role_variant": null,
+      "operation_gold": null,
+      "abstention_reason": "attributed_source",
+      "relation_type": "quantity",
+      "target_literal": "abrix",
+      "role_scope": "",
+      "value": {
+        "magnitude": 223,
+        "sign": 1
+      },
+      "temporal_state": "reported",
+      "totality": "partial",
+      "grounding": "attributed_source",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "161a45217e034db726d2784c56ed509c28db2016af6e8eecbcfe392c2675f060",
+      "phase_a_reason": "attributed_source"
+    },
+    {
+      "case_id": "holdout-attribution-03",
+      "split": "holdout",
+      "topology": "multiclause",
+      "text": "Per Jexa, I store 224 cedrons, but I have 1258 qorels2.",
+      "episode_id": "episode-holdout-attribution-03",
+      "claim_ordinal": 0,
+      "source_key": "624f1a5d9727988296823c14800478d02cfe085b9facddcec158732b525e33bd",
+      "claim_span": {
+        "start_char": 0,
+        "end_char": 29,
+        "text": "Per Jexa, I store 224 cedrons",
+        "sha256": "24a0a5562e342e45e2c00ffd450f115d09f3cd34508565fdd3a89bbbcf3efe95"
+      },
+      "quantity_span": {
+        "start_char": 18,
+        "end_char": 21,
+        "text": "224",
+        "sha256": "84a5092e4a5b6fe968fd523fb2fc917dbffae44105f82b6b94c8ed5b9a800223"
+      },
+      "gold_dependency_path": {
+        "node_char_offsets": {
+          "subject": 10,
+          "predicate": 12,
+          "numeric": 18,
+          "target": 22
+        },
+        "node_literals": {
+          "subject": "I",
+          "predicate": "store",
+          "numeric": "224",
+          "target": "cedrons"
+        },
+        "edges": [
+          {
+            "head_char": 12,
+            "dependent_char": 10,
+            "dependency_label": "nsubj"
+          },
+          {
+            "head_char": 22,
+            "dependent_char": 18,
+            "dependency_label": "nummod"
+          },
+          {
+            "head_char": 12,
+            "dependent_char": 22,
+            "dependency_label": "dobj"
+          }
+        ]
+      },
+      "role_gold": "attribution",
+      "role_variant": null,
+      "operation_gold": null,
+      "abstention_reason": "attributed_source",
+      "relation_type": "quantity",
+      "target_literal": "cedrons",
+      "role_scope": "",
+      "value": {
+        "magnitude": 224,
+        "sign": 1
+      },
+      "temporal_state": "reported",
+      "totality": "partial",
+      "grounding": "attributed_source",
+      "admit_gold": false,
+      "phase_a_expectation": "negative",
+      "source_sha256": "1f955a17bd2deb79bfedd664bdf390c18bf266b3ec5a2527ad0933ccbe06ba2e",
+      "phase_a_reason": "attributed_source"
+    }
+  ]
+}

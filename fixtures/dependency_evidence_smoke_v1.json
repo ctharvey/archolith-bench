@@ -1,0 +1,48 @@
+{
+  "schema_version": "dependency-evidence-smoke-v1",
+  "description": "Generic source-authored smoke labels for the absolute-only evidence seam.",
+  "cases": [
+    {
+      "case_id": "lanterns-train-positive",
+      "split": "train",
+      "source": "I have 4 lanterns.",
+      "syntax": {"candidate_span": [0, 17], "numeric_value_span": [7, 8], "subject_span": [0, 1], "predicate_span": [2, 6], "target_span": [9, 17], "marker_categories": [], "clause_root_token": 1},
+      "expected": {"semantic_role": "current_total", "operation": "absolute", "admit": true}
+    },
+    {
+      "case_id": "maps-train-positive",
+      "split": "train",
+      "source": "I store 7 maps.",
+      "syntax": {"candidate_span": [0, 14], "numeric_value_span": [8, 9], "subject_span": [0, 1], "predicate_span": [2, 7], "target_span": [10, 14], "marker_categories": [], "clause_root_token": 1},
+      "expected": {"semantic_role": "current_total", "operation": "absolute", "admit": true}
+    },
+    {
+      "case_id": "seals-holdout-positive",
+      "split": "holdout",
+      "source": "I keep 2 seals.",
+      "syntax": {"candidate_span": [0, 14], "numeric_value_span": [7, 8], "subject_span": [0, 1], "predicate_span": [2, 6], "target_span": [9, 14], "marker_categories": [], "clause_root_token": 1},
+      "expected": {"semantic_role": "current_total", "operation": "absolute", "admit": true}
+    },
+    {
+      "case_id": "loaves-train-event",
+      "split": "train",
+      "source": "I baked 5 loaves.",
+      "syntax": {"candidate_span": [0, 16], "numeric_value_span": [8, 9], "subject_span": [0, 1], "predicate_span": [2, 7], "target_span": [10, 16], "marker_categories": ["past_morphology"], "clause_root_token": 1},
+      "expected": {"semantic_role": "event", "operation": null, "admit": false, "reason": "non_holding_event"}
+    },
+    {
+      "case_id": "badges-holdout-attribution",
+      "split": "holdout",
+      "source": "I hear Fara has 8 badges.",
+      "syntax": {"candidate_span": [0, 24], "numeric_value_span": [16, 17], "subject_span": [7, 11], "predicate_span": [12, 15], "target_span": [18, 24], "marker_categories": ["embedded_clause"], "clause_root_token": 1},
+      "expected": {"semantic_role": "attribution", "operation": null, "admit": false, "reason": "attributed_source"}
+    },
+    {
+      "case_id": "tags-holdout-competing-value",
+      "split": "holdout",
+      "source": "I have 3 tags and 6 seals.",
+      "syntax": {"candidate_span": [0, 25], "numeric_value_span": [7, 8], "subject_span": [0, 1], "predicate_span": [2, 6], "target_span": [9, 13], "marker_categories": ["additional_numeric", "coordination"], "clause_root_token": 1},
+      "expected": {"semantic_role": "competing_value", "operation": null, "admit": false, "reason": "competing_value"}
+    }
+  ]
+}

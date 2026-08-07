@@ -39,6 +39,12 @@ harness = ["datasets>=2"]
 content-vector = ["neo4j>=5.0", "openai>=1.0"]
 # Bolt read path for the menhir-scalar-state e2e harness (shadow Views are not recall-visible).
 menhir-scalar = ["neo4j>=5.0"]
+# Offline research parser only; this is intentionally excluded from `all` and `dev`.
+# The official en_core_web_sm 3.8.0 metadata requires spaCy >=3.8,<3.9 and is ~12 MB.
+research-parser = [
+    "spacy==3.8.14",
+    "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85",
+]
 all = ["archolith-filter", "archolith-audit", "datasets>=2"]
 dev = ["pytest>=8", "ruff>=0.4"]
 

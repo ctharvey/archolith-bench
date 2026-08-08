@@ -1,6 +1,58 @@
 # Arm E (Recall Lab) rescore of the 78-item KU slice — 2026-08-08
 
-## What this is
+> **SUPERSEDED (2026-08-08, later same day).** Everything below "Decomposition" was measured
+> before a second missing-field bug was found and fixed (menhir `d0c6752`: `_serialize_result`
+> also omitted each memory's `temporal_facts`, which the KU prompt's "previously vs now" /
+> supersession reasoning depends on, dropped for every Recall Lab arm regardless of tuning).
+> **See "CORRECTED results" below for the real, deconfounded numbers** -- the original
+> decomposition table understated every arm's score and mischaracterized which tuning
+> actually costs anything. Kept for the record, not as current guidance.
+
+## CORRECTED results (2026-08-08, after menhir `d0c6752` — temporal_facts fix)
+
+Reran D/E/F/G/H against the same graph (`LME_RUN_SUFFIX=-v2`, results in
+`results/lme-ku-buildout/scalar-canonical-ku78-v1-20260806-arm-{arm}-rescore-v2/`), after
+confirming live (not just via the unit tests) that the real Recall Lab endpoint now returns
+`temporal_facts` for the exact case that was broken before (`c4ea545c`'s superseded gym
+schedule fact).
+
+| Arm | Facet candidates | Oracle + intent lens | Warden gate | Evidence-anchor | Score |
+|---|---|---|---|---|---|
+| canonical (production) | off | off | off | — | **68/78 (0.872)** |
+| F | **on** | off | off | on (moot — no warden) | **68/78 (0.872)** — no cost |
+| G | off | **on** | off | on (moot — no warden) | **65/78 (0.833)** — real −3 |
+| H | on | on | **off** | soft | **68/78 (0.872)** — recovered |
+| D | on | on | **on** | hard | 67/78 (0.859) |
+| E | on | on | **on** | soft | 67/78 (0.859) |
+
+**This is a materially different picture from the confounded run:**
+
+1. **Facet candidates alone has zero measurable cost** (F = canonical exactly). The earlier
+   64/78 was almost entirely the missing-`temporal_facts` artifact, not a real facet-ranking
+   defect.
+2. **Oracle ranking + intent lens alone has a real, non-artifact cost of 3 questions**
+   (68→65, G). Regressed: `6071bd76`, `c4ea545c`, `e61a7584`.
+3. **Adding facet candidates on top of oracle+intent (H) recovers 2 of those 3 questions**
+   (`6071bd76`, `c4ea545c`) — facet candidates appear to compensate for something oracle
+   ranking alone gets wrong, landing H back at 68/78, matching canonical. `e61a7584`
+   ("How long have I had my cat, Luna?", gold "9 months") stays wrong in G, H, *and* D/E — a
+   genuine oracle_ranking-caused failure that facet candidates cannot rescue.
+4. **Warden gate still costs something on top of the recovered H baseline** — D and E both
+   drop to 67/78 (one further question below H). Real, but far smaller than the confounded
+   run suggested (that showed D/E at 63/78, a 5-question gap from canonical; the real gap is
+   1 question from H, 2 from raw oracle-only G's floor).
+5. **D=E still holds** (both 67/78) — the evidence-anchor hard/soft verification from earlier
+   this session is unaffected by this fix; that finding was never confounded by the
+   `temporal_facts` gap since it only affects whether Guard 5 is in the chain at all, not
+   candidate content.
+
+**Revised bottom line:** the KU-slice "regression" this session set out to explain was
+mostly a measurement artifact (missing `temporal_facts`). Once corrected, the only genuine
+per-arm cost left is oracle_ranking+intent_lens's 3-question hit — largely, but not
+completely, offset when facet_candidates is also on — plus a small additional warden-gate
+cost. Facet candidates and evidence-anchor mode are not the story.
+
+## What this is (original run, now historical — see correction above)
 
 Rescored the most recent canonical 78-item knowledge-update LME slice
 (`scalar-canonical-ku78-v1-20260806`) through Menhir's Recall Lab **arm E** tuning

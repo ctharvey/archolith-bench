@@ -42,30 +42,44 @@ schedule fact).
    drop to 67/78 (one further question below H). Real, but far smaller than the confounded
    run suggested (that showed D/E at 63/78, a 5-question gap from canonical; the real gap is
    1 question from H, 2 from raw oracle-only G's floor).
-5. **D=E's matching aggregate score is partly coincidental — verified per-item, not just
-   per-score.** D and E disagree on two *different* questions that happen to net to the same
-   count:
-   - **`26bdc477` (D wrong, E/H right) — correction: weaker than "real signal", closer to
-     ambiguous.** An earlier pass here compared recalled-content *length* (6413 vs 5713 chars)
-     and concluded D admitted new content containing the contradictory trip breakdown ("three
-     to Yellowstone, three to Yosemite, three to the Grand Canyon"). Full text diff shows that
-     was wrong: **the breakdown is present, byte-identical, in both D's and H's recalled
-     context**, buried in the same shared `[RELATED semantic MEMORY] user:` mega-blob. The
-     actual difference is one extra, unrelated `[RELATED semantic MEMORY]` item at the end of
-     D's list (about a tripod, not trip counts). H had access to the same contradictory text
-     and ignored it; D had one extra distractor item and surfaced the breakdown verbatim. That
-     is a much weaker causal story than "D admitted bad content" — it may be a real
-     length/attention threshold effect, or it may be the same kind of same-input-adjacent,
-     different-output stochastic behavior as `6071bd76` below. Not confidently distinguishable
-     from noise on this evidence.
-   - **`6071bd76` (E wrong, D/H right) is pure LLM generation noise, not signal.** H and E's
-     recalled context is **byte-for-byte identical** for this item — same prompt, same
-     context — yet H answers correctly and E doesn't. Nothing about evidence-anchor mode can
-     explain this; it's stochastic variance in the gpt-4o answer call.
-   - Net effect: the original "D=E, hard vs soft evidence-anchor doesn't matter" verdict
-     still holds in aggregate. Of the two items behind that aggregate match, one (`6071bd76`)
-     is confirmed pure noise; the other (`26bdc477`) is not confidently real signal either —
-     don't cite this pair as evidence of a genuine evidence-anchor behavioral difference.
+5. **D=E's matching aggregate score is coincidental, and the earlier "verified, not a
+   misconfiguration" conclusion about evidence-anchor was itself too strong — corrected with
+   both code and cross-arm data.**
+
+   Comparing all four arms (F/H/D/E) together on the same items, not just pairwise, shows
+   **F, H, and E converge on identical recalled content** (byte-identical block order) on
+   `26bdc477` and `c4ea545c`; **D alone consistently differs**. That pattern is explained by
+   the actual gating code (`recall_support.py:562-647`, `recall_pipeline.py:1452`):
+   - `_apply_frontier` (the whole oracle/warden pass) only runs at all when
+     `oracle_ranking`, `warden_gate`, or `belief_gate` is on. **F has none of the three** —
+     `_apply_frontier` never executes for F, so its default `enable_evidence_anchor=True` is
+     completely inert.
+   - `AssertionPipeline` always computes REFUSE/FLAG verdicts from `evidence_anchor` whenever
+     `_apply_frontier` runs — but those verdicts only actually **remove candidates from the
+     result** when `enable_warden_gate=True` (`recall_support.py:640`:
+     `if tuning.enable_warden_gate: ... [s for s in result if s.uuid not in refused]`).
+     Without it, the computed refusals are discarded.
+   - **H** triggers `_apply_frontier` via `oracle_ranking=True`, but has `warden_gate=False` —
+     so nothing gets filtered, only reordered, and here the reorder happened to preserve the
+     same order as no-frontier-at-all (F). **E** has `warden_gate=True` but
+     `evidence_anchor=False` — Guard 5 (`EvidenceAnchorWarden`) never enters the chain, so
+     there's nothing for hard-vs-soft to differ on. **D is the only arm where `warden_gate=True`
+     AND `evidence_anchor=True` (default) coincide** — the one configuration where Guard 5 can
+     actually refuse a candidate and have that refusal applied.
+   - Given that, D's content differences from E on `26bdc477` and `c4ea545c` (both confirmed —
+     see items above) are the mechanism working as designed, not noise or an artifact.
+
+   **Correction to the earlier "verified this is not a misconfiguration" pass**: that check
+   confirmed the wiring is correct and established evidence-anchor's effect *could* only touch
+   a small population (96.6% of episodes are `source="user"`, a recognized anchor) — both
+   true — but then concluded evidence-anchor "measurably does nothing" on this corpus, which
+   overstates it. A small population (~3.4% non-`user` episodes) is enough to reach a handful
+   of real questions, and two are now confirmed (`26bdc477`, `c4ea545c`). Evidence-anchor mode
+   does have a real, mechanistic, if narrow, effect here — it isn't inert, and D≠E's aggregate
+   score match should not be read as behavioral equivalence.
+   - `6071bd76` (E wrong, D/H right) remains **confirmed pure LLM generation noise** — H and
+     E's recalled context is byte-for-byte identical for this specific item, so nothing
+     mechanistic explains the differing answer.
 6. **`e61a7584` ("How long have I had my cat, Luna?", gold "9 months") — correction: also
    pure LLM noise, not a Recall-Lab mechanism.** An earlier version of this note called this
    a genuine open finding (the model over-applying "superseded" caution to a duration

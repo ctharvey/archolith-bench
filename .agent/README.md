@@ -15,6 +15,15 @@ Unified benchmark suite for the archolith product family. Measures token savings
 - **audit** (Phase 4): MCP token-waste reduction before/after via archolith-audit
 - **industry** (Launch gate): Product-to-benchmark coverage matrix tying Archolith claims to trusted external benchmark families
 
+## Docs map
+
+- **Full per-script methodology** (scalar-identity/dependency-bridge research instruments, menhir
+  ScalarStateView instruments) -> [`.agent/scripts-index.md`](scripts-index.md)
+- **System design, data flow, file layout** -> [`.agent/architecture.md`](architecture.md)
+- **Dataclass/schema reference** -> [`.agent/data_models.md`](data_models.md)
+- **Pre-launch checklist** -> [`.agent/launch-readiness-tracker.md`](launch-readiness-tracker.md)
+- **User-facing install/quickstart** -> [`../README.md`](../README.md)
+
 ## Before writing a script, read the index
 
 `projects/archolith/menhir/.agent/scripts-index.md` indexes **every durable script in both repos**
@@ -24,122 +33,10 @@ the same commit that adds it). **Keep the bench half of that index in sync** whe
 or remove a script here.
 
 Before writing a new analysis script, check it there first. Two sessions in a row re-derived results
-an existing instrument already produced.
-
-The durable offline typed-scalar instrument is
-`scripts/measure_deterministic_scalar_shadow.py`. It consumes only JSON captures from Menhir's
-`scripts/freeze_scalar_samples.py`, loads the real Menhir proposal/gate/extractor/comparator from an
-explicit checkout, reruns the pure deterministic extractor over frozen episode text, and replays
-captured LLM proposals through the real gate/comparator. It makes no new LLM, network, Neo4j, Docker,
-or service calls. The first held-out input is the versioned non-LME
-`fixtures/deterministic_scalar_heldout_v1.json`; its six `2 namespaces × k=3` calls are smoke
-evidence only, not a promotion or population gate. The paired Menhir workflow owns the exact
-capture/report commands.
-
-The research scalar-identity acceptance panel is deliberately smaller and has no runtime lane. It
-feeds source-bound raw candidates through Menhir's pure research adapter and structural composer:
-
-```bash
-python scripts/measure_scalar_identity_acceptance_panel.py \
-  fixtures/scalar_identity_acceptance_v1.json \
-  --menhir-root ../menhir \
-  --json-out results/scalar-identity-acceptance/report.json \
-  --markdown-out results/scalar-identity-acceptance/report.md
-```
-
-The report is source-free and keeps `promotion_status=not_evaluable`; it is a regression panel, not
-a population estimate or permission to route/persist deterministic candidates.
-
-The paired noisy-language companion keeps clean and informal cases in separately reported slices:
-
-```bash
-python scripts/measure_scalar_identity_noisy_panel.py \
-  fixtures/scalar_identity_noisy_v1.json \
-  --menhir-root ../menhir \
-  --json-out results/scalar-identity-noisy/report.json \
-  --markdown-out results/scalar-identity-noisy/report.md
-```
-
-It reports paired invariance, perturbation coverage, and false-current-state errors. It remains a
-bounded regression panel with `promotion_status=not_evaluable`, not a population estimate.
-
-The opt-in mapped-isolation comparison runs the same fixture through both research paths and reports
-identity differences and composition gains without source quotes:
-
-```bash
-python scripts/measure_scalar_identity_isolated_comparison.py \
-  fixtures/scalar_identity_noisy_v1.json \
-  --menhir-root ../menhir \
-  --json-out results/scalar-identity-isolated/report.json \
-  --markdown-out results/scalar-identity-isolated/report.md
-```
-
-The isolated adapter must be present in the selected Menhir checkout; the runner fails loudly rather
-than falling back to the canonical adapter. This is research evidence only and never enables routing,
-persistence, or scalar authority.
-
-The cumulative-completion holdout reuses the same source-free comparison runner:
-
-```bash
-python scripts/measure_scalar_identity_isolated_comparison.py \
-  fixtures/scalar_identity_cumulative_v1.json \
-  --menhir-root ../menhir \
-  --json-out results/scalar-identity-cumulative/report.json \
-  --markdown-out results/scalar-identity-cumulative/report.md
-```
-
-`fixtures/scalar_identity_cumulative_v1.json` is a 24-case, 12-pair non-LME contract with six
-train and six holdout pairs. Positive cases use only source-authored present-perfect completion
-forms with strict `so far`/`to date` wording and typed operation `absolute`; adversarial cases
-cover past, negation, modality/future, history, coordination, and subset/empty-target risks.
-The validated result is baseline clean 12/12 (6 composed), baseline noisy 6/12 (0 composed), and
-isolated clean/noisy 12/12 (6 composed each), with a +6 noisy composition gain and 0/0
-false-current-state errors. It is a bounded regression instrument, not a production-promotion gate.
-
-The dependency-evidence bridge has a separate offline measurement runner:
-
-```bash
-python scripts/measure_dependency_scalar_bridge.py --menhir-root ../menhir \
-  --json-out results/dependency-bridge/report.json \
-  --markdown-out results/dependency-bridge/report.md
-```
-
-It strictly verifies the 48-case fixture SHA/version, builds raw candidates from supplied subject,
-operation/value, claim text, and locators, and loads the real Menhir adapter, immutable evidence
-models, and Phase-A dependency rule. It has no LLM, network, runtime, Neo4j, cache, or
-bridge-to-baseline fallback lane. Gold candidate locators are supplied explicitly, so span
-recognition is reported as `not_measured_gold_locator_supplied`; role and operation
-classification remain `not_measured`. Outputs refuse overwrite and create parent directories.
-
-The authoritative r2 execution is recorded in
-`results/dependency-scalar-bridge/phase-a-v1-20260806-r2/report.{json,md}` for fixture SHA
-`bde118508cf55c94bbd10fc88fbc625a0f465859a545f3ca79deb391a25ba57b`: 48 cases, 5/6 supported
-identities/provenance exact, 0/14 unsupported composed, 0/28 false-current, 45/45 evidence
-provenance, 45/45 bridge provenance, 179/192 cue exact, and edges 135 TP / 180 predicted / 144
-gold (P .75/R .9375/F1 .8333). Proposal parity was 45/48 (three `temporal_past_only` adapter
-drops); composer replay was stable 45/45; baseline composition was 2/48 (43 abstain, 3 drops).
-R1 was the historical first execution with incomplete git provenance; r2 changed instrumentation
-only and aggregates/cases are identical. Promotion remains `not_evaluable`, and recognition,
-role/operation, performance, cache, and full replay gates remain unmeasured. The one supported miss
-is bare `retain`; no post-hoc holdout tuning is permitted—broader support requires an independent
-policy panel. Report SHA256: JSON
-`53aff17ecd1d758f2d808050e9ac8e2512f269a3254ae2fee99f25d2696fc412`; Markdown
-`3284c6d81d47e22907c7fcd6fe79993ca65fa386a7206366d9d079ac78999287`.
-
-## menhir ScalarStateView instruments (live here, documented in menhir)
-
-`scripts/scalar_state_coverage.py` and its siblings (`run_scalar_state_e2e.sh`,
-`inspect_scalar_state_graph.py`, `scalar_view_authority_live.py`, `scalar_leads_authority_live.py`,
-`scalar_phase_d.py`) measure menhir's scalar/View ingest path. They live here because they import
-`archolith_bench.harness.menhir_scalar_state` fixtures and the `scalar_bolt` prod guard.
-
-Anyone working in menhir looks for them there and does not find them, then re-derives the answers by
-hand. The index that prevents that is
-`projects/archolith/menhir/.agent/workflows/scalar_state_measurement.md` — **keep it in sync when
-adding, renaming, or removing an instrument here.**
-
-Frozen methodology: every measured run uses a FRESH ISOLATED menhir+neo4j stack. Stacking rounds on
-one stack is invalid for comparative yield.
+an existing instrument already produced. Full methodology for the bench-owned scalar-research and
+ScalarStateView instruments (commands, fixtures, validated results) lives in
+[`.agent/scripts-index.md`](scripts-index.md) — read that before touching `scripts/measure_*.py` or
+`scripts/scalar_*.py`.
 
 ## How to Run
 ```bash

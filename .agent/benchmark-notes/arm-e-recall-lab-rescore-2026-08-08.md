@@ -66,16 +66,21 @@ schedule fact).
      still holds in aggregate. Of the two items behind that aggregate match, one (`6071bd76`)
      is confirmed pure noise; the other (`26bdc477`) is not confidently real signal either —
      don't cite this pair as evidence of a genuine evidence-anchor behavioral difference.
-6. **`e61a7584` ("How long have I had my cat, Luna?", gold "9 months") is a genuine, open
-   finding worth its own follow-up.** F/G/H all refuse to answer, citing the fact as
-   "superseded and not applicable for the current context" — the model is treating a
-   duration-since-acquisition fact as if it stops being knowable once marked superseded,
-   when logically it should still answer from the superseded acquisition fact plus elapsed
-   time. Canonical answers it correctly. This is present even in F (no warden, no oracle at
-   all), so it isn't warden-gate- or oracle-ranking-specific; it's a real, reproducible
-   Recall-Lab-vs-production difference not yet root-caused. Directly relevant to the
-   warden/oracle stack's governance framing (rightly conservative about asserting stale facts
-   as current) needing to not overcorrect on ordinary personal-memory duration questions.
+6. **`e61a7584` ("How long have I had my cat, Luna?", gold "9 months") — correction: also
+   pure LLM noise, not a Recall-Lab mechanism.** An earlier version of this note called this
+   a genuine open finding (the model over-applying "superseded" caution to a duration
+   question). Byte-for-byte diff shows that's wrong: **canonical's and G's recalled context
+   are 100% identical** — same content, same order, same 5573 bytes — yet canonical answers
+   correctly ("...as of March 30, 2023, you had Luna for about 9 months") and G refuses
+   ("does not provide a current authoritative value"). Same input, different output, same
+   class of noise as `6071bd76`. There is no retrieval, tuning, warden, or oracle mechanism
+   to point at here — it's the answer model's own inconsistency on an ambiguous instruction.
+   The system prompt's "safe veto" policy doesn't clearly say whether a superseded
+   duration-since-X fact should be extrapolated or refused, and the model resolves that
+   ambiguity differently across otherwise-identical calls. That prompt-clarity gap is a real,
+   worthwhile thing to fix — but it is independent of anything found in this session's arm
+   decomposition, and F/G/H all landing on the wrong side of that coin flip here looks like
+   coincidence, not a shared cause, given the G-vs-canonical byte-identity.
 
 **Revised bottom line:** the KU-slice "regression" this session set out to explain was
 mostly a measurement artifact (missing `temporal_facts`). Once corrected, the only genuine

@@ -45,19 +45,27 @@ schedule fact).
 5. **D=E's matching aggregate score is partly coincidental — verified per-item, not just
    per-score.** D and E disagree on two *different* questions that happen to net to the same
    count:
-   - **`26bdc477` (D wrong, E/H right) is real, mechanistic signal.** D's recalled context is
-     genuinely different from E's/H's (6413 vs 5713 chars, identical everywhere else) — D's
-     hard evidence-anchor mode admits extra content: a trip-by-trip breakdown ("three to
-     Yellowstone, three to Yosemite, three to the Grand Canyon") that numerically contradicts
-     the correct total of five. E and H, without that extra content, both answer correctly.
+   - **`26bdc477` (D wrong, E/H right) — correction: weaker than "real signal", closer to
+     ambiguous.** An earlier pass here compared recalled-content *length* (6413 vs 5713 chars)
+     and concluded D admitted new content containing the contradictory trip breakdown ("three
+     to Yellowstone, three to Yosemite, three to the Grand Canyon"). Full text diff shows that
+     was wrong: **the breakdown is present, byte-identical, in both D's and H's recalled
+     context**, buried in the same shared `[RELATED semantic MEMORY] user:` mega-blob. The
+     actual difference is one extra, unrelated `[RELATED semantic MEMORY]` item at the end of
+     D's list (about a tripod, not trip counts). H had access to the same contradictory text
+     and ignored it; D had one extra distractor item and surfaced the breakdown verbatim. That
+     is a much weaker causal story than "D admitted bad content" — it may be a real
+     length/attention threshold effect, or it may be the same kind of same-input-adjacent,
+     different-output stochastic behavior as `6071bd76` below. Not confidently distinguishable
+     from noise on this evidence.
    - **`6071bd76` (E wrong, D/H right) is pure LLM generation noise, not signal.** H and E's
      recalled context is **byte-for-byte identical** for this item — same prompt, same
      context — yet H answers correctly and E doesn't. Nothing about evidence-anchor mode can
      explain this; it's stochastic variance in the gpt-4o answer call.
    - Net effect: the original "D=E, hard vs soft evidence-anchor doesn't matter" verdict
-     still holds in aggregate, but is now known to rest on one real effect and one noise
-     artifact that happen to cancel, not on the two modes being behaviorally identical
-     item-by-item.
+     still holds in aggregate. Of the two items behind that aggregate match, one (`6071bd76`)
+     is confirmed pure noise; the other (`26bdc477`) is not confidently real signal either —
+     don't cite this pair as evidence of a genuine evidence-anchor behavioral difference.
 6. **`e61a7584` ("How long have I had my cat, Luna?", gold "9 months") is a genuine, open
    finding worth its own follow-up.** F/G/H all refuse to answer, citing the fact as
    "superseded and not applicable for the current context" — the model is treating a

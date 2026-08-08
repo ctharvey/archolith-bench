@@ -32,19 +32,42 @@ schedule fact).
    defect.
 2. **Oracle ranking + intent lens alone has a real, non-artifact cost of 3 questions**
    (68→65, G). Regressed: `6071bd76`, `c4ea545c`, `e61a7584`.
-3. **Adding facet candidates on top of oracle+intent (H) recovers 2 of those 3 questions**
-   (`6071bd76`, `c4ea545c`) — facet candidates appear to compensate for something oracle
-   ranking alone gets wrong, landing H back at 68/78, matching canonical. `e61a7584`
-   ("How long have I had my cat, Luna?", gold "9 months") stays wrong in G, H, *and* D/E — a
-   genuine oracle_ranking-caused failure that facet candidates cannot rescue.
+3. **Adding facet candidates on top of oracle+intent (H) recovers 2 of G's 3 regressions**
+   (`6071bd76`, `c4ea545c`) — H nets back to 68/78, matching canonical. **Correction to an
+   earlier version of this note:** `e61a7584` is NOT oracle-specific — it is wrong in **F
+   too** (facet-only, no oracle/intent/warden at all), so all three Recall Lab arms (F, G, H)
+   fail on it identically while canonical gets it right. It is a residual Recall-Lab-vs-
+   production difference, not attributable to any one tuning flag — see item 6 below.
 4. **Warden gate still costs something on top of the recovered H baseline** — D and E both
    drop to 67/78 (one further question below H). Real, but far smaller than the confounded
    run suggested (that showed D/E at 63/78, a 5-question gap from canonical; the real gap is
    1 question from H, 2 from raw oracle-only G's floor).
-5. **D=E still holds** (both 67/78) — the evidence-anchor hard/soft verification from earlier
-   this session is unaffected by this fix; that finding was never confounded by the
-   `temporal_facts` gap since it only affects whether Guard 5 is in the chain at all, not
-   candidate content.
+5. **D=E's matching aggregate score is partly coincidental — verified per-item, not just
+   per-score.** D and E disagree on two *different* questions that happen to net to the same
+   count:
+   - **`26bdc477` (D wrong, E/H right) is real, mechanistic signal.** D's recalled context is
+     genuinely different from E's/H's (6413 vs 5713 chars, identical everywhere else) — D's
+     hard evidence-anchor mode admits extra content: a trip-by-trip breakdown ("three to
+     Yellowstone, three to Yosemite, three to the Grand Canyon") that numerically contradicts
+     the correct total of five. E and H, without that extra content, both answer correctly.
+   - **`6071bd76` (E wrong, D/H right) is pure LLM generation noise, not signal.** H and E's
+     recalled context is **byte-for-byte identical** for this item — same prompt, same
+     context — yet H answers correctly and E doesn't. Nothing about evidence-anchor mode can
+     explain this; it's stochastic variance in the gpt-4o answer call.
+   - Net effect: the original "D=E, hard vs soft evidence-anchor doesn't matter" verdict
+     still holds in aggregate, but is now known to rest on one real effect and one noise
+     artifact that happen to cancel, not on the two modes being behaviorally identical
+     item-by-item.
+6. **`e61a7584` ("How long have I had my cat, Luna?", gold "9 months") is a genuine, open
+   finding worth its own follow-up.** F/G/H all refuse to answer, citing the fact as
+   "superseded and not applicable for the current context" — the model is treating a
+   duration-since-acquisition fact as if it stops being knowable once marked superseded,
+   when logically it should still answer from the superseded acquisition fact plus elapsed
+   time. Canonical answers it correctly. This is present even in F (no warden, no oracle at
+   all), so it isn't warden-gate- or oracle-ranking-specific; it's a real, reproducible
+   Recall-Lab-vs-production difference not yet root-caused. Directly relevant to the
+   warden/oracle stack's governance framing (rightly conservative about asserting stale facts
+   as current) needing to not overcorrect on ordinary personal-memory duration questions.
 
 **Revised bottom line:** the KU-slice "regression" this session set out to explain was
 mostly a measurement artifact (missing `temporal_facts`). Once corrected, the only genuine

@@ -279,7 +279,7 @@ and Graphiti-backed graph mutation as a normal build. Parsed `haystack_dates` ar
 `occurred_at` on both the episode and its `TurnEvidence`; Menhir retains its own `recorded_at`
 separately for processing cursors.
 
-`run_suburbs_fixture.sh` is the canonical extraction-regression entrypoint. It gives the run a
+`scripts/longmemeval/run_suburbs_fixture.sh` is the canonical extraction-regression entrypoint. It gives the run a
 dedicated Neo4j container, volume, ports, manifest, logs, and result directory; refuses accidental
 reuse unless resume is explicitly enabled; checks that Menhir contains the required fix commit;
 then verifies current and retired graph facts directly. Fixture evidence is diagnostic and must

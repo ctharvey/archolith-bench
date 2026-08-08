@@ -81,6 +81,42 @@ The regression is baked into facet_candidates and oracle_ranking/intent_lens ind
 (not their combination, and not evidence-anchor mode) — that's where a fix would need to
 target, not the evidence-anchor gate.
 
+## Verified this is not a misconfiguration (2026-08-08)
+
+D=E was suspicious enough to check the wiring rather than assume the flag is a no-op bug.
+Traced the full chain in `src/menhir` and confirmed live against the graph:
+
+- `RecallLabTuning.enable_evidence_anchor` -> `RetrievalTuningConfig` -> `AssertionPipeline.
+  __init__` (`services/assertion_pipeline.py:104-105`): `if evidence_anchor:
+  default.append(EvidenceAnchorWarden())` -- correctly gates whether Guard 5 is even in the
+  warden chain. Confirmed correct, not the issue.
+- `EvidenceAnchorWarden` only REFUSEs when a candidate's `SupportProfile` is synthetic-only
+  (`domain/self_reinforcement.py`: `is_synthetic_only` / `has_external_anchor` against
+  `ANCHOR_KINDS = {"user", "log", "test", "git", "file", "external", "manual", "timestamp"}`,
+  `domain/truth/kinds.py`).
+- **Live query against the actual graph** (`menhir-lme-scalar-canonical-ku78-v1-20260806`,
+  restarted read-only for this check, stopped again after):
+  ```cypher
+  MATCH (e:Episodic) WHERE e.group_id STARTS WITH 'lme-'
+  RETURN e.source, count(*)
+  -- "user": 1826, "remote-api": 58, "message": 6
+  ```
+  **96.6% of episodes carry `source="user"`** -- confirmed in the ingest code too
+  (`scripts/longmemeval/lib/ingest.py:264`: `source=("user" if is_user else None)`).
+  `"user"` is in `ANCHOR_KINDS`, so nearly every candidate already has a legitimate external
+  anchor by construction (LongMemEval haystacks are simulated user statements). Guard 5 in
+  hard mode (D) therefore ADMITs almost everything already, the same as soft mode (E) --
+  there's barely any synthetic-only population for the hard/soft distinction to act on. The
+  remaining ~64 non-`user` episodes (2-4 per namespace, scattered thinly across ~30
+  namespaces) plausibly explain D's slightly higher token count vs E ($0.218 vs $0.208) but
+  weren't enough to flip any answer.
+
+**Verdict: arm E is configured correctly.** The D=E result is a genuine property of this
+corpus (heavily user-anchored by construction), not a wiring bug. Evidence-anchor strictness
+would plausibly show a real difference on a corpus with a meaningful share of purely
+agent-inferred/LLM-summarized content lacking user/git/test/file provenance -- this fixture
+isn't that.
+
 ## Caveats
 
 - Single run per arm, no repeated seeds — the score deltas (4-5 questions) are larger than

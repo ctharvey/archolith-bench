@@ -439,6 +439,12 @@ def test_recall_event_blocking_anchor_gate_returns_advisory_without_items(http_c
         ],
         "event_authority_layer": [
             {
+                "status": "leads",
+                "gate": "pass",
+                "predicate": "acquired",
+                "object_display": "blue bike",
+            },
+            {
                 "status": "advisory",
                 "gate": "anchor",
                 "reason": "no evidence-anchored object could be selected",

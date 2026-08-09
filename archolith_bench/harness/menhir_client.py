@@ -551,6 +551,7 @@ class HttpMenhirClient:
             return [
                 rendered
                 for record in event_authority_records
+                if str(record.get("gate") or "").strip().lower() in _BLOCKING_EVENT_GATES
                 if (rendered := _format_event_authority_record(record))
             ][:limit]
 

@@ -13,6 +13,11 @@ from typing import Any
 
 import httpx
 
+# Selection-failure gates that indicate no single event object could be anchored.
+# When the event authority layer reports one of these, recall emits an advisory and
+# suppresses the ordinary result items (there is no authoritative event to compare them against).
+_BLOCKING_EVENT_GATES = frozenset({"anchor", "ambiguity", "time", "scope", "no_candidate"})
+
 
 def _format_duration_alias(value: Any, unit: str) -> str | None:
     """Return a human-readable duration and clock form for integral seconds."""
@@ -147,6 +152,80 @@ def _format_authority_record(record: dict[str, Any]) -> str:
         if support:
             lines.append("provenance:")
             lines.extend(f"- {item}" for item in support)
+    return "\n".join(lines)
+
+
+def _event_authority_display(record: dict[str, Any]) -> str:
+    """Pick the event label: object_display, else predicate (or subject+predicate fallback)."""
+    object_display = record.get("object_display")
+    if isinstance(object_display, str) and object_display.strip():
+        return object_display.strip()
+    subject = str(record.get("subject_uuid") or "").strip()
+    predicate = str(record.get("predicate") or "").strip().replace("_", " ")
+    if subject and predicate:
+        return f"{subject} — {predicate}"
+    return predicate
+
+
+def _event_evidence_identities(record: dict[str, Any]) -> str:
+    """Render the event's evidence identities from its known identity fields."""
+    ids: list[str] = []
+    for field in ("assertion_key", "episode_uuid", "turn_evidence_uuid"):
+        value = record.get(field)
+        if value is not None and str(value).strip():
+            ids.append(str(value).strip())
+    return ", ".join(ids)
+
+
+def _format_event_authority_record(record: dict[str, Any]) -> str:
+    """Render a Menhir EventAuthorityVerdict as compact, provenance-rich LLM context.
+
+    Only ``status="leads"`` (normally ``gate="pass"``) renders an authoritative event
+    lead with the selected object, its evidence identities, and a preference over
+    conflicting memories. Any other status renders a non-blocking advisory that invents
+    no object. A blocking selection-failure gate (anchor, ambiguity, time, scope,
+    no_candidate) is handled separately by the caller, which suppresses the ordinary
+    result items because there is no authoritative event to rank them against.
+    """
+    gate = str(record.get("gate") or "").strip().lower()
+    status = str(record.get("status") or "").strip().lower()
+    if status != "leads":
+        lines = ["[EVENT HISTORY VERDICT | advisory]"]
+        reason = record.get("reason")
+        if isinstance(reason, str) and reason.strip():
+            lines.append(f"note: {reason.strip()}")
+        if gate:
+            lines.append(f"gate: {gate}")
+        return "\n".join(lines)
+
+    lines = ["[AUTHORITATIVE EVENT HISTORY]"]
+    display = _event_authority_display(record)
+    if display:
+        lines.append(f"event: {display}")
+    predicate = str(record.get("predicate") or "").strip().replace("_", " ")
+    if predicate:
+        lines.append(f"predicate: {predicate}")
+    object_key = record.get("object_key")
+    if isinstance(object_key, str) and object_key.strip():
+        lines.append(f"object key: {object_key.strip()}")
+    valid_at = str(record.get("valid_at") or "").strip()
+    if valid_at:
+        lines.append(f"valid at: {valid_at}")
+    time_basis = str(record.get("time_basis") or "").strip()
+    if time_basis:
+        lines.append(f"time basis: {time_basis}")
+    domain = str(record.get("domain") or "").strip()
+    if domain:
+        lines.append(f"domain: {domain}")
+    stated_span = str(record.get("stated_span") or "").strip()
+    if stated_span:
+        lines.append(f'quote: "{stated_span}"')
+    evidence = _event_evidence_identities(record)
+    if evidence:
+        lines.append(f"evidence identities: {evidence}")
+    if gate:
+        lines.append(f"gate: {gate}")
+    lines.append("preference: prefer this event over conflicting related memories")
     return "\n".join(lines)
 
 
@@ -397,9 +476,15 @@ class HttpMenhirClient:
         "results"/"memories"/"snippets" key. Each element may be a string or
         dict with "text"/"content"/"summary" key. When Menhir returns a
         structured ``authority_layer``, current scalar authority is emitted first
-        with its source time and supporting quote. Other results are labeled as
-        related/non-authoritative or superseded context so a flat text prompt does
-        not erase Menhir's conflict-resolution semantics.
+        with its source time and supporting quote. A structured
+        ``event_authority_layer`` is consumed alongside it: a non-blocking lead
+        renders an AUTHORITATIVE EVENT HISTORY with its predicate, selected
+        object display/key, valid_at, time_basis, domain, stated_span quote,
+        evidence identities, gate, and a preference over conflicts. A blocking
+        selection-failure gate (anchor, ambiguity, time, scope, no_candidate)
+        returns an advisory and suppresses the ordinary result items. Other
+        results are labeled as related/non-authoritative or superseded context so
+        a flat text prompt does not erase Menhir's conflict-resolution semantics.
         """
         url = self._base_url.rstrip("/") + self._recall_path
         # include_session=True: benchmark memories are freshly ingested and live at
@@ -430,6 +515,7 @@ class HttpMenhirClient:
                     break
 
         authority_records: list[dict[str, Any]] = []
+        event_authority_records: list[dict[str, Any]] = []
         if isinstance(data, dict):
             raw_authority = data.get("authority_layer")
             if isinstance(raw_authority, dict):
@@ -437,31 +523,62 @@ class HttpMenhirClient:
             elif isinstance(raw_authority, list):
                 authority_records = [record for record in raw_authority if isinstance(record, dict)]
 
+            raw_event_authority = data.get("event_authority_layer")
+            if isinstance(raw_event_authority, dict):
+                event_authority_records = [raw_event_authority]
+            elif isinstance(raw_event_authority, list):
+                event_authority_records = [
+                    record for record in raw_event_authority if isinstance(record, dict)
+                ]
+
+        has_authority = bool(authority_records) or bool(event_authority_records)
+        event_blocked = any(
+            str(record.get("gate") or "").strip().lower() in _BLOCKING_EVENT_GATES
+            for record in event_authority_records
+        )
+
         authority_view_ids = {
             str(record["view_uuid"])
             for record in authority_records
             if record.get("view_uuid")
         }
+
+        if event_blocked:
+            # A blocking selection-failure leaves no authoritative event to rank the ordinary
+            # items against, so emit only the rendered event advisories. Current-state scalar
+            # authority is suppressed too: it can mislead a historical-before query whose event
+            # anchor is unresolved.
+            return [
+                rendered
+                for record in event_authority_records
+                if (rendered := _format_event_authority_record(record))
+            ][:limit]
+
         snippets: list[str] = []
         for record in authority_records:
             rendered = _format_authority_record(record)
             if rendered:
                 snippets.append(rendered)
 
+        for record in event_authority_records:
+            rendered = _format_event_authority_record(record)
+            if rendered:
+                snippets.append(rendered)
+
         for item in items:
             if isinstance(item, str):
                 if item.strip():
-                    if authority_records:
+                    if has_authority:
                         snippets.append(f"[RELATED MEMORY | non-authoritative] {item.strip()}")
                     else:
                         snippets.append(item)
             elif isinstance(item, dict):
-                if authority_records and str(item.get("uuid") or "") in authority_view_ids:
+                if has_authority and str(item.get("uuid") or "") in authority_view_ids:
                     continue
                 text = _recall_item_text(item)
                 if not text:
                     continue
-                if authority_records:
+                if has_authority:
                     memory_type = str(item.get("memory_type") or "memory").strip().lower()
                     if item.get("is_superseded_view") is True:
                         prefix = f"[SUPERSEDED {memory_type} MEMORY | historical only]"

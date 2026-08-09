@@ -367,3 +367,243 @@ def test_recall_labels_string_results_when_authority_is_present(http_client):
 
     assert recalled[0].startswith("[AUTHORITATIVE CURRENT MEMORY]")
     assert recalled[1] == "[RELATED MEMORY | non-authoritative] User needs 125 stars."
+
+
+def test_recall_event_authority_unique_lead_renders_full_history(http_client):
+    """A status='leads' event verdict must render the selected object and its evidence."""
+    client, fake = http_client
+    fake.response_data = {
+        "results": [
+            {
+                "uuid": "stale-espresso",
+                "name": "Espresso machine",
+                "content": "User was thinking about buying an espresso machine.",
+                "memory_type": "SEMANTIC",
+            }
+        ],
+        "event_authority_layer": [
+            {
+                "status": "leads",
+                "gate": "pass",
+                "kind": "purchase",
+                "predicate": "purchased",
+                "subject_uuid": "user-7",
+                "object_display": "espresso machine",
+                "object_key": "entity:appliance:espresso_machine",
+                "valid_at": "2023-07-30T03:56:00Z",
+                "time_basis": "world",
+                "domain": "purchases",
+                "stated_span": "I bought an espresso machine yesterday",
+                "assertion_key": "assertion:espresso:2023",
+                "episode_uuid": "ep-55",
+                "turn_evidence_uuid": "turn-88",
+                "has_foundation": True,
+            }
+        ],
+    }
+
+    recalled = client.recall("lme-e1", "Did I buy an espresso machine?", limit=10)
+
+    assert recalled[0].startswith("[AUTHORITATIVE EVENT HISTORY]")
+    assert "event: espresso machine" in recalled[0]
+    assert "predicate: purchased" in recalled[0]
+    assert "object key: entity:appliance:espresso_machine" in recalled[0]
+    assert "valid at: 2023-07-30T03:56:00Z" in recalled[0]
+    assert "time basis: world" in recalled[0]
+    assert "domain: purchases" in recalled[0]
+    assert '"I bought an espresso machine yesterday"' in recalled[0]
+    assert "evidence identities: assertion:espresso:2023, ep-55, turn-88" in recalled[0]
+    assert "gate: pass" in recalled[0]
+    assert "preference:" in recalled[0]
+    assert recalled[1].startswith("[RELATED semantic MEMORY | non-authoritative]")
+    assert "thinking about buying" in recalled[1]
+
+
+def test_recall_event_blocking_anchor_gate_returns_advisory_without_items(http_client):
+    """A blocking selection-failure gate must render an advisory and suppress ordinary items."""
+    client, fake = http_client
+    fake.response_data = {
+        "results": [
+            {
+                "uuid": "tempting-1",
+                "name": "Tempting memory",
+                "content": "User owns a red bike.",
+                "memory_type": "SEMANTIC",
+            },
+            {
+                "uuid": "tempting-2",
+                "name": "Another tempting memory",
+                "content": "User is planning to buy a bike.",
+                "memory_type": "SEMANTIC",
+            },
+        ],
+        "event_authority_layer": [
+            {
+                "status": "advisory",
+                "gate": "anchor",
+                "reason": "no evidence-anchored object could be selected",
+            }
+        ],
+    }
+
+    recalled = client.recall("lme-e2", "Which bike did I buy?", limit=10)
+
+    assert len(recalled) == 1
+    assert recalled[0].startswith("[EVENT HISTORY VERDICT | advisory]")
+    assert "gate: anchor" in recalled[0]
+    assert "no evidence-anchored object could be selected" in recalled[0]
+    assert all("bike" not in m.lower() or "gate" in m.lower() for m in recalled)
+
+
+def test_recall_event_blocking_gates_all_labeled_variants(http_client):
+    """Every blocking selection-failure gate must suppress ordinary items the same way."""
+    client, fake = http_client
+    for gate in ("ambiguity", "time", "scope", "no_candidate"):
+        fake.response_data = {
+            "results": [{"name": "tempt", "content": "A tempting recollection."}],
+            "event_authority_layer": [{"status": "advisory", "gate": gate}],
+        }
+        recalled = client.recall("lme-e3", "which?", limit=10)
+        assert len(recalled) == 1, f"{gate} should suppress ordinary items"
+        assert recalled[0].startswith("[EVENT HISTORY VERDICT | advisory]")
+        assert f"gate: {gate}" in recalled[0]
+        assert "tempting recollection" not in recalled[0]
+
+
+def test_recall_event_nonblocking_advisory_does_not_suppress_items(http_client):
+    """A non-blocking advisory (status=advisory, gate=pass) labels but keeps ordinary items."""
+    client, fake = http_client
+    fake.response_data = {
+        "results": [{"name": "note", "content": "A normal recollection.", "memory_type": "SEMANTIC"}],
+        "event_authority_layer": [
+            {"status": "advisory", "gate": "pass", "reason": "event noted but not authoritative"}
+        ],
+    }
+
+    recalled = client.recall("lme-e3b", "note", limit=10)
+
+    assert recalled[0].startswith("[EVENT HISTORY VERDICT | advisory]")
+    assert "gate: pass" in recalled[0]
+    assert "event noted but not authoritative" in recalled[0]
+    assert recalled[1].startswith("[RELATED semantic MEMORY | non-authoritative]")
+
+
+def test_recall_event_authority_with_scalar_layer_both_render_first(http_client):
+    """Scalar and event authority may coexist; both leads render before ordinary items."""
+    client, fake = http_client
+    fake.response_data = {
+        "results": [
+            {
+                "uuid": "rel-mem",
+                "name": "Old note",
+                "content": "User keeps an old notebook entry.",
+                "memory_type": "SEMANTIC",
+            }
+        ],
+        "authority_layer": [
+            {
+                "kind": "current",
+                "status": "leads",
+                "attribute": "gold_level",
+                "value": "120",
+                "has_foundation": True,
+                "view_uuid": "view-120",
+            }
+        ],
+        "event_authority_layer": [
+            {
+                "status": "leads",
+                "gate": "pass",
+                "predicate": "reached",
+                "object_display": "gold level",
+                "valid_at": "2023-07-30T03:56:00Z",
+                "stated_span": "I finally hit the gold level",
+            }
+        ],
+    }
+
+    recalled = client.recall("lme-e4", "gold level", limit=10)
+
+    assert recalled[0].startswith("[AUTHORITATIVE CURRENT MEMORY]")
+    assert "gold_level = 120" in recalled[0]
+    assert recalled[1].startswith("[AUTHORITATIVE EVENT HISTORY]")
+    assert "event: gold level" in recalled[1]
+    assert recalled[2].startswith("[RELATED semantic MEMORY | non-authoritative]")
+    assert "old notebook entry" in recalled[2]
+
+
+def test_recall_event_blocking_suppresses_scalar_authority_and_items(http_client):
+    """A blocking anchor advisory must hide scalar current-state authority and ordinary items."""
+    client, fake = http_client
+    fake.response_data = {
+        "results": [
+            {
+                "uuid": "tempting",
+                "name": "Tempting memory",
+                "content": "User bought a blue bike.",
+                "memory_type": "SEMANTIC",
+            }
+        ],
+        "authority_layer": [
+            {
+                "kind": "current",
+                "status": "leads",
+                "attribute": "bike_color",
+                "value": "blue",
+                "has_foundation": True,
+                "view_uuid": "view-bike",
+            }
+        ],
+        "event_authority_layer": [
+            {
+                "status": "advisory",
+                "gate": "anchor",
+                "reason": "no evidence-anchored object could be selected",
+            }
+        ],
+    }
+
+    recalled = client.recall("lme-e6", "What color was the bike before?", limit=10)
+
+    assert len(recalled) == 1
+    assert recalled[0].startswith("[EVENT HISTORY VERDICT | advisory]")
+    assert "gate: anchor" in recalled[0]
+    assert all("AUTHORITATIVE CURRENT MEMORY" not in m for m in recalled)
+    assert all("bike_color" not in m for m in recalled)
+    assert all("blue bike" not in m for m in recalled)
+
+
+def test_recall_event_authority_tolerates_malformed_and_empty_layers(http_client):
+    """A malformed event layer must never crash recall or invent items."""
+    client, fake = http_client
+    # malformed: string layers, non-string object_display, missing evidence identity fields
+    fake.response_data = {
+        "results": [{"name": "Ok", "content": "A normal recollection."}],
+        "authority_layer": "not-a-list",
+        "event_authority_layer": {
+            "status": "leads",
+            "gate": "pass",
+            "object_display": 42,  # not a string -> fall back to predicate
+            "predicate": "purchased",
+            "assertion_key": "assertion:7",
+            "turn_evidence_uuid": None,
+        },
+    }
+
+    recalled = client.recall("lme-e5", "ok", limit=10)
+
+    assert recalled[0].startswith("[AUTHORITATIVE EVENT HISTORY]")
+    assert "event: purchased" in recalled[0]
+    assert "evidence identities: assertion:7" in recalled[0]
+    assert recalled[1].startswith("[RELATED memory MEMORY | non-authoritative]")
+
+    # empty layers: legacy behavior with no authority and no event layer present
+    fake.response_data = {"results": [{"name": "Biscuit", "content": "The dog is Biscuit."}]}
+    assert client.recall("lme-e5", "dog") == ["Biscuit: The dog is Biscuit."]
+
+    # event layer present but empty list -> still legacy-identical
+    fake.response_data = {
+        "results": [{"name": "Biscuit", "content": "The dog is Biscuit."}],
+        "event_authority_layer": [],
+    }
+    assert client.recall("lme-e5", "dog") == ["Biscuit: The dog is Biscuit."]

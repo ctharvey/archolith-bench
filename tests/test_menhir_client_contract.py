@@ -525,7 +525,7 @@ def test_recall_event_authority_with_scalar_layer_both_render_first(http_client)
     recalled = client.recall("lme-e4", "gold level", limit=10)
 
     assert recalled[0].startswith("[AUTHORITATIVE CURRENT MEMORY]")
-    assert "gold_level = 120" in recalled[0]
+    assert "gold level = 120" in recalled[0]
     assert recalled[1].startswith("[AUTHORITATIVE EVENT HISTORY]")
     assert "event: gold level" in recalled[1]
     assert recalled[2].startswith("[RELATED semantic MEMORY | non-authoritative]")

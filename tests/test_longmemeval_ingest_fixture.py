@@ -191,6 +191,10 @@ def test_buildout_wrapper_records_every_phase_with_effective_settings() -> None:
         "scalar_consolidation_call_budget=%s",
         "scalar_reconcile_attribute=%s",
         "scalar_history_enabled=%s",
+        "event_history_enabled=%s",
+        "event_history_authority_enabled=%s",
+        "scalar_deterministic_router=%s",
+        "scalar_deterministic_shadow=%s",
         "consolidation_audit_enabled=%s",
         "turn_evidence_required=%s",
     ):

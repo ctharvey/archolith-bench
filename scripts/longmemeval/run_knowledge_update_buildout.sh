@@ -59,6 +59,13 @@ export LME_SCALAR_VIEW_AUTHORITY_ENABLED="${LME_SCALAR_VIEW_AUTHORITY_ENABLED:-1
 export LME_CONSOLIDATION_AUDIT_ENABLED="${LME_CONSOLIDATION_AUDIT_ENABLED:-1}"
 export LME_RECALL_AUDIT_ENABLED="${LME_RECALL_AUDIT_ENABLED:-1}"
 export MENHIR_PERSONAL_MEMORY_CONSOLIDATION_AUDIT_ENABLED="${LME_CONSOLIDATION_AUDIT_ENABLED}"
+# These are Menhir runtime settings rather than benchmark-arm settings. Pin their effective
+# values to Menhir's production defaults when callers omit them, then record them below so a
+# buildout cannot accidentally claim Event History or deterministic routing after the fact.
+export MENHIR_PERSONAL_MEMORY_EVENT_HISTORY_ENABLED="${MENHIR_PERSONAL_MEMORY_EVENT_HISTORY_ENABLED:-0}"
+export MENHIR_PERSONAL_MEMORY_EVENT_HISTORY_AUTHORITY_ENABLED="${MENHIR_PERSONAL_MEMORY_EVENT_HISTORY_AUTHORITY_ENABLED:-0}"
+export MENHIR_PERSONAL_MEMORY_SCALAR_DETERMINISTIC_ROUTER="${MENHIR_PERSONAL_MEMORY_SCALAR_DETERMINISTIC_ROUTER:-0}"
+export MENHIR_PERSONAL_MEMORY_SCALAR_DETERMINISTIC_SHADOW="${MENHIR_PERSONAL_MEMORY_SCALAR_DETERMINISTIC_SHADOW:-0}"
 export LME_KU_ALLOW_RESUME="${LME_KU_ALLOW_RESUME:-0}"
 export LME_KU_KEEP_NEO4J_UP="${LME_KU_KEEP_NEO4J_UP:-0}"
 export LME_KU_ALLOW_DIRTY="${LME_KU_ALLOW_DIRTY:-0}"
@@ -197,7 +204,7 @@ PY
 )"
 [ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY in menhir .env"
 
-log "preflight PASS: arm=${ARM} run=${RUN_ID} fresh=${LME_REQUIRE_FRESH} scalar=1 scalar_history=${LME_SCALAR_HISTORY_ENABLED} threshold=${LME_SCALAR_THRESHOLD} reconcile=${LME_SCALAR_RECONCILE_ATTRIBUTE}/${LME_SCALAR_RECONCILE_SCOPE}/${LME_SCALAR_RECONCILE_SUBJECT} authority=${LME_SCALAR_VIEW_AUTHORITY_ENABLED} turn_evidence=${LME_REQUIRE_TURN_EVIDENCE} audits=${LME_CONSOLIDATION_AUDIT_ENABLED}/${LME_RECALL_AUDIT_ENABLED} ingest_concurrency=${LME_INGEST_CONCURRENCY} checkpoint_items=${LME_KU_CHECKPOINT_ITEMS}"
+log "preflight PASS: arm=${ARM} run=${RUN_ID} fresh=${LME_REQUIRE_FRESH} scalar=1 scalar_history=${LME_SCALAR_HISTORY_ENABLED} threshold=${LME_SCALAR_THRESHOLD} reconcile=${LME_SCALAR_RECONCILE_ATTRIBUTE}/${LME_SCALAR_RECONCILE_SCOPE}/${LME_SCALAR_RECONCILE_SUBJECT} authority=${LME_SCALAR_VIEW_AUTHORITY_ENABLED} event_history=${MENHIR_PERSONAL_MEMORY_EVENT_HISTORY_ENABLED}/${MENHIR_PERSONAL_MEMORY_EVENT_HISTORY_AUTHORITY_ENABLED} deterministic_router_shadow=${MENHIR_PERSONAL_MEMORY_SCALAR_DETERMINISTIC_ROUTER}/${MENHIR_PERSONAL_MEMORY_SCALAR_DETERMINISTIC_SHADOW} turn_evidence=${LME_REQUIRE_TURN_EVIDENCE} audits=${LME_CONSOLIDATION_AUDIT_ENABLED}/${LME_RECALL_AUDIT_ENABLED} ingest_concurrency=${LME_INGEST_CONCURRENCY} checkpoint_items=${LME_KU_CHECKPOINT_ITEMS}"
 
 if [ "${MODE}" = "--preflight-only" ]; then
   exit 0
@@ -241,6 +248,12 @@ phase_settings(){
     "${LME_SCALAR_RECONCILE_SUBJECT}" "${LME_SCALAR_VIEW_AUTHORITY_ENABLED}"
   printf -- '--setting\nscalar_history_enabled=%s\n' \
     "${LME_SCALAR_HISTORY_ENABLED}"
+  printf -- '--setting\nevent_history_enabled=%s\n--setting\nevent_history_authority_enabled=%s\n' \
+    "${MENHIR_PERSONAL_MEMORY_EVENT_HISTORY_ENABLED}" \
+    "${MENHIR_PERSONAL_MEMORY_EVENT_HISTORY_AUTHORITY_ENABLED}"
+  printf -- '--setting\nscalar_deterministic_router=%s\n--setting\nscalar_deterministic_shadow=%s\n' \
+    "${MENHIR_PERSONAL_MEMORY_SCALAR_DETERMINISTIC_ROUTER}" \
+    "${MENHIR_PERSONAL_MEMORY_SCALAR_DETERMINISTIC_SHADOW}"
   printf -- '--setting\nconsolidation_audit_enabled=%s\n--setting\nrecall_audit_enabled=%s\n' \
     "${LME_CONSOLIDATION_AUDIT_ENABLED}" "${LME_RECALL_AUDIT_ENABLED}"
   printf -- '--setting\nturn_evidence_required=%s\n--setting\nbackfill_dates=%s\n' \
@@ -305,6 +318,10 @@ cat > "${ATTEMPT_RECORD}" <<EOF
   "scalar_reconcile_scope": ${LME_SCALAR_RECONCILE_SCOPE},
   "scalar_reconcile_subject": ${LME_SCALAR_RECONCILE_SUBJECT},
   "scalar_view_authority_enabled": ${LME_SCALAR_VIEW_AUTHORITY_ENABLED},
+  "event_history_enabled": ${MENHIR_PERSONAL_MEMORY_EVENT_HISTORY_ENABLED},
+  "event_history_authority_enabled": ${MENHIR_PERSONAL_MEMORY_EVENT_HISTORY_AUTHORITY_ENABLED},
+  "scalar_deterministic_router": ${MENHIR_PERSONAL_MEMORY_SCALAR_DETERMINISTIC_ROUTER},
+  "scalar_deterministic_shadow": ${MENHIR_PERSONAL_MEMORY_SCALAR_DETERMINISTIC_SHADOW},
   "consolidation_audit_enabled": ${LME_CONSOLIDATION_AUDIT_ENABLED},
   "recall_audit_enabled": ${LME_RECALL_AUDIT_ENABLED},
   "turn_evidence_required": ${LME_REQUIRE_TURN_EVIDENCE},

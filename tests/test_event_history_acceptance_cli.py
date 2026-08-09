@@ -127,13 +127,14 @@ class FakeProposal:
 
 
 class FakeChoice:
-    def __init__(self, content: str):
+    def __init__(self, content: str, finish_reason: str = "stop"):
         self.message = type("Msg", (), {"content": content})
+        self.finish_reason = finish_reason
 
 
 class FakeCompletion:
-    def __init__(self, content: str, usage=None):
-        self.choices = [FakeChoice(content)]
+    def __init__(self, content: str, usage=None, finish_reason: str = "stop"):
+        self.choices = [FakeChoice(content, finish_reason)]
         self.usage = usage
 
 
@@ -342,7 +343,10 @@ def test_run_acceptance_writes_report_and_aggregates_usage(tmp_path):
         total_tokens = 15
         prompt_tokens_details = type("D", (), {"cached_tokens": 3})()
 
+    requests = []
+
     def responder(**kwargs):
+        requests.append(kwargs)
         return FakeCompletion(json.dumps([{"episode": 0, "events": []}]), Usage())
 
     exit_code = run_acceptance(
@@ -371,6 +375,8 @@ def test_run_acceptance_writes_report_and_aggregates_usage(tmp_path):
     assert by_case["0977f2af"]["query_routing_measured"] is True
     assert by_case["control-intent-only"]["query_routing_measured"] is False
     assert report["config"]["model"] == "gpt-4o-mini"
+    assert report["config"]["max_tokens"] == 512
+    assert report["config"]["llm_error_retries"] == 1
     num_calls = report["usage"]["calls"]
     assert num_calls == 3 * 3  # 3 cases x samples=3
     assert report["usage"]["total_tokens"] == num_calls * 15
@@ -378,6 +384,9 @@ def test_run_acceptance_writes_report_and_aggregates_usage(tmp_path):
     assert report["usage"]["output_tokens"] == num_calls * 5
     assert report["usage"]["cached_tokens"] == num_calls * 3
     assert all(call["raw_usage"]["prompt_tokens"] == 10 for call in report["usage"]["per_call"])
+    assert all(call["finish_reason"] == "stop" for call in report["usage"]["per_call"])
+    assert all(request["max_tokens"] == 512 for request in requests)
+    assert report["aggregate"]["llm_error_retries"] == 0
     assert report["provenance"]["source_fixture"]["sha256"]["match_mode"] in {"raw", "canonical_crlf"}
     assert report["provenance"]["fixture"]["raw_sha256"]
     assert report["provenance"]["source_fixture"]["declared_source_fixture"] == str(source)

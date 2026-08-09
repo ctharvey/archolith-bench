@@ -38,6 +38,7 @@ LLM_COMPLETE = Callable[..., str]
 
 _INTENTS = frozenset({"latest", "predecessor"})
 _STATUSES = frozenset({"unique", "none", "ambiguous"})
+_RETRYABLE_LLM_DROP_REASONS = frozenset({"malformed_json", "not_a_json_array"})
 
 
 class EventHistoryProbeError(RuntimeError):
@@ -565,6 +566,7 @@ def analyze_case(
     llm_complete: LLM_COMPLETE,
     samples: int = 3,
     required_votes: int = 2,
+    llm_error_retries: int = 1,
     generated_at: str | None = None,
     api: ProbeEventHistoryApi | None = None,
 ) -> dict[str, Any]:
@@ -578,6 +580,8 @@ def analyze_case(
         raise _error(f"case {case.case_id}", "predecessor cases require anchor_object_key")
     if samples < 1 or required_votes < 1 or required_votes > samples:
         raise _error(f"case {case.case_id}", "required votes must be within [1, samples]")
+    if llm_error_retries < 0:
+        raise _error(f"case {case.case_id}", "llm_error_retries must be non-negative")
 
     loaded_api = api or load_menhir_event_history_api(menhir_root)
     learned_at = _default_learned_at(generated_at)
@@ -604,19 +608,32 @@ def analyze_case(
     router = derive_latest_scope(case.question, case.intent)
     query_routing_measured = router["evaluated"]
     for sample_index in range(samples):
-        parser_drops: list[str] = []
-        try:
-            proposals = list(
-                loaded_api.extract_events_once(
-                    episode_objects, llm_complete, on_drop=parser_drops.append
+        retry_reasons: list[str] = []
+        attempt_count = 0
+        while True:
+            attempt_count += 1
+            parser_drops: list[str] = []
+            try:
+                proposals = list(
+                    loaded_api.extract_events_once(
+                        episode_objects, llm_complete, on_drop=parser_drops.append
+                    )
                 )
+            except Exception as exc:  # noqa: BLE001 - surface extraction failures as drops
+                proposal_rows = []
+                build_receipts = []
+                drop_reasons = [f"extract_error:{type(exc).__name__}"]
+                assertions = []
+                break
+
+            retryable = next(
+                (reason for reason in parser_drops if reason in _RETRYABLE_LLM_DROP_REASONS),
+                None,
             )
-        except Exception as exc:  # noqa: BLE001 - surface extraction failures as drops
-            proposal_rows: list[dict[str, Any]] = []
-            build_receipts: list[dict[str, Any]] = []
-            drop_reasons = [f"extract_error:{type(exc).__name__}"]
-            assertions: list[Any] = []
-        else:
+            if retryable is not None and len(retry_reasons) < llm_error_retries:
+                retry_reasons.append(retryable)
+                continue
+
             proposal_rows = [
                 {
                     "domain_override_applied": True,
@@ -636,6 +653,7 @@ def analyze_case(
                 if not receipt["built"] and receipt["reason"]
             ]
             drop_reasons = list(parser_drops) + build_drops
+            break
 
         scope_assertions, routing = _apply_scope(assertions, router)
         source = _InMemorySource(scope_assertions)
@@ -669,6 +687,9 @@ def analyze_case(
         sample_rows.append(
             {
                 "sample_index": sample_index,
+                "attempt_count": attempt_count,
+                "retry_count": len(retry_reasons),
+                "retry_reasons": retry_reasons,
                 "proposals": proposal_rows,
                 "build_receipts": build_receipts,
                 "drop_reasons": drop_reasons,
@@ -718,6 +739,7 @@ def analyze_case(
             "safety_violation": safety_violation,
             "wrong_unique_samples": wrong_unique,
             "abstentions": abstentions,
+            "llm_error_retries": sum(row["retry_count"] for row in sample_rows),
             "domain_override": {"applied": True, "lane_domain": case.lane_domain},
             "routing": {
                 "evaluated": router["evaluated"],

@@ -51,6 +51,8 @@ MODEL_DEFAULT = "gpt-4o-mini"
 TEMPERATURE_DEFAULT = 0.7
 SAMPLES_DEFAULT = 3
 REQUIRED_VOTES_DEFAULT = 2
+MAX_TOKENS_DEFAULT = 512
+LLM_ERROR_RETRIES_DEFAULT = 1
 
 
 class EventHistoryRunnerError(RuntimeError):
@@ -365,9 +367,10 @@ def _usage_to_dict(usage: Any) -> dict[str, Any] | None:
 class UsageRecorder:
     """Records per-call and aggregate OpenAI chat-completion usage telemetry."""
 
-    def __init__(self, model: str, temperature: float) -> None:
+    def __init__(self, model: str, temperature: float, max_tokens: int) -> None:
         self.model = model
         self.temperature = temperature
+        self.max_tokens = max_tokens
         self.calls: list[dict[str, Any]] = []
         self._total = Counter()
         self._missing_usage = 0
@@ -405,7 +408,9 @@ class UsageRecorder:
         full = {
             "model": self.model,
             "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
             "latency_ms": round(latency_ms, 3),
+            "finish_reason": getattr(response.choices[0], "finish_reason", None),
             **record,
             "raw_usage": raw_usage,
         }
@@ -422,6 +427,7 @@ class UsageRecorder:
             "missing_usage_calls": self._missing_usage,
             "model": self.model,
             "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
             "per_call": list(self.calls),
         }
 
@@ -440,6 +446,7 @@ def make_llm_complete(
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
+                max_tokens=recorder.max_tokens,
             )
         except Exception as exc:  # noqa: BLE001 - normalize provider errors
             status_code = getattr(exc, "status_code", None)
@@ -489,6 +496,8 @@ def run_acceptance(
     temperature: float = TEMPERATURE_DEFAULT,
     samples: int = SAMPLES_DEFAULT,
     required_votes: int = REQUIRED_VOTES_DEFAULT,
+    max_tokens: int = MAX_TOKENS_DEFAULT,
+    llm_error_retries: int = LLM_ERROR_RETRIES_DEFAULT,
     client: Any = None,
     api: ProbeEventHistoryApi | None = None,
     generated_at: str | None = None,
@@ -509,7 +518,11 @@ def run_acceptance(
 
         client = openai.OpenAI(api_key=key)
 
-    recorder = UsageRecorder(model, temperature)
+    if max_tokens < 1:
+        raise EventHistoryRunnerError("max_tokens must be positive")
+    if llm_error_retries < 0:
+        raise EventHistoryRunnerError("llm_error_retries must be non-negative")
+    recorder = UsageRecorder(model, temperature, max_tokens)
     llm_complete = make_llm_complete(client, recorder)
     generated = generated_at or datetime.now(timezone.utc).isoformat()
 
@@ -524,6 +537,7 @@ def run_acceptance(
             llm_complete,
             samples=samples,
             required_votes=required_votes,
+            llm_error_retries=llm_error_retries,
             generated_at=generated,
             api=api,
         )
@@ -592,6 +606,8 @@ def run_acceptance(
             "temperature": temperature,
             "samples": samples,
             "required_votes": required_votes,
+            "max_tokens": max_tokens,
+            "llm_error_retries": llm_error_retries,
         },
         "cases": case_reports,
         "aggregate": {
@@ -600,6 +616,10 @@ def run_acceptance(
             "failed_cases": len(failures),
             "failed_case_ids": failures,
             "safety_violations": safety_violations,
+            "llm_error_retries": sum(
+                case_report["aggregate"]["llm_error_retries"]
+                for case_report in case_reports
+            ),
         },
         "usage": recorder.summary(),
     }
@@ -620,6 +640,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--temperature", type=float, default=TEMPERATURE_DEFAULT)
     parser.add_argument("--samples", type=int, default=SAMPLES_DEFAULT)
     parser.add_argument("--required-votes", type=int, default=REQUIRED_VOTES_DEFAULT)
+    parser.add_argument("--max-tokens", type=int, default=MAX_TOKENS_DEFAULT)
+    parser.add_argument(
+        "--llm-error-retries", type=int, default=LLM_ERROR_RETRIES_DEFAULT,
+    )
     return parser
 
 
@@ -635,6 +659,8 @@ def main(argv: list[str] | None = None) -> int:
             temperature=args.temperature,
             samples=args.samples,
             required_votes=args.required_votes,
+            max_tokens=args.max_tokens,
+            llm_error_retries=args.llm_error_retries,
         )
     except EventHistoryRunnerError as exc:
         print(f"error: {exc}", file=sys.stderr)

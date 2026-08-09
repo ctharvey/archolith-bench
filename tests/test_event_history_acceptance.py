@@ -117,6 +117,43 @@ def test_latest_selects_expected_object(api):
     assert len(report["samples"][0]["projection"]["timeline_entries"]) > 0
 
 
+@pytest.mark.parametrize(
+    ("bad_response", "expected_reason"),
+    [("{", "malformed_json"), ("{}", "not_a_json_array")],
+)
+def test_invalid_llm_response_is_retried_once(api, bad_response, expected_reason):
+    case = _latest_two_episode_case("latest-retry-malformed")
+    envelopes = [
+        _envelope(0, [_event("user", "pencil", "acquired a pencil last week")]),
+        _envelope(1, [_event("user", "notebook", "acquired a notebook yesterday")]),
+    ]
+    calls = 0
+
+    def llm_complete(system: str, user: str) -> str:
+        nonlocal calls
+        calls += 1
+        return bad_response if calls == 1 else json.dumps(envelopes)
+
+    report = analyze_case(
+        case,
+        _menhir_root(),
+        llm_complete,
+        samples=1,
+        required_votes=1,
+        llm_error_retries=1,
+        api=api,
+    )
+    sample = report["samples"][0]
+    assert calls == 2
+    assert sample["attempt_count"] == 2
+    assert sample["retry_count"] == 1
+    assert sample["retry_reasons"] == [expected_reason]
+    assert sample["drop_reasons"] == []
+    assert sample["correct"] is True
+    assert report["aggregate"]["llm_error_retries"] == 1
+    assert report["aggregate"]["passed"] is True
+
+
 def test_latest_reports_query_routing_unmeasured(api):
     case = _latest_two_episode_case("latest-routing")
     envelopes = [

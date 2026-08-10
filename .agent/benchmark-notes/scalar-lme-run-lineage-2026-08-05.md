@@ -1,5 +1,29 @@
 # Scalar LME run lineage — 2026-08-05
 
+## 2026-08-09 canonical update
+
+`scalar-event-activity-ku78-v6-20260809` is now the best canonical KU78 result at
+**71/78 (0.910256; displayed 0.910)**. It was a fresh, non-resumed 78-item build with clean pinned
+Menhir `1fa57955b24f90d08550c911f26133e5b14cbb89` and Bench
+`d5e97cc4fc322564c624a749e2cb25dccdf9c2ea`, a passing two-item checkpoint, 78/78 manifest rows,
+zero cumulative failed episodes, zero final PENDING/ENRICHING/FAILED episodes, and harness exit 0.
+The scored Menhir arm used 117,933 input and 1,376 output tokens for `$0.308592`; provider-reported
+combined run usage was 17,516,332 tokens.
+
+The immediate clean predecessor, `scalar-event-activity-ku78-v4-20260809`, scored
+**69/78 (0.884615; displayed 0.885)** at Menhir `9d9675c` / Bench `b7a2754`. V6 gained five passes
+and lost three relative to v4, for a net +2. It is also +3 correct versus the previous canonical
+`scalar-canonical-ku78-v1-20260806` at 68/78 (0.872). The seven v6 failures were
+`f9e8c073`, `c4ea545c`, `e61a7584`, `a2f3aa27`, `26bdc477`, `031748ae_abs`, and `07741c45`.
+Only `26bdc477` exposed a clear deterministic Menhir defect: possessive `my camera` did not bind
+to the co-mentioned `Canon EOS 80D camera`. The other misses do not justify broad benchmark-driven
+production changes.
+
+This updates the canonical comparison point; it does not turn the result into an approved launch
+headline or establish a scalar-only causal effect. The exact campaign record, per-item outcomes,
+settings, infrastructure, and artifact hashes are in
+[`results/lme-ku-buildout/LEDGER.md`](../../results/lme-ku-buildout/LEDGER.md).
+
 ## Correction and decision
 
 The `58/78` score in [scalar-spend-attribution-2026-08-05.md](scalar-spend-attribution-2026-08-05.md)
@@ -8,10 +32,12 @@ ingestion `scalar-duration-completeness-candidate-v2-20260730`, selected because
 manifest, telemetry, a `no_memory` arm, and the accounting inputs needed by the offline attribution
 instrument.
 
-The best observed scalar development result is `scalar-write-repair-targeted-v1-20260730` at
+The best historical noncanonical scalar development result in the July ladder is
+`scalar-write-repair-targeted-v1-20260730` at
 **70/78 (0.897436)**, with 115,490 input tokens, 1,448 output tokens, and estimated answer cost
-`$0.303206`. Use 70/78 as the best observed scalar development outcome and 58/78 only as the
-accounting source. Neither is canonical acceptance evidence.
+`$0.303206`. Use 70/78 only for that development ladder and 58/78 only as the accounting source.
+Neither July result is canonical acceptance evidence; the current canonical comparison is the
+71/78 v6 run above.
 
 | Run | Result / economics | Decision use | Scope warning |
 | --- | --- | --- | --- |

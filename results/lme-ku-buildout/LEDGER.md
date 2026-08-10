@@ -26,6 +26,82 @@ Frozen detector snapshots are saved in each run's results directory where applic
 | **scalar-ku-20260722** | 2026-07-22 | 78 | adaptive | *(measure-only, no QA)* | gpt-4o-mini | Scalar-consolidation MEASURE run (k=3). Materialization, not recall-scored: 18/78 (23%) scalar views, 20/78 typed. See section below + `.agent/reviews/menhir-lme-scalar-ku-20260722-results.md` |
 | **scalar-current-candidate-v3-20260728** | 2026-07-29 | 32/78 | adaptive | **(killed / INVALID)** | gpt-4o-mini | Mixed-code/provenance run; item `2133c1b5` was consolidated with one real FAILED episode under threshold 2. Do not resume, score, or compare. |
 | **scalar-canonical-ku78-v1-20260806** | 2026-08-06 | 78 | adaptive | **0.872** | gpt-4o-mini | **CANONICAL BENCHMARK EVIDENCE.** Fresh candidate-arm ingest; 68/78 recall vs 6/78 (0.077) no-memory; harness exit 0. |
+| **scalar-event-activity-ku78-v2-20260809** | 2026-08-09 | 0/78 | adaptive | *(aborted pre-manifest)* | gpt-4o-mini | Launch attempt produced provenance only; no graph result or semantic evidence. |
+| **scalar-event-activity-ku78-v3-20260809** | 2026-08-09 | 0/78 | adaptive | *(aborted pre-manifest)* | gpt-4o-mini | Launch reached fresh-graph startup but produced no manifest or score; container/volume later absent. |
+| **scalar-event-activity-ku78-v4-20260809** | 2026-08-09 | 78 | adaptive | **0.885** | gpt-4o-mini | Fresh clean run; 69/78 recall vs 6/78 (0.077) no-memory; harness exit 0. Superseded by v6. |
+| **scalar-event-activity-ku78-v5-20260809** | 2026-08-09 | 0/78 | adaptive | *(launch refused)* | gpt-4o-mini | No ingest: first wrapper call refused an existing result directory; replacement attempt left provenance only. No graph/container. |
+| **scalar-event-activity-ku78-v6-20260809** | 2026-08-09 | 78 | adaptive | **0.910** | gpt-4o-mini | **CURRENT CANONICAL BENCHMARK EVIDENCE.** Fresh clean run; 71/78 recall vs 6/78 (0.077) no-memory; harness exit 0. |
+
+## 2026-08-09 — Event/activity scalar KU78 campaign
+
+The v2, v3, and v5 attempts ended before a manifest row was written and provide no semantic or
+score evidence. V4 and v6 each used a fresh, non-resumed graph, the unchanged 78-item oracle
+fixture (SHA256 `bba252a302e7b257a0f7457fe97411f7de144aafd1c6b44c98a0e88ee8570907`), a two-item
+checkpoint, adaptive segmentation, concurrency 2, 2/3 scalar agreement, `k=3`, 1/1/1
+attribute/scope/subject reconciliation, scalar state/history and View authority, TurnEvidence,
+and a zero-failed-episodes-per-namespace policy.
+
+V4 used Menhir `9d9675c9397770b5bc654ce6f15da315d15c616a` and Bench
+`b7a275403d413f4c9a7f92cd2ac5df9eae38b3a0`. It completed 78/78 manifest rows with cumulative
+`failed_remaining=0`, final PENDING/ENRICHING/FAILED counts all zero, and harness exit 0. Menhir
+recall scored **69/78 (0.884615; displayed 0.885)** with 117,104 input tokens, 1,494 output tokens,
+and `$0.307697` in the scored arm. Provider-reported combined run usage was 17,413,642 tokens.
+
+V6 used Menhir `1fa57955b24f90d08550c911f26133e5b14cbb89` and Bench
+`d5e97cc4fc322564c624a749e2cb25dccdf9c2ea`. Event History and Event History authority were enabled;
+the deterministic scalar router and shadow paths were disabled. The two-item checkpoint passed
+before release. The full run completed 78/78 manifest rows with cumulative `failed_remaining=0`,
+final PENDING/ENRICHING/FAILED counts all zero, and harness exit 0. Menhir recall scored
+**71/78 (0.910256; displayed 0.910)** with 117,933 input tokens, 1,376 output tokens, and
+`$0.308592` in the scored arm. Provider-reported combined run usage was 17,516,332 tokens. This is
+the current best canonical KU78 result: +2 correct versus v4 and +3 versus the 68/78 canonical
+baseline. It is benchmark evidence, but it is not automatically an approved launch headline.
+
+### Per-Item Results (`scalar-event-activity-ku78-v4-20260809`, `menhir_recall`)
+
+PASS (69): 6aeb4375 830ce83f 852ce960 945e3d21 71315a70 89941a93 ce6d2d27 9ea5eabc
+07741c44 a1eacc2a 184da446 031748ae 4d6b87c8 0f05491a 08e075c7 f9e8c073 41698283
+2698e78f b6019101 45dc21b6 6071bd76 e493bb7c 618f13b2 72e3ee87 c4ea545c 01493427
+6a27ffc2 2133c1b5 18bc8abd db467c8c 7a87bd0c e61a7584 1cea1afa ed4ddc30 8fb83627
+b01defab 22d2cb42 0e4e4c46 4b24c848 7e974930 603deb26 59524333 5831f84d eace081b
+affe2881 50635ada e66b632c 0ddfec37 f685340e cc5ded98 dfde3500 69fee5aa 7401057b
+cf22b7bf 06db6396 3ba21379 9bbe84a2 10e09553 dad224aa ba61f0b9 42ec0761 5c40ec5b
+c6853660 0977f2af 6aeb4375_abs 2698e78f_abs 2133c1b5_abs 0ddfec37_abs f685340e_abs
+
+FAIL (9): 6a1eabeb d7c942c3 5a4f22c0 a2f3aa27 c7dc5443 26bdc477 031748ae_abs
+89941a94 07741c45
+
+### Per-Item Results (`scalar-event-activity-ku78-v6-20260809`, `menhir_recall`)
+
+PASS (71): 6a1eabeb 6aeb4375 830ce83f 852ce960 945e3d21 d7c942c3 71315a70 89941a93
+ce6d2d27 9ea5eabc 07741c44 a1eacc2a 184da446 031748ae 4d6b87c8 0f05491a 08e075c7
+41698283 2698e78f b6019101 45dc21b6 5a4f22c0 6071bd76 e493bb7c 618f13b2 72e3ee87
+01493427 6a27ffc2 2133c1b5 18bc8abd db467c8c 7a87bd0c 1cea1afa ed4ddc30 8fb83627
+b01defab 22d2cb42 0e4e4c46 4b24c848 7e974930 603deb26 59524333 5831f84d eace081b
+affe2881 50635ada e66b632c 0ddfec37 f685340e cc5ded98 dfde3500 69fee5aa 7401057b
+cf22b7bf c7dc5443 06db6396 3ba21379 9bbe84a2 10e09553 dad224aa ba61f0b9 42ec0761
+5c40ec5b c6853660 0977f2af 6aeb4375_abs 2698e78f_abs 2133c1b5_abs 0ddfec37_abs
+f685340e_abs 89941a94
+
+FAIL (7): f9e8c073 c4ea545c e61a7584 a2f3aa27 26bdc477 031748ae_abs 07741c45
+
+V6 fixed five v4 misses (`5a4f22c0`, `6a1eabeb`, `89941a94`, `c7dc5443`, `d7c942c3`) and
+regressed three v4 passes (`c4ea545c`, `e61a7584`, `f9e8c073`). Inspection found that the needed
+evidence remained present for those three regressions, so they are not evidence for broad
+production-rule changes. Of the seven v6 misses, the clearest deterministic defect is
+`26bdc477`: `trip_count=3` and `trip_count=5` were both minted but remained `binding_pending`
+because possessive `my camera` did not bind to the co-mentioned `Canon EOS 80D camera`. Keep this
+as backlog until an unrelated, non-benchmark panel establishes the general alias pattern.
+
+Key v6 artifact SHA256 values:
+
+| Artifact | SHA256 |
+| --- | --- |
+| `manifest.json` | `21c6a0b09d413d0b87dac5aa2d7e28d827db739f80240a1071e64cb32dce64ee` |
+| `run_provenance.json` | `04eea619eccb2d4eb77ee0beb0684cff628c6a2199c81813298fec7a7e354e5e` |
+| `run_llm_usage.json` | `0035ecea36804c3f743b0e108764724b3a0de3d4a1ef08956200c90ee7d736fe` |
+| `harness_recall/.checkpoint_longmemeval-menhir_oracle_gpt-4o.jsonl` | `9d4ed6c7ae91b736a11e698b0c98ee09c239a46f5d64b494c7a8865b5b4adef3` |
+| `harness_recall/results.md` | `bdd05e1444582bd07bf6035e62f2cbc14315863c86882f4820b0c4356de9b73d` |
 
 ## Invalidated Run (scalar-current-candidate-v3-20260728)
 
@@ -207,8 +283,14 @@ FAIL (8): 6aeb4375 852ce960 945e3d21 89941a93 9ea5eabc 07741c44 184da446 031748a
 | ku-adaptive-full-20260717 | menhir-lme-ku-adaptive-full-20260717 | 7698 | 7485 | 8132 | 8133 |
 | ku-nosplit-full-20260717 | menhir-lme-ku-nosplit-full-20260717 | 7699 | 7486 | 8134 | 8135 |
 | scalar-current-candidate-v3-20260728 | menhir-lme-scalar-current-candidate-v3-20260728 *(stopped, preserved)* | 7694 | — | 8124 | 8125 |
+| scalar-event-activity-ku78-v2-20260809 | none *(aborted before usable graph)* | 7720 | 7507 | 8160 | 8161 |
+| scalar-event-activity-ku78-v3-20260809 | none *(aborted pre-manifest; removed)* | 7720 | 7507 | 8160 | 8161 |
+| scalar-event-activity-ku78-v4-20260809 | menhir-lme-scalar-event-activity-ku78-v4-20260809 *(stopped, volume preserved)* | 7720 | 7507 | 8160 | 8161 |
+| scalar-event-activity-ku78-v5-20260809 | none *(launch refused/pre-ingest)* | 7721 | 7508 | 8163 | 8164 |
+| scalar-event-activity-ku78-v6-20260809 | menhir-lme-scalar-event-activity-ku78-v6-20260809 *(running, volume preserved)* | 7721 | 7508 | 8163 | 8164 |
 
-All runs: Menhir commit `6d37255`, Bench commit `8209c20`
+The legacy July `ku-*` rows above used Menhir `6d37255` and Bench `8209c20`. Later scalar campaign
+commits are recorded in their dedicated sections and run provenance.
 
 ## Fixture
 
@@ -224,6 +306,13 @@ All runs: Menhir commit `6d37255`, Bench commit `8209c20`
 
 ## Known Issues
 
+- **Event/activity KU78 residuals are heterogeneous**: v6's seven misses include answer-selection
+  variance with relevant evidence present, approximate/current-value policy, a synthetic unsupported
+  role premise, and plan-versus-observation semantics. Do not tune broad production behavior to the
+  miss list.
+- **Possessive-to-specific object binding remains unresolved**: in `lme-26bdc477`, `my camera` did
+  not bind to the exact co-mentioned `Canon EOS 80D camera`, leaving both trip-count assertions
+  pending. Require independent generic evidence before adding provenance-bound alias resolution.
 - **Invalid mixed-code scalar candidate run**: `scalar-current-candidate-v3-20260728` stopped at
   32/78 and is explicitly quarantined. Its provenance is stale and it consolidated a namespace
   with one real failed episode. It must never be resumed or used as comparative evidence.

@@ -1,5 +1,32 @@
 # archolith-bench Changelog
 
+## 2026-08-09 - Close the KU78 handoff and gate Beacon/full-500 follow-up
+
+Required blocking Event History suppression to carry both an advisory status and a recognized
+selection-failure gate, matching Menhir's production context-builder contract. Added regression
+coverage for a contradictory `status=leads`, `gate=anchor` wire record so malformed or drifting
+producer output cannot silently activate advisory-only suppression.
+
+Added `.agent/plans/beacon-view-contract-and-full500-gate-2026-08-09.md` as the separate owner for
+the Beacon View envelope, `MenhirBeaconProvider` vertical slice, review gate, and checkpointed paid
+full-500 run. These are no longer reported as incomplete acceptance work in the implemented Menhir
+cumulative-activity plan.
+
+## 2026-08-09 - Record canonical event/activity scalar KU78 evidence
+
+Recorded the completed `scalar-event-activity-ku78-v4-20260809` and
+`scalar-event-activity-ku78-v6-20260809` runs, plus the pre-manifest v2/v3/v5 attempts, in the
+mandatory KU-buildout ledger. V6 is the current best canonical KU78 result at 71/78 (0.910256),
+up from v4 at 69/78 (0.884615) and the prior canonical baseline at 68/78 (0.871795). It completed
+78/78 manifest rows with zero cumulative failed episodes, zero final PENDING/ENRICHING/FAILED
+episodes, and harness exit 0 on clean pinned Menhir `1fa5795` / Bench `d5e97cc` code.
+
+V6 used Event History and Event History authority with deterministic scalar router/shadow paths
+disabled. The scored Menhir arm used 117,933 input and 1,376 output tokens for `$0.308592`;
+provider-reported combined usage was 17,516,332 tokens. The ledger includes exact per-item results,
+artifact hashes, infrastructure, and the seven residual misses. This evidence updates the canonical
+comparison point but is not automatically an approved `HEADLINE-NUMBERS.md` launch claim.
+
 ## 2026-08-06 - Record dependency scalar bridge Phase-A r2 evidence
 
 Recorded authoritative offline 48-case Phase-A reports at

@@ -10,7 +10,9 @@ producer output cannot silently activate advisory-only suppression.
 Added `.agent/plans/beacon-view-contract-and-full500-gate-2026-08-09.md` as the separate owner for
 the Beacon View envelope, `MenhirBeaconProvider` vertical slice, review gate, and checkpointed paid
 full-500 run. These are no longer reported as incomplete acceptance work in the implemented Menhir
-cumulative-activity plan.
+cumulative-activity plan. The execution plan now anchors to Beacon `77ad631` and explicitly nests
+under Beacon's canonical functional-product roadmap rather than presenting the provider/full-500
+work as the whole product path.
 
 ## 2026-08-09 - Record canonical event/activity scalar KU78 evidence
 

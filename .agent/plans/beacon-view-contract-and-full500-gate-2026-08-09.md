@@ -3,7 +3,9 @@
 **Status:** PLANNED — implementation and paid run not started
 **Date:** 2026-08-09
 **Owner:** Cross-repository follow-up (`beacon`, `menhir`, `archolith-bench`)
-**Starting anchors:** Beacon `6bde0d2c0807431ed9acdc56234714ad6385e7d3`; Menhir
+**Parent roadmap:** Beacon `docs/beacon-functional-product-roadmap.md` (v0.5 dynamic/temporal
+release plus Menhir/evaluation workstreams)
+**Starting anchors:** Beacon `77ad631`; Menhir
 `1fa57955b24f90d08550c911f26133e5b14cbb89`; Bench
 `d5e97cc4fc322564c624a749e2cb25dccdf9c2ea`
 
@@ -12,6 +14,11 @@
 Prove that Beacon can consume a small, generic Menhir View projection for real project knowledge
 without changing Beacon's five v0 provider/tool contracts, then use that reviewed contract as the
 go/no-go gate for a fresh paid LongMemEval full-500 run.
+
+This is a child execution plan, not the complete Beacon product roadmap. It supplies the first
+Menhir-backed current/superseded proof and one backend-scale validation stream for Beacon v0.5. The
+parent roadmap separately owns maintainer setup, repository adapters, snapshots/refresh, task
+evaluation, remote operations/security, compatibility, examples, and the v1 release gate.
 
 This plan begins only after the cumulative-activity/KU78 plan is closed. The KU78 implementation and
 71/78 result are prior evidence, not unfinished work in this plan.
@@ -26,6 +33,8 @@ This plan begins only after the cumulative-activity/KU78 plan is closed. The KU7
 - Do not launch the full 500 before the View/provider gate is reviewed and a fresh cost estimate is
   accepted.
 - Do not mutate KU78 v4/v6 artifacts or reuse their graph as the full-500 graph.
+- Do not claim that completing this plan makes Beacon a functional v1 product; the parent roadmap's
+  project-task, operability, compatibility, and maintainer-journey gates remain independent.
 
 ## Contract Decision Gate
 
@@ -139,6 +148,8 @@ be named with exact missing modules rather than being reported as a pass.
 - The full-500 run starts only after explicit cost/go-no-go approval and a passing mixed checkpoint.
 - Final full-500 artifacts are immutable, hash-anchored, clean-commit-provenanced, and honest about
   failures, cost, and whether the result is headline-approved.
+- Outcomes and unresolved product implications are recorded back in Beacon's canonical functional
+  product roadmap or its linked execution-plan index.
 
 ## Deferred Backlog
 

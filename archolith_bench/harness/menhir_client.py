@@ -533,7 +533,8 @@ class HttpMenhirClient:
 
         has_authority = bool(authority_records) or bool(event_authority_records)
         event_blocked = any(
-            str(record.get("gate") or "").strip().lower() in _BLOCKING_EVENT_GATES
+            str(record.get("status") or "").strip().lower() == "advisory"
+            and str(record.get("gate") or "").strip().lower() in _BLOCKING_EVENT_GATES
             for record in event_authority_records
         )
 
@@ -551,7 +552,8 @@ class HttpMenhirClient:
             return [
                 rendered
                 for record in event_authority_records
-                if str(record.get("gate") or "").strip().lower() in _BLOCKING_EVENT_GATES
+                if str(record.get("status") or "").strip().lower() == "advisory"
+                and str(record.get("gate") or "").strip().lower() in _BLOCKING_EVENT_GATES
                 if (rendered := _format_event_authority_record(record))
             ][:limit]
 

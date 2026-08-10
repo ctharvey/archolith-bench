@@ -476,6 +476,34 @@ def test_recall_event_blocking_gates_all_labeled_variants(http_client):
         assert "tempting recollection" not in recalled[0]
 
 
+def test_recall_event_blocking_gate_requires_advisory_status(http_client):
+    """A contradictory leads record must not activate advisory-only suppression."""
+    client, fake = http_client
+    fake.response_data = {
+        "results": [
+            {
+                "name": "Related note",
+                "content": "A normal recollection.",
+                "memory_type": "SEMANTIC",
+            }
+        ],
+        "event_authority_layer": [
+            {
+                "status": "leads",
+                "gate": "anchor",
+                "predicate": "acquired",
+                "object_display": "blue bike",
+            }
+        ],
+    }
+
+    recalled = client.recall("lme-e3c", "which?", limit=10)
+
+    assert recalled[0].startswith("[AUTHORITATIVE EVENT HISTORY]")
+    assert recalled[1].startswith("[RELATED semantic MEMORY | non-authoritative]")
+    assert "normal recollection" in recalled[1]
+
+
 def test_recall_event_nonblocking_advisory_does_not_suppress_items(http_client):
     """A non-blocking advisory (status=advisory, gate=pass) labels but keeps ordinary items."""
     client, fake = http_client

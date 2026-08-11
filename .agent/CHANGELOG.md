@@ -1,5 +1,17 @@
 # archolith-bench Changelog
 
+## 2026-08-10 - Preserve typed recall-packet evaluation tools and review artifacts
+
+Added durable noncanonical, recall-only instruments for comparing Menhir's full/query-filtered
+typed Recall Lab packet against the canonical KU78 checkpoint and for running the preregistered
+ten-item held-out packet-shape panel over shared production retrieval. Added focused contract,
+transition, token-accounting, and incomplete-model-evidence tests, and indexed both paid instruments
+in the Bench and Menhir script catalogs.
+
+Tracked the previously local July scalar-history handoff, suburbs-fixture wrapup, and recall-CI
+wrapup so those historical implementation and evidence boundaries are reviewable from the
+repository instead of existing only in one working tree.
+
 ## 2026-08-09 - Close the KU78 handoff and gate Beacon/full-500 follow-up
 
 Required blocking Event History suppression to carry both an advisory status and a recognized

@@ -110,6 +110,21 @@ policy panel. Report SHA256: JSON
 `53aff17ecd1d758f2d808050e9ac8e2512f269a3254ae2fee99f25d2696fc412`; Markdown
 `3284c6d81d47e22907c7fcd6fe79993ca65fa386a7206366d9d079ac78999287`.
 
+## Recall-packet evaluation instruments
+
+`scripts/longmemeval/analysis/run_typed_recall_packet_rescore.py` is a noncanonical,
+recall-only comparison of Menhir Recall Lab's full or query-filtered typed packet against the
+canonical KU78 recall checkpoint. It reuses an existing graph, performs no ingest or graph writes,
+rejects incomplete answer/judge evidence, records code and fixture provenance, and writes task
+transitions plus token totals under a new run directory. It requires a live read-only Recall Lab
+endpoint and explicit answer/judge provider credentials.
+
+`scripts/longmemeval/analysis/run_packet_shape_panel.py` is the paired preregistered held-out packet
+shape panel. It excludes the five development cases, reuses the same production retrieval results
+for both shapes, scores ten fixed strata, and labels every result noncanonical and recall-only. It
+may make paid answer/judge calls and writes its registration, fixture, checkpoints, results, and
+provenance under `results/lme-ku-buildout/`.
+
 ## menhir ScalarStateView instruments (live here, documented in menhir)
 
 `scripts/scalar_state_coverage.py` and its siblings (`run_scalar_state_e2e.sh`,

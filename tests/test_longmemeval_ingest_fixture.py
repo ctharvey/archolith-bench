@@ -122,6 +122,18 @@ def test_build_graph_wires_same_namespace_window_into_menhir_workers() -> None:
     assert '--namespace-window "${LME_INGEST_CONCURRENCY}"' in script
     assert '--manifest-item-limit "${LME_INGEST_STOP_AFTER_ITEMS}"' in script
     assert '"ingest_target_items": ${INGEST_TARGET}' in script
+
+
+def test_build_graph_supports_explicit_local_extraction_provider() -> None:
+    config = (ROOT / "scripts" / "longmemeval" / "config.sh").read_text(encoding="utf-8")
+    script = (ROOT / "scripts" / "longmemeval" / "build_graph.sh").read_text(encoding="utf-8")
+
+    assert 'LME_EXTRACT_PROVIDER="${LME_EXTRACT_PROVIDER:-openai}"' in config
+    assert 'LME_EXTRACT_BASE_URL="${LME_EXTRACT_BASE_URL:-}"' in config
+    assert 'case "${LME_EXTRACT_PROVIDER}" in' in script
+    assert 'export LOCAL_LLM_BASE_URL="${LME_EXTRACT_BASE_URL}"' in script
+    assert 'export LOCAL_LLM_CHAT_MODEL="${LME_EXTRACT_MODEL}"' in script
+    assert 'export GRAPHITI_EMBED_PROVIDER="openai"' in script
     assert '"ingest_concurrency": ${LME_INGEST_CONCURRENCY}' in script
     assert (
         'export MENHIR_PERSONAL_MEMORY_SCALAR_HISTORY_ENABLED="${LME_SCALAR_HISTORY_ENABLED}"'

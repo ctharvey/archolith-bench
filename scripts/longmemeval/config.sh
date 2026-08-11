@@ -74,6 +74,12 @@ LME_PORT_ENTROPY="${LME_PORT_ENTROPY:-8119}"           # analysis/entropy.sh (D0
 # follow-on prompt-level research. Slower/costlier full-corpus builds than nano was chosen
 # for; accept the tradeoff for comparability, same as Zep/Mem0 did.
 LME_EXTRACT_MODEL="${LME_EXTRACT_MODEL:-gpt-4o-mini}"
+# Extraction defaults to the canonical OpenAI path for benchmark comparability.  A local
+# OpenAI-compatible endpoint can be selected for explicitly noncanonical model probes without
+# changing the embedding provider used by the corpus build.
+LME_EXTRACT_PROVIDER="${LME_EXTRACT_PROVIDER:-openai}"
+LME_EXTRACT_BASE_URL="${LME_EXTRACT_BASE_URL:-}"
+LME_EXTRACT_API_KEY="${LME_EXTRACT_API_KEY:-not-needed}"
 LME_ANSWER_MODEL="${LME_ANSWER_MODEL:-gpt-4o}"
 LME_JUDGE_MODEL="${LME_JUDGE_MODEL:-gpt-4o-mini}"
 LME_EMBED_MODEL="${LME_EMBED_MODEL:-text-embedding-3-small}"

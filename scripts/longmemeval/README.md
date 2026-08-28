@@ -47,7 +47,7 @@ The built-in analysis harnesses (`matrix`, `msc`, `ablation`) already loop acros
 - `menhir-frontier` venv (optional, for frontier A/B). **As of 2026-07-15, `MENHIR_FRONTIER`
   defaults to `MENHIR_MAIN`** (the frontier branch merged to main, so `../../menhir-frontier` no
   longer exists) — only set `MENHIR_FRONTIER` explicitly if a real frontier fork checkout returns.
-- OpenAI API key in `menhir/.env` as `OPENAI_API_KEY`
+- OpenAI API key in `archolith-bench/.env` as `OPENAI_API_KEY`
 - HuggingFace dataset: `xiaowu0162/longmemeval` (auto-cached)
 
 ## Quickstart

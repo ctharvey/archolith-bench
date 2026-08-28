@@ -32,18 +32,18 @@ from archolith_bench.facet.models import FacetFixture  # noqa: E402
 from archolith_bench.facet.runner import BASELINE_CONDITIONS, FacetBenchmarkRunner  # noqa: E402
 
 DEFAULT_FIXTURE = REPO_ROOT / "fixtures" / "facet_demo.json"
-MENHIR_ENV = Path(r"C:\Users\thron\IdeaProjects\projects\archolith\menhir\.env")
+BENCH_ENV = REPO_ROOT / ".env"
 
 
 def _load_openai_key() -> str:
-    """OPENAI_API_KEY from the env, falling back to menhir/.env."""
+    """OPENAI_API_KEY from the environment, falling back to Bench's .env."""
     key = os.environ.get("OPENAI_API_KEY")
-    if not key and MENHIR_ENV.exists():
+    if not key and BENCH_ENV.exists():
         from dotenv import dotenv_values
 
-        key = dotenv_values(str(MENHIR_ENV)).get("OPENAI_API_KEY")
+        key = dotenv_values(str(BENCH_ENV)).get("OPENAI_API_KEY")
     if not key:
-        raise SystemExit("--embedder openai needs OPENAI_API_KEY (env or menhir/.env)")
+        raise SystemExit("--embedder openai needs OPENAI_API_KEY (env or archolith-bench/.env)")
     return key
 
 

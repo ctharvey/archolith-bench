@@ -20,10 +20,10 @@ NAME="${LME_NEO4J_NAME}"; BOLT="${LME_BOLT}"; PW="${LME_NEO4J_PW}"
 PY="${MENHIR_FRONTIER_PY}"; BIN="${MENHIR_FRONTIER_BIN}"; SRC="${MENHIR_FRONTIER}"
 EVAL="$(dirname "${BASH_SOURCE[0]}")/brief_ab.py"
 
-KEY="$("$PY" - "${SRC}/.env" OPENAI_API_KEY <<'PYK'
+KEY="$("$PY" - "${BENCH_DIR}/.env" OPENAI_API_KEY <<'PYK'
 import sys; from dotenv import dotenv_values; print(dotenv_values(sys.argv[1]).get(sys.argv[2],""))
 PYK
-)"; [ -n "$KEY" ] || { echo "no OPENAI_API_KEY in ${SRC}/.env" >&2; exit 1; }
+)"; [ -n "$KEY" ] || { echo "no OPENAI_API_KEY in ${BENCH_DIR}/.env" >&2; exit 1; }
 docker start "$NAME" >/dev/null 2>&1
 
 serve(){ # $1 = true|false brief flag

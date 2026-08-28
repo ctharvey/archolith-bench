@@ -32,10 +32,10 @@ lme_container_running "${LME_NEO4J_NAME}" \
   || die "menhir console script missing — pip install -e ${MENHIR_FRONTIER}"
 [ -f "${BENCH_PY}" ] || die "archolith-bench venv python missing: ${BENCH_PY}"
 
-OPENAI_KEY="$("${MENHIR_FRONTIER_PY}" - "${MENHIR_FRONTIER}/.env" OPENAI_API_KEY <<'PY'
+OPENAI_KEY="$("${MENHIR_FRONTIER_PY}" - "${BENCH_DIR}/.env" OPENAI_API_KEY <<'PY'
 import sys; from dotenv import dotenv_values; print(dotenv_values(sys.argv[1]).get(sys.argv[2],""))
 PY
-)"; [ -n "${OPENAI_KEY}" ] || die "OPENAI_API_KEY not found in ${MENHIR_FRONTIER}/.env"
+)"; [ -n "${OPENAI_KEY}" ] || die "OPENAI_API_KEY not found in ${BENCH_DIR}/.env"
 log "preflight OK. keys resolved."
 
 # ---- menhir-frontier lifecycle (stops on exit; Neo4j stays up) --------------

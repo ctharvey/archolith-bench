@@ -195,14 +195,14 @@ for raw in sys.argv[1:]:
 PY
 fi
 
-OPENAI_KEY="$("${MENHIR_MAIN_PY}" - "${MENHIR_MAIN}/.env" OPENAI_API_KEY <<'PY'
+OPENAI_KEY="$("${MENHIR_MAIN_PY}" - "${BENCH_DIR}/.env" OPENAI_API_KEY <<'PY'
 import sys
 from dotenv import dotenv_values
 
 print(dotenv_values(sys.argv[1]).get(sys.argv[2], ""))
 PY
 )"
-[ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY in menhir .env"
+[ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY in ${BENCH_DIR}/.env"
 
 log "preflight PASS: arm=${ARM} run=${RUN_ID} fresh=${LME_REQUIRE_FRESH} scalar=1 scalar_history=${LME_SCALAR_HISTORY_ENABLED} threshold=${LME_SCALAR_THRESHOLD} reconcile=${LME_SCALAR_RECONCILE_ATTRIBUTE}/${LME_SCALAR_RECONCILE_SCOPE}/${LME_SCALAR_RECONCILE_SUBJECT} authority=${LME_SCALAR_VIEW_AUTHORITY_ENABLED} event_history=${MENHIR_PERSONAL_MEMORY_EVENT_HISTORY_ENABLED}/${MENHIR_PERSONAL_MEMORY_EVENT_HISTORY_AUTHORITY_ENABLED} deterministic_router_shadow=${MENHIR_PERSONAL_MEMORY_SCALAR_DETERMINISTIC_ROUTER}/${MENHIR_PERSONAL_MEMORY_SCALAR_DETERMINISTIC_SHADOW} turn_evidence=${LME_REQUIRE_TURN_EVIDENCE} audits=${LME_CONSOLIDATION_AUDIT_ENABLED}/${LME_RECALL_AUDIT_ENABLED} ingest_concurrency=${LME_INGEST_CONCURRENCY} checkpoint_items=${LME_KU_CHECKPOINT_ITEMS}"
 

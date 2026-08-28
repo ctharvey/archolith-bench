@@ -18,7 +18,7 @@ Usage:
     # Resume after interruption
     python reflection_rescue_survey.py --resume
 
-Requires OPENAI_API_KEY in environment or in menhir/.env.
+Requires OPENAI_API_KEY in the environment or archolith-bench/.env.
 """
 from __future__ import annotations
 
@@ -35,11 +35,10 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent          # analysis/
 LME_DIR = SCRIPT_DIR.parent                            # scripts/longmemeval/
 BENCH_ROOT = LME_DIR.parents[1]                        # archolith-bench/
-MENHIR_DIR = BENCH_ROOT.parent / "menhir"
 
-# Load OPENAI_API_KEY from menhir/.env if not already set.
+# Load OPENAI_API_KEY from Bench's own .env if not already set.
 if not os.environ.get("OPENAI_API_KEY"):
-    env_path = MENHIR_DIR / ".env"
+    env_path = BENCH_ROOT / ".env"
     if env_path.exists():
         for line in env_path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
@@ -48,7 +47,7 @@ if not os.environ.get("OPENAI_API_KEY"):
                 break
 
 if not os.environ.get("OPENAI_API_KEY"):
-    print("ERROR: OPENAI_API_KEY not found in environment or menhir/.env", file=sys.stderr)
+    print("ERROR: OPENAI_API_KEY not found in environment or archolith-bench/.env", file=sys.stderr)
     sys.exit(1)
 
 from openai import AsyncOpenAI  # noqa: E402

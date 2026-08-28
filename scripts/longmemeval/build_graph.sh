@@ -27,10 +27,10 @@ if [ "${LME_INGEST_STOP_AFTER_ITEMS}" -gt 0 ]; then
   INGEST_TARGET="${LME_INGEST_STOP_AFTER_ITEMS}"
 fi
 
-OPENAI_KEY="$("${MENHIR_FRONTIER_PY}" - "${MENHIR_FRONTIER}/.env" OPENAI_API_KEY <<'PY'
+OPENAI_KEY="$("${MENHIR_FRONTIER_PY}" - "${BENCH_DIR}/.env" OPENAI_API_KEY <<'PY'
 import sys; from dotenv import dotenv_values; print(dotenv_values(sys.argv[1]).get(sys.argv[2],""))
 PY
-)"; [ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY"
+)"; [ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY in ${BENCH_DIR}/.env"
 
 # ---- persistent Neo4j (reuse if already up) ----
 # Freshness provenance: "graph_fresh" must mean the DATA is new, not just that the

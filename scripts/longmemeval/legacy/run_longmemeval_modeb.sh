@@ -134,9 +134,9 @@ docker version --format '{{.Server.Version}}' >/dev/null 2>&1 \
 [ -e "${BENCH_BIN}" ] || [ -e "${BENCH_BIN}.exe" ] || die "archolith-bench not installed -- create ${BENCH_DIR}/.venv and 'pip install -e .[longmemeval]'"
 
 DEEPSEEK_KEY="$(read_env_val "${DELEGATE_ENV}" DELEGATE_API_KEY)"
-OPENAI_KEY="$(read_env_val "${MENHIR_DIR}/.env" OPENAI_API_KEY)"
+OPENAI_KEY="$(read_env_val "${BENCH_DIR}/.env" OPENAI_API_KEY)"
 [ -n "${DEEPSEEK_KEY}" ] || die "DELEGATE_API_KEY (deepseek) not found in ${DELEGATE_ENV}"
-[ -n "${OPENAI_KEY}" ]   || die "OPENAI_API_KEY not found in ${MENHIR_DIR}/.env"
+[ -n "${OPENAI_KEY}" ]   || die "OPENAI_API_KEY not found in ${BENCH_DIR}/.env"
 log "secrets resolved: deepseek=set(len=${#DEEPSEEK_KEY}) openai=set(len=${#OPENAI_KEY})"
 
 if [ "${CHECK_ONLY}" = "1" ]; then

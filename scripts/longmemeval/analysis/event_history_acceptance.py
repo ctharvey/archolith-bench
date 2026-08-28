@@ -123,17 +123,17 @@ def normalize_reference_time(raw: str) -> str:
     return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _load_key(menhir_root: Path) -> str:
+def _load_key(_menhir_root: Path) -> str:
     key = os.environ.get("OPENAI_API_KEY")
     if key:
         return key.strip()
-    env_path = menhir_root / ".env"
+    env_path = REPO_ROOT / ".env"
     if env_path.is_file():
         for raw in env_path.read_text(encoding="utf-8").splitlines():
             line = raw.strip()
             if line.startswith("OPENAI_API_KEY="):
                 return line[len("OPENAI_API_KEY="):].strip().strip('"').strip("'")
-    raise EventHistoryRunnerError("OPENAI_API_KEY not set and not found in menhir/.env")
+    raise EventHistoryRunnerError("OPENAI_API_KEY not set and not found in archolith-bench/.env")
 
 
 def load_source_fixture(source_fixture: str | Path) -> list[dict[str, Any]]:

@@ -95,11 +95,11 @@ log "build complete"
 # ---- Phase 2: recall+QA scoring ----
 log "======== PHASE 2: RECALL+QA SCORING ========"
 
-OPENAI_KEY="$("${MENHIR_MAIN_PY}" - "${MENHIR_MAIN}/.env" OPENAI_API_KEY <<'PY'
+OPENAI_KEY="$("${MENHIR_MAIN_PY}" - "${BENCH_DIR}/.env" OPENAI_API_KEY <<'PY'
 import sys; from dotenv import dotenv_values; print(dotenv_values(sys.argv[1]).get(sys.argv[2],""))
 PY
 )"
-[ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY in menhir .env"
+[ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY in ${BENCH_DIR}/.env"
 
 RECALL_PORT="${LME_KU_ADAPTIVE_RECALL_PORT:-8131}"
 RECALL_URL="http://localhost:${RECALL_PORT}"

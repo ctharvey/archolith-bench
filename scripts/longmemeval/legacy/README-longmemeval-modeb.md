@@ -15,7 +15,7 @@ Driver: `scripts/run_longmemeval_modeb.sh` (orchestrates everything below).
 
 Secrets are read at runtime, never committed:
 - DeepSeek key ← `cth.mcp.delegate/.env:DELEGATE_API_KEY`
-- OpenAI key ← `menhir/.env:OPENAI_API_KEY`
+- OpenAI key ← `archolith-bench/.env:OPENAI_API_KEY`
 
 ## Why no code change was needed for `MENHIR_BENCHMARK_MODE`
 

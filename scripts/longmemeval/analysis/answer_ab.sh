@@ -17,11 +17,11 @@ OUT="${AB_OUT:-${LME_RESULTS_DIR%/lme-ingest}/lme-answer-ab}"; mkdir -p "$OUT"
 SOURCE_TAG="perception-lme"
 docker start "$NAME" >/dev/null 2>&1
 
-KEY="$("$PY" - "${SRC}/.env" OPENAI_API_KEY <<'PYK'
+KEY="$("$PY" - "${BENCH_DIR}/.env" OPENAI_API_KEY <<'PYK'
 import sys; from dotenv import dotenv_values; print(dotenv_values(sys.argv[1]).get(sys.argv[2],""))
 PYK
 )"
-[ -n "$KEY" ] || { echo "no OPENAI key in ${SRC}/.env" >&2; exit 1; }
+[ -n "$KEY" ] || { echo "no OPENAI key in ${BENCH_DIR}/.env" >&2; exit 1; }
 
 del_views(){ "$PY" - "$BOLT" "$PW" "$SOURCE_TAG" <<'PYC'
 import sys

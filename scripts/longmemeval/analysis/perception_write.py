@@ -16,7 +16,7 @@ Cleanup (all writes carry source='perception-capstone'):
 
 Env: LME_BOLT (bolt://localhost:7689), LME_NEO4J_PW, PC_MODEL=gpt-4o-mini, PC_TEMP=0.7, PC_K=5,
      PC_THRESHOLD=1.0, PC_COUNT_LIMIT=14, PC_HELDOUT_LIMIT=12, PC_OUT (~/perception-write.json).
-     OPENAI_API_KEY else menhir/.env. STOP on 429 per protocol.
+     OPENAI_API_KEY else archolith-bench/.env. STOP on 429 per protocol.
 """
 
 from __future__ import annotations

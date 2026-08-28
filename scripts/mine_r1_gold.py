@@ -62,7 +62,8 @@ from pathlib import Path
 
 DUMMY_URI = "bolt://localhost:7687"
 DUMMY_AUTH = ("neo4j", "menhirdummy123")
-MENHIR_ENV = Path(r"C:\Users\thron\IdeaProjects\projects\archolith\menhir\.env")
+REPO_ROOT = Path(__file__).resolve().parent.parent
+BENCH_ENV = REPO_ROOT / ".env"
 
 # Names too generic to be a fair retrieval target (ambiguous / ubiquitous).
 _STOP_NAMES = {
@@ -100,14 +101,14 @@ def _describe_query(name: str, body: str, client) -> tuple[str, str]:
 
 
 def _load_openai_key() -> str:
-    """OPENAI_API_KEY from the env, falling back to menhir/.env."""
+    """OPENAI_API_KEY from the environment, falling back to Bench's .env."""
     key = os.environ.get("OPENAI_API_KEY")
-    if not key and MENHIR_ENV.exists():
+    if not key and BENCH_ENV.exists():
         from dotenv import dotenv_values
 
-        key = dotenv_values(str(MENHIR_ENV)).get("OPENAI_API_KEY")
+        key = dotenv_values(str(BENCH_ENV)).get("OPENAI_API_KEY")
     if not key:
-        raise SystemExit("--paraphrase needs OPENAI_API_KEY (env or menhir/.env)")
+        raise SystemExit("--paraphrase needs OPENAI_API_KEY (env or archolith-bench/.env)")
     return key
 
 

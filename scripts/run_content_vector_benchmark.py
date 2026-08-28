@@ -47,7 +47,7 @@ from archolith_bench.r1.runner import ConditionResult, evaluate_win_gate  # noqa
 
 
 def _load_env() -> None:
-    for key, value in dotenv_values(MENHIR / ".env").items():
+    for key, value in dotenv_values(ROOT / ".env").items():
         if value is not None:
             os.environ[key] = value
     os.environ.update({

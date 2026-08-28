@@ -36,7 +36,6 @@ from pathlib import Path
 from time import perf_counter
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-MENHIR_DIR = Path(r"C:\Users\thron\IdeaProjects\projects\archolith\menhir")
 MENHIR_FRONTIER_SRC = Path(r"C:\Users\thron\IdeaProjects\projects\archolith\menhir-frontier") / "src"
 THROWAWAY_URI = "bolt://localhost:7688"
 GROUP = "r1_bench"
@@ -46,10 +45,10 @@ if str(REPO_ROOT) not in sys.path:
 
 
 def _bootstrap_env() -> None:
-    """Reuse menhir's openai/nano config but FORCE the throwaway Neo4j. Never prod."""
+    """Load Bench's provider config but FORCE the throwaway Neo4j. Never prod."""
     from dotenv import dotenv_values
 
-    cfg = dotenv_values(str(MENHIR_DIR / ".env"))
+    cfg = dotenv_values(str(REPO_ROOT / ".env"))
     for k, v in cfg.items():
         if v is not None and k not in os.environ:
             os.environ[k] = v
@@ -70,7 +69,7 @@ def _bootstrap_env() -> None:
     if os.environ["NEO4J_URI"] != THROWAWAY_URI:  # defense in depth
         sys.exit("refusing to run: NEO4J_URI is not the throwaway (7688)")
     if not os.environ.get("OPENAI_API_KEY"):
-        sys.exit("OPENAI_API_KEY not found in menhir/.env")
+        sys.exit("OPENAI_API_KEY not found in archolith-bench/.env")
     # frontier src first (R0 trace lives there), then the main worktree.
     sys.path.insert(0, str(MENHIR_FRONTIER_SRC))
 

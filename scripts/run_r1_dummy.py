@@ -36,7 +36,6 @@ from pathlib import Path
 from time import perf_counter
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-MENHIR_DIR = Path(r"C:\Users\thron\IdeaProjects\projects\archolith\menhir")
 MENHIR_FRONTIER_SRC = Path(r"C:\Users\thron\IdeaProjects\projects\archolith\menhir-frontier") / "src"
 DUMMY_URI = "bolt://localhost:7687"
 DUMMY_USER = "neo4j"
@@ -47,10 +46,10 @@ if str(REPO_ROOT) not in sys.path:
 
 
 def _bootstrap_env() -> None:
-    """Reuse menhir's openai config but FORCE the dummy Neo4j. Read-only; never prod."""
+    """Load Bench's provider config but FORCE the dummy Neo4j. Read-only; never prod."""
     from dotenv import dotenv_values
 
-    cfg = dotenv_values(str(MENHIR_DIR / ".env"))
+    cfg = dotenv_values(str(REPO_ROOT / ".env"))
     for k, v in cfg.items():
         if v is not None and k not in os.environ:
             os.environ[k] = v
@@ -74,7 +73,7 @@ def _bootstrap_env() -> None:
     if os.environ["NEO4J_URI"] != DUMMY_URI:  # defense in depth
         sys.exit("refusing to run: NEO4J_URI is not the dummy (7687)")
     if not os.environ.get("OPENAI_API_KEY"):
-        sys.exit("OPENAI_API_KEY not found in menhir/.env (needed for query embeddings)")
+        sys.exit("OPENAI_API_KEY not found in archolith-bench/.env (needed for query embeddings)")
     sys.path.insert(0, str(MENHIR_FRONTIER_SRC))  # frontier src first (R0 trace + hybrid live here)
 
 

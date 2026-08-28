@@ -8,11 +8,12 @@ ARCH=/c/Users/thron/IdeaProjects/projects/archolith
 BENCH="$ARCH/archolith-bench"
 BENCH_PY="$BENCH/.venv/Scripts/python.exe"
 BENCH_BIN="$BENCH/.venv/Scripts/archolith-bench"
-KEY_PY="$ARCH/menhir/.venv/Scripts/python.exe"
-OPENAI_KEY="$("$KEY_PY" - "$ARCH/menhir/.env" OPENAI_API_KEY <<'PY'
+KEY_PY="$BENCH_PY"
+OPENAI_KEY="$("$KEY_PY" - "$BENCH/.env" OPENAI_API_KEY <<'PY'
 import sys; from dotenv import dotenv_values; print(dotenv_values(sys.argv[1]).get(sys.argv[2],""))
 PY
 )"
+[ -n "$OPENAI_KEY" ] || { echo "no OPENAI_API_KEY in $BENCH/.env" >&2; exit 1; }
 LOG="${LME_BUILDOUT_LOG:-$BENCH/results/lme-slice-ab.log}"; mkdir -p "$(dirname "$LOG")"
 log(){ printf '[slice] %s %s\n' "$(date '+%F %H:%M:%S')" "$*" >> "$LOG"; }
 

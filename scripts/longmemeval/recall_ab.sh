@@ -65,10 +65,10 @@ fi
 VARIANT="$(basename "${SRC_DIR}")"
 RUN_OUTPUT_DIR="${BENCH_DIR}/results/lme-recall-${VARIANT}"; mkdir -p "${RUN_OUTPUT_DIR}"
 
-OPENAI_KEY="$("${MENHIR_MAIN_PY}" - "${MENHIR_MAIN}/.env" OPENAI_API_KEY <<'PY'
+OPENAI_KEY="$("${MENHIR_MAIN_PY}" - "${BENCH_DIR}/.env" OPENAI_API_KEY <<'PY'
 import sys; from dotenv import dotenv_values; print(dotenv_values(sys.argv[1]).get(sys.argv[2],""))
 PY
-)"; [ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY in ${MENHIR_MAIN}/.env"
+)"; [ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY in ${BENCH_DIR}/.env"
 
 # ---- ensure the PRE-BUILT Neo4j is up (reuse only; never create, never reset) ----
 lme_container_running "${LME_NEO4J_NAME}" \

@@ -13,7 +13,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../config.sh"
 PER="${LME_PER_TYPE:-15}"
 PORT="${LME_PORT_MATRIX}"
 URL="http://localhost:$PORT"
-KEY="$("${MENHIR_MAIN_PY}" - "${MENHIR_MAIN}/.env" OPENAI_API_KEY <<'PY'
+KEY="$("${MENHIR_MAIN_PY}" - "${BENCH_DIR}/.env" OPENAI_API_KEY <<'PY'
 import sys; from dotenv import dotenv_values; print(dotenv_values(sys.argv[1]).get(sys.argv[2],""))
 PY
 )"

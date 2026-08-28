@@ -8,7 +8,7 @@ PORT=8104; URL="http://localhost:$PORT"
 NS="${1:-lme-gpt4_2655b836}"
 Q="${2:-What was the first issue I had with my new car after its first service?}"
 
-KEY="$("${MENHIR_MAIN_PY}" - "${MENHIR_MAIN}/.env" OPENAI_API_KEY <<'PY'
+KEY="$("${MENHIR_MAIN_PY}" - "${BENCH_DIR}/.env" OPENAI_API_KEY <<'PY'
 import sys; from dotenv import dotenv_values; print(dotenv_values(sys.argv[1]).get(sys.argv[2],""))
 PY
 )"

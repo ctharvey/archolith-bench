@@ -51,10 +51,10 @@ die(){ printf '[scalar-e2e] ERROR: %s\n' "$*" >&2; exit 1; }
   "${BENCH_PY}" -m pip install -e "${BENCH_DIR}[menhir-scalar]" >/dev/null
 }
 
-OPENAI_KEY="$("${MENHIR_MAIN_PY}" - "${MENHIR_MAIN}/.env" OPENAI_API_KEY <<'PY'
+OPENAI_KEY="$("${MENHIR_MAIN_PY}" - "${BENCH_DIR}/.env" OPENAI_API_KEY <<'PY'
 import sys; from dotenv import dotenv_values; print(dotenv_values(sys.argv[1]).get(sys.argv[2],""))
 PY
-)"; [ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY in ${MENHIR_MAIN}/.env"
+)"; [ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY in ${BENCH_DIR}/.env"
 
 MENHIR_PID=""
 cleanup(){

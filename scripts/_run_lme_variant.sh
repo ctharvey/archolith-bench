@@ -25,7 +25,7 @@ PY
 }
 
 [ "${VARIANT}" = "main" ] || [ "${VARIANT}" = "frontier" ] || die "variant must be main|frontier"
-OPENAI_KEY="$(rdval "${MENHIR_DIR}/.env" OPENAI_API_KEY)"; [ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY"
+OPENAI_KEY="$(rdval "${BENCH_DIR}/.env" OPENAI_API_KEY)"; [ -n "${OPENAI_KEY}" ] || die "no OPENAI_API_KEY in ${BENCH_DIR}/.env"
 RUN_OUTPUT_DIR="${BENCH_DIR}/results/lme-${VARIANT}"; mkdir -p "${RUN_OUTPUT_DIR}"
 
 MENHIR_PID=""

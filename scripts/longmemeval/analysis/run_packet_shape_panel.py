@@ -323,7 +323,7 @@ def _key() -> str:
     key = os.environ.get("OPENAI_API_KEY")
     if key:
         return key
-    return str(dotenv_values(MENHIR_DIR / ".env").get("OPENAI_API_KEY") or "")
+    return str(dotenv_values(BENCH_DIR / ".env").get("OPENAI_API_KEY") or "")
 
 
 def _result_rows(data: dict[str, Any]) -> list[dict[str, Any]]:

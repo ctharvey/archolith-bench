@@ -26,7 +26,7 @@ cleanup(){ [ -n "$PID" ] && kill "$PID" 2>/dev/null || true; }
 trap cleanup EXIT
 
 if [ "$MODE" != "floor" ]; then
-  KEY="$("$PY" - "${SRC}/.env" OPENAI_API_KEY <<'PYK'
+  KEY="$("$PY" - "${BENCH_DIR}/.env" OPENAI_API_KEY <<'PYK'
 import sys; from dotenv import dotenv_values; print(dotenv_values(sys.argv[1]).get(sys.argv[2],""))
 PYK
 )"

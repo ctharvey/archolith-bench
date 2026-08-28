@@ -18,6 +18,7 @@ import json
 import statistics
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 # --- Corpus: conversation episodes with gold entities + gold facts (substring-scored). ---
 CORPUS: list[dict] = [
@@ -430,7 +431,7 @@ def default_targets(full: bool = False) -> list[dict]:
     """
     import os
 
-    menhir_env = r"C:\Users\thron\IdeaProjects\projects\archolith\menhir\.env"
+    bench_env = str(Path(__file__).resolve().parent.parent / ".env")
     delegate_env = r"C:\Users\thron\IdeaProjects\projects\ctharvey\cth.mcp.delegate\.env"
 
     def _key(*envvars: str, files_keys: tuple[tuple[str, str], ...] = ()) -> str:
@@ -444,13 +445,13 @@ def default_targets(full: bool = False) -> list[dict]:
                 return val
         return ""
 
-    openai_key = _key("OPENAI_API_KEY", files_keys=((menhir_env, "OPENAI_API_KEY"),))
+    openai_key = _key("OPENAI_API_KEY", files_keys=((bench_env, "OPENAI_API_KEY"),))
     deepseek_key = _key("DEEPSEEK_API_KEY", files_keys=((delegate_env, "DELEGATE_API_KEY"),))
-    groq_key = _key("GROQ_API_KEY", files_keys=((menhir_env, "GROQ_API_KEY"),))
+    groq_key = _key("GROQ_API_KEY", files_keys=((bench_env, "GROQ_API_KEY"),))
     gemini_key = _key("GEMINI_API_KEY", "GOOGLE_API_KEY",
-                      files_keys=((menhir_env, "GEMINI_API_KEY"), (menhir_env, "GOOGLE_API_KEY")))
-    cerebras_key = _key("CEREBRAS_API_KEY", files_keys=((menhir_env, "CEREBRAS_API_KEY"),))
-    openrouter_key = _key("OPENROUTER_API_KEY", files_keys=((menhir_env, "OPENROUTER_API_KEY"),))
+                      files_keys=((bench_env, "GEMINI_API_KEY"), (bench_env, "GOOGLE_API_KEY")))
+    cerebras_key = _key("CEREBRAS_API_KEY", files_keys=((bench_env, "CEREBRAS_API_KEY"),))
+    openrouter_key = _key("OPENROUTER_API_KEY", files_keys=((bench_env, "OPENROUTER_API_KEY"),))
     _or = "https://openrouter.ai/api/v1"
 
     candidates = [

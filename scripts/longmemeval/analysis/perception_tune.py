@@ -24,7 +24,7 @@ held-out. Recall (correct commits) is the free variable; precision is the constr
 
 API-RATE PROTOCOL: on a 429 we STOP immediately and report — never keep hammering the key.
 
-Env: OPENAI_API_KEY (else read from menhir/.env), PT_MODEL=gpt-4o-mini, PT_TEMP=0.7, PT_K=5,
+Env: OPENAI_API_KEY (else read from archolith-bench/.env), PT_MODEL=gpt-4o-mini, PT_TEMP=0.7, PT_K=5,
      PT_THRESHOLDS=0.6,0.8,1.0, PT_COUNT_LIMIT=14, PT_HELDOUT_LIMIT=12, PT_EMBED=1 (dedup on),
      PT_CROSS=1 (Lever B cross-check on; 0 = prior baseline), PT_OUT (~/perception-tune.json).
      Reuses entropy._items/_evidence_prefixes for the same slice.
@@ -72,17 +72,15 @@ def _load_key() -> str:
     key = os.getenv("OPENAI_API_KEY")
     if key:
         return key
-    for env in (
-        os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "menhir", ".env"),
-        os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "menhir-frontier", ".env"),
-    ):
-        try:
-            for line in open(os.path.abspath(env), encoding="utf-8"):
+    env = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".env"))
+    try:
+        with open(env, encoding="utf-8") as handle:
+            for line in handle:
                 if line.startswith("OPENAI_API_KEY"):
                     return line.split("=", 1)[1].strip().strip('"').strip("'")
-        except OSError:
-            continue
-    raise SystemExit("OPENAI_API_KEY not set and not found in menhir/.env")
+    except OSError:
+        pass
+    raise SystemExit("OPENAI_API_KEY not set and not found in archolith-bench/.env")
 
 
 def _rate_limit_stop(exc: Exception) -> None:

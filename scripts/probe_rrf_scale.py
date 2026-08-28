@@ -21,15 +21,16 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-MENHIR_DIR = Path(r"C:\Users\thron\IdeaProjects\projects\archolith\menhir")
+REPO_ROOT = Path(__file__).resolve().parent.parent
+MENHIR_DIR = REPO_ROOT.parent / "menhir"
 
 
 def _bootstrap_env() -> None:
-    # Reuse menhir's known-good openai config (LLM/embed/reranker = openai, gpt-4.1-nano),
+    # Load Bench's provider config (LLM/embed/reranker = openai, gpt-4.1-nano),
     # then OVERRIDE neo4j to the throwaway. Telemetry/scheduler off to avoid event-loop stalls.
     from dotenv import dotenv_values
 
-    cfg = dotenv_values(str(MENHIR_DIR / ".env"))
+    cfg = dotenv_values(str(REPO_ROOT / ".env"))
     for k, v in cfg.items():
         if v is not None and k not in os.environ:
             os.environ[k] = v
@@ -49,7 +50,7 @@ def _bootstrap_env() -> None:
     for k in ("LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_HOST"):
         os.environ[k] = ""
     if not os.environ.get("OPENAI_API_KEY"):
-        sys.exit("OPENAI_API_KEY not found in menhir/.env")
+        sys.exit("OPENAI_API_KEY not found in archolith-bench/.env")
     # import menhir from the main worktree's editable install
     sys.path.insert(0, str(MENHIR_DIR / "src"))
 
